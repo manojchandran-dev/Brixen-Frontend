@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"d:\\\\Manoj\\\\Projects\\\\Personal\\\\Projects\\\\brixen\" -Force)",
+      "Bash(Select-Object Name)",
+      "Bash(flutter test *)",
+      "Bash(flutter pub *)",
+      "Bash(pg_isready -U postgres)",
+      "Bash(psql -U postgres -c \"\\\\l\")",
+      "PowerShell($pgData = \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\data\"; if \\(Test-Path \"$pgData\\\\pg_hba.conf\"\\) { Get-Content \"$pgData\\\\pg_hba.conf\" | Where-Object { $_ -notmatch \"^#\" -and $_.Trim\\(\\) -ne \"\" } })"
+    ]
+  }
+}

@@ -1,0 +1,80 @@
+import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
+
+enum AttendanceStatus { present, absent, leave, halfDay }
+
+extension AttendanceStatusX on AttendanceStatus {
+  String get label {
+    switch (this) {
+      case AttendanceStatus.present:  return 'Present';
+      case AttendanceStatus.absent:   return 'Absent';
+      case AttendanceStatus.leave:    return 'Leave';
+      case AttendanceStatus.halfDay:  return 'Half Day';
+    }
+  }
+
+  Color get color {
+    switch (this) {
+      case AttendanceStatus.present:  return const Color(0xFF059669); // deep emerald
+      case AttendanceStatus.absent:   return const Color(0xFFBE185D); // deep rose
+      case AttendanceStatus.leave:    return const Color(0xFFB45309); // antique gold
+      case AttendanceStatus.halfDay:  return const Color(0xFF4361EE); // deep indigo
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case AttendanceStatus.present:  return Icons.check_circle_rounded;
+      case AttendanceStatus.absent:   return Icons.cancel_rounded;
+      case AttendanceStatus.leave:    return Icons.beach_access_rounded;
+      case AttendanceStatus.halfDay:  return Icons.timelapse_rounded;
+    }
+  }
+}
+
+class AttendanceRecord extends Equatable {
+  final String id;
+  final String employeeId;
+  final String employeeName;
+  final DateTime date;
+  final TimeOfDay? inTime;
+  final TimeOfDay? outTime;
+  final AttendanceStatus status;
+  final String? note;
+
+  const AttendanceRecord({
+    required this.id,
+    required this.employeeId,
+    required this.employeeName,
+    required this.date,
+    required this.status,
+    this.inTime,
+    this.outTime,
+    this.note,
+  });
+
+  AttendanceRecord copyWith({
+    String? id,
+    String? employeeId,
+    String? employeeName,
+    DateTime? date,
+    TimeOfDay? inTime,
+    TimeOfDay? outTime,
+    AttendanceStatus? status,
+    String? note,
+  }) {
+    return AttendanceRecord(
+      id: id ?? this.id,
+      employeeId: employeeId ?? this.employeeId,
+      employeeName: employeeName ?? this.employeeName,
+      date: date ?? this.date,
+      status: status ?? this.status,
+      inTime: inTime ?? this.inTime,
+      outTime: outTime ?? this.outTime,
+      note: note ?? this.note,
+    );
+  }
+
+  @override
+  List<Object?> get props => [id, employeeId, date];
+}
