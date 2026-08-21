@@ -20,34 +20,61 @@ class CompaniesRepositoryImpl implements CompaniesRepository {
 
   @override
   Future<Company> createCompany(Company company) {
-    final body = {
-      'name': company.name,
-      'owner_name': company.ownerName,
-      'email': company.email,
-      if (company.code != null) 'code': company.code,
-      if (company.phone != null) 'phone': company.phone,
-      if (company.address != null) 'address': company.address,
-      if (company.city != null) 'city': company.city,
-      if (company.state != null) 'state': company.state,
-      if (company.country != null) 'country': company.country,
-      if (company.pincode != null) 'pincode': company.pincode,
-      if (company.industryType != null) 'industry_type': company.industryType,
+    // Step 1: identity fields only — server auto-generates company_code
+    final body = <String, dynamic>{
+      'company_name': company.name,
       if (company.entityType != null) 'entity_type': company.entityType,
-      if (company.panNumber != null) 'pan_number': company.panNumber,
-      if (company.subscriptionPlan != null) 'subscription_plan': company.subscriptionPlan,
-      'is_active': company.isActive,
+      if (company.industryType != null) 'industry_type': company.industryType,
+      if (company.gstNumber != null && company.gstNumber!.isNotEmpty)
+        'gst_number': company.gstNumber,
+      if (company.panNumber != null && company.panNumber!.isNotEmpty)
+        'pan_card': company.panNumber,
     };
     return _ds.createCompany(body);
   }
 
   @override
-  Future<Company> updateCompany(String id, Company company) {
-    final body = {
-      'name': company.name,
+  Future<Company> updateCompanyStep2(String id, Company company) {
+    final body = <String, dynamic>{
       'owner_name': company.ownerName,
-      'email': company.email,
-      if (company.code != null) 'code': company.code,
-      if (company.phone != null) 'phone': company.phone,
+      if (company.email != null && company.email!.isNotEmpty) 'email': company.email,
+      if (company.phone != null && company.phone!.isNotEmpty) 'phone': company.phone,
+      if (company.secondaryEmail != null && company.secondaryEmail!.isNotEmpty)
+        'secondary_email': company.secondaryEmail,
+      if (company.website != null && company.website!.isNotEmpty) 'website': company.website,
+    };
+    return _ds.updateCompanyStep2(id, body);
+  }
+
+  @override
+  Future<Company> updateCompanyStep3(String id, Company company) {
+    final body = <String, dynamic>{
+      if (company.address != null) 'address': company.address,
+      if (company.city != null) 'city': company.city,
+      if (company.state != null) 'state': company.state,
+      if (company.pincode != null) 'pincode': company.pincode,
+    };
+    return _ds.updateCompanyStep3(id, body);
+  }
+
+  @override
+  Future<Company> updateCompanyStatus(String id, bool isActive) =>
+      _ds.updateCompanyStatus(id, isActive ? 'active' : 'inactive');
+
+  @override
+  Future<Company> updateCompany(String id, Company company) {
+    final body = <String, dynamic>{
+      'company_name': company.name,
+      'owner_name': company.ownerName,
+      if (company.email != null && company.email!.isNotEmpty) 'email': company.email,
+      if (company.phone != null && company.phone!.isNotEmpty) 'phone': company.phone,
+      if (company.secondaryEmail != null && company.secondaryEmail!.isNotEmpty)
+        'secondary_email': company.secondaryEmail,
+      if (company.website != null && company.website!.isNotEmpty) 'website': company.website,
+      if (company.gstNumber != null && company.gstNumber!.isNotEmpty)
+        'gst_number': company.gstNumber,
+      if (company.panNumber != null && company.panNumber!.isNotEmpty)
+        'pan_card': company.panNumber,
       if (company.address != null) 'address': company.address,
       if (company.city != null) 'city': company.city,
       if (company.state != null) 'state': company.state,
@@ -55,9 +82,8 @@ class CompaniesRepositoryImpl implements CompaniesRepository {
       if (company.pincode != null) 'pincode': company.pincode,
       if (company.industryType != null) 'industry_type': company.industryType,
       if (company.entityType != null) 'entity_type': company.entityType,
-      if (company.panNumber != null) 'pan_number': company.panNumber,
       if (company.subscriptionPlan != null) 'subscription_plan': company.subscriptionPlan,
-      'is_active': company.isActive,
+      'status': company.isActive ? 'active' : 'inactive',
     };
     return _ds.updateCompany(id, body);
   }

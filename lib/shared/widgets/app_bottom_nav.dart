@@ -5,10 +5,15 @@ import '../../core/router/app_router.dart';
 
 class AppBottomNav extends StatelessWidget {
   final int activeIndex;
-  const AppBottomNav({super.key, required this.activeIndex});
+  final ValueChanged<int>? onTap;
+  const AppBottomNav({super.key, required this.activeIndex, this.onTap});
 
   void _onTap(BuildContext context, int index) {
     if (index == activeIndex) return;
+    if (onTap != null) {
+      onTap!(index);
+      return;
+    }
     switch (index) {
       case 0:
       case 1:
@@ -21,39 +26,46 @@ class AppBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      color: Colors.transparent,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-          child: Container(
-            height: 64,
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.surface : AppColors.lightSurface,
-              borderRadius: BorderRadius.circular(36),
-              border: Border.all(color: Theme.of(context).dividerColor),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  blurRadius: 20,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                _NavBtn(icon: Icons.dashboard_outlined,    activeIcon: Icons.dashboard_rounded,           label: 'Dashboard',  isActive: activeIndex == 0, onTap: () => _onTap(context, 0)),
-                _NavBtn(icon: Icons.access_time_outlined,  activeIcon: Icons.access_time_filled_rounded,  label: 'Attendance', isActive: activeIndex == 1, onTap: () => _onTap(context, 1)),
-                _NavBtn(icon: Icons.bar_chart_outlined,    activeIcon: Icons.bar_chart_rounded,           label: 'Report',     isActive: activeIndex == 2, onTap: () => _onTap(context, 2)),
-                _NavBtn(icon: Icons.grid_view_outlined,    activeIcon: Icons.grid_view_rounded,           label: 'Menu',       isActive: activeIndex == 3, onTap: () => _onTap(context, 3)),
-              ],
-            ),
+    // NOTE: no transparent ColoredBox wrapper here — with `extendBody: true`
+    // this widget is stretched to the full Scaffold height, and a
+    // Container(color: ...) — even fully transparent — always intercepts
+    // hit-testing across its whole bounds, silently swallowing every tap
+    // (including the AppBar's hamburger) outside the actual nav pill.
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Container(
+          height: 64,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.surface : AppColors.black,
+            borderRadius: BorderRadius.circular(36),
+            border: isDark ? Border.all(color: Theme.of(context).dividerColor) : null,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _NavBtn(icon: Icons.dashboard_outlined,    activeIcon: Icons.dashboard_rounded,           label: 'Dashboard',  isActive: activeIndex == 0, onTap: () => _onTap(context, 0)),
+              // Attendance module disabled for now — uncomment to re-enable.
+              // _NavBtn(icon: Icons.access_time_outlined,  activeIcon: Icons.access_time_filled_rounded,  label: 'Attendance', isActive: activeIndex == 1, onTap: () => _onTap(context, 1)),
+              _NavBtn(icon: Icons.bar_chart_outlined,    activeIcon: Icons.bar_chart_rounded,           label: 'Report',     isActive: activeIndex == 2, onTap: () => _onTap(context, 2)),
+              _NavBtn(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded,             label: 'More',       isActive: activeIndex == 3, onTap: () => _onTap(context, 3)),
+            ],
           ),
         ),
       ),
     );
   }
 }
+
 
 class _NavBtn extends StatelessWidget {
   final IconData icon;
@@ -73,9 +85,38 @@ class _NavBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final inactiveColor = isDark ? AppColors.textSecondary : AppColors.lightTextHint;
-    final activePillColor = isDark ? null : AppColors.lightTextPrimary;
-    final activeContentColor = isDark ? AppColors.black : AppColors.white;
+
+    if (!isDark) {
+      // Light mode: black pill bar, active icon shown inside a filled green circle.
+      final iconColor = isActive ? AppColors.white : Colors.white.withValues(alpha: 0.5);
+      return SizedBox(
+        width: 52,
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: isActive ? AppColors.positive : null,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isActive ? activeIcon : icon,
+                size: 19,
+                color: iconColor,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Dark mode: unchanged — full pill glow.
+    const inactiveColor = AppColors.textSecondary;
+    const activeContentColor = AppColors.black;
 
     return Expanded(
       child: GestureDetector(
@@ -85,15 +126,12 @@ class _NavBtn extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           margin: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            gradient: (isActive && isDark) ? AppColors.silverGradient : null,
-            color: isActive ? activePillColor : Colors.transparent,
+            gradient: isActive ? AppColors.silverGradient : null,
             borderRadius: BorderRadius.circular(28),
             boxShadow: isActive
                 ? [
                     BoxShadow(
-                      color: isDark
-                          ? AppColors.silver.withValues(alpha: 0.22)
-                          : Colors.black.withValues(alpha: 0.25),
+                      color: AppColors.silver.withValues(alpha: 0.22),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),

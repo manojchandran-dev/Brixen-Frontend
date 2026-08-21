@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/app_bottom_nav.dart';
+import '../../../../shared/widgets/app_drawer.dart';
+import '../../../../shared/widgets/rich_card_shell.dart';
 import '../../domain/entities/purchase.dart';
 import '../providers/purchases_provider.dart';
 
@@ -33,6 +35,7 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
 
     return Scaffold(
       extendBody: true,
+      drawer: widget.fromMasters ? null : const AppDrawer(),
       bottomNavigationBar: const AppBottomNav(activeIndex: 3),
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -43,19 +46,43 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: Theme.of(context).dividerColor),
         ),
-        leading: GestureDetector(
-          onTap: () => widget.fromMasters ? context.pop() : context.go(AppRouter.companies),
-          child: Container(
-            margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              gradient: isDark ? AppColors.silverGradient : null,
-              color: isDark ? null : AppColors.lightTextPrimary,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.2), blurRadius: 6, offset: const Offset(0, 2))],
-            ),
-            child: Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: isDark ? AppColors.black : AppColors.white),
-          ),
-        ),
+        leading: widget.fromMasters
+            ? GestureDetector(
+                onTap: () => context.pop(),
+                child: Container(
+                  width: 40, height: 40,
+                  margin: const EdgeInsets.all(8),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: isDark ? cs.surfaceContainerHighest : AppColors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
+                      BoxShadow(color: AppColors.white.withValues(alpha: 0.8), blurRadius: 4, offset: const Offset(-2, -2)),
+                    ],
+                  ),
+                  child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
+                ),
+              )
+            : Builder(
+                builder: (ctx) => GestureDetector(
+                  onTap: () => Scaffold.of(ctx).openDrawer(),
+                  child: Container(
+                    width: 40, height: 40,
+                    margin: const EdgeInsets.all(8),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isDark ? cs.surfaceContainerHighest : AppColors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
+                        BoxShadow(color: AppColors.white.withValues(alpha: 0.8), blurRadius: 4, offset: const Offset(-2, -2)),
+                      ],
+                    ),
+                    child: const Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
+                  ),
+                ),
+              ),
         title: widget.fromMasters
             ? SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -79,12 +106,14 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
             onTap: () => context.push(AppRouter.createPurchase, extra: widget.fromMasters ? 'masters' : null),
             child: Container(
               margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
-              width: 36, height: 36,
+              width: 38, height: 38,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
-                gradient: isDark ? AppColors.silverGradient : null,
-                color: isDark ? null : AppColors.lightTextPrimary,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.2), blurRadius: 6, offset: const Offset(0, 2))],
+                gradient: isDark
+                    ? AppColors.silverGradient
+                    : const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.brand, AppColors.brandDeep]),
+                borderRadius: BorderRadius.circular(13),
+                boxShadow: [BoxShadow(color: AppColors.brand.withValues(alpha: isDark ? 0.0 : 0.4), blurRadius: 10, offset: const Offset(0, 4))],
               ),
               child: Icon(Icons.add_rounded, size: 20, color: isDark ? AppColors.black : AppColors.white),
             ),
@@ -95,20 +124,29 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: TextField(
-              controller: _searchCtrl,
-              onChanged: (_) => setState(() {}),
-              style: TextStyle(color: cs.onSurface, fontSize: 14),
-              decoration: InputDecoration(
-                hintText: 'Search by supplier or status…',
-                hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
-                prefixIcon: Icon(Icons.search_rounded, color: cs.onSurfaceVariant, size: 20),
-                filled: true,
-                fillColor: cs.surfaceContainerHighest,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).dividerColor)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).dividerColor)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? AppColors.silver : AppColors.lightTextPrimary, width: 1.5)),
+            child: Container(
+              height: 48,
+              decoration: BoxDecoration(
+                color: isDark ? cs.surfaceContainerHighest : AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: isDark
+                    ? null
+                    : [
+                        BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
+                        BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+                      ],
+              ),
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (_) => setState(() {}),
+                style: TextStyle(color: cs.onSurface, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Search by supplier or status…',
+                  hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
+                  prefixIcon: Icon(Icons.search_rounded, color: cs.onSurfaceVariant, size: 20),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 13),
+                ),
               ),
             ),
           ),
@@ -133,7 +171,7 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                   itemCount: filtered.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) => _PurchaseCard(purchase: filtered[i], isDark: isDark),
+                  itemBuilder: (_, i) => _PurchaseCard(purchase: filtered[i], index: i),
                 );
               },
             ),
@@ -148,94 +186,125 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
 
 class _PurchaseCard extends ConsumerWidget {
   final Purchase purchase;
-  final bool isDark;
-  const _PurchaseCard({required this.purchase, required this.isDark});
+  final int index;
+  const _PurchaseCard({required this.purchase, this.index = 0});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs = Theme.of(context).colorScheme;
     final statusColor = _statusColor(purchase.paymentStatus);
     final fmt = NumberFormat('#,##,##0.00', 'en_IN');
 
-    return GestureDetector(
+    // Cycle each card's own background through pale tints of the same 5
+    // colours used elsewhere (drawer icons, Companies/Employees/Sales/Customers lists).
+    const accentColors = [AppColors.brand, AppColors.positive, AppColors.brandDeep, AppColors.brandLight, AppColors.ink];
+    final accent = accentColors[index % accentColors.length];
+    final bg = Color.lerp(AppColors.surface, accent, 0.32)!;
+
+    const fg = AppColors.ink;
+    final fgMuted = AppColors.ink.withValues(alpha: 0.6);
+    final dividerColor = AppColors.ink.withValues(alpha: 0.12);
+
+    return SwipeActions(
       onTap: () => context.push(AppRouter.purchaseDetail, extra: purchase),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? cs.surfaceContainerHighest : AppColors.lightSurface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Theme.of(context).dividerColor),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.18 : 0.05), blurRadius: 8, offset: const Offset(0, 2))],
+      actions: [
+        SwipeAction(
+          icon: Icons.edit_outlined,
+          label: 'Edit',
+          color: AppColors.accentIndigo,
+          onTap: () => context.push(AppRouter.createPurchase, extra: {'purchase': purchase, 'fromMasters': false}),
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(13),
-          child: Row(
+        SwipeAction(
+          icon: Icons.delete_outline,
+          label: 'Delete',
+          color: AppColors.error,
+          onTap: () => _confirmDelete(context, ref),
+        ),
+      ],
+      child: RichCardShell(
+        accentColor: statusColor,
+        backgroundColor: bg,
+        showAccentBar: false,
+        edgeColor: accent,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(width: 3, color: statusColor),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(child: Text(purchase.supplierName, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: cs.onSurface))),
-                          _StatusChip(status: purchase.paymentStatus, color: statusColor),
-                          const SizedBox(width: 4),
-                          PopupMenuButton<String>(
-                            onSelected: (v) => _onAction(context, ref, v),
-                            color: Theme.of(context).scaffoldBackgroundColor,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            icon: Icon(Icons.more_vert_rounded, size: 18, color: cs.onSurfaceVariant),
-                            itemBuilder: (_) => [
-                              _menuItem(context, 'view', 'View', Icons.visibility_outlined, cs.onSurface),
-                              _menuItem(context, 'edit', 'Edit', Icons.edit_outlined, AppColors.accentIndigo),
-                              _menuItem(context, 'delete', 'Delete', Icons.delete_outline_rounded, AppColors.accentRose),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Row(children: [
-                        Icon(Icons.calendar_today_outlined, size: 12, color: cs.onSurfaceVariant),
-                        const SizedBox(width: 4),
-                        Text(DateFormat('dd MMM yyyy').format(purchase.billDate), style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-                        if (purchase.invoiceType != null) ...[
-                          const SizedBox(width: 12),
-                          Icon(Icons.description_outlined, size: 12, color: cs.onSurfaceVariant),
-                          const SizedBox(width: 4),
-                          Text(purchase.invoiceType!, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-                        ],
-                      ]),
-                      const SizedBox(height: 10),
-                      Row(children: [
-                        _AmountChip(label: 'Subtotal', value: '₹${fmt.format(purchase.subtotal)}', color: AppColors.accentSlate),
-                        const SizedBox(width: 8),
-                        _AmountChip(label: 'Tax', value: '₹${fmt.format(purchase.taxAmount)}', color: AppColors.accentGold),
-                        const SizedBox(width: 8),
-                        _AmountChip(label: 'Total', value: '₹${fmt.format(purchase.totalAmount)}', color: AppColors.accentTeal, bold: true),
-                      ]),
-                    ],
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [accent, accent.withValues(alpha: 0.75)]),
+                      shape: BoxShape.circle,
+                      boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))],
+                    ),
+                    child: Text(
+                      purchase.supplierName.trim().isNotEmpty ? purchase.supplierName.trim()[0].toUpperCase() : '?',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.white),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(purchase.supplierName,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg),
+                            overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 2),
+                        Row(children: [
+                          Icon(Icons.calendar_today_rounded, size: 11, color: fgMuted),
+                          const SizedBox(width: 4),
+                          Text(DateFormat('dd MMM yyyy').format(purchase.billDate),
+                              style: TextStyle(fontSize: 12, color: fgMuted)),
+                          if (purchase.invoiceType != null) ...[
+                            const SizedBox(width: 8),
+                            Text('•', style: TextStyle(color: fgMuted)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(purchase.invoiceType!,
+                                  style: TextStyle(fontSize: 12, color: fgMuted),
+                                  overflow: TextOverflow.ellipsis),
+                            ),
+                          ],
+                        ]),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    width: 26,
+                    height: 26,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: AppColors.ink.withValues(alpha: 0.08), shape: BoxShape.circle),
+                    child: Icon(Icons.chevron_right_rounded, size: 16, color: fgMuted),
+                  ),
+                ],
               ),
+              const SizedBox(height: 14),
+              RichCardDivider(color: dividerColor),
+              const SizedBox(height: 12),
+              StatGrid(
+                labelColor: fgMuted,
+                valueColor: fg,
+                dividerColor: dividerColor,
+                items: [
+                  StatGridItem(label: 'Subtotal', value: '₹${fmt.format(purchase.subtotal)}'),
+                  StatGridItem(label: 'Tax', value: '₹${fmt.format(purchase.taxAmount)}', color: AppColors.brand),
+                  StatGridItem(label: 'Total', value: '₹${fmt.format(purchase.totalAmount)}', color: AppColors.positive, bold: true),
+                ],
+              ),
+              const SizedBox(height: 12),
+              RichCardDivider(color: dividerColor),
+              const SizedBox(height: 10),
+              _StatusChip(status: purchase.paymentStatus, color: statusColor),
             ],
           ),
         ),
       ),
     );
-  }
-
-  PopupMenuItem<String> _menuItem(BuildContext context, String value, String label, IconData icon, Color color) {
-    return PopupMenuItem(value: value, child: Row(children: [Icon(icon, size: 16, color: color), const SizedBox(width: 10), Text(label, style: TextStyle(fontSize: 13, color: color))]));
-  }
-
-  void _onAction(BuildContext context, WidgetRef ref, String action) {
-    switch (action) {
-      case 'view': context.push(AppRouter.purchaseDetail, extra: purchase);
-      case 'edit': context.push(AppRouter.createPurchase, extra: {'purchase': purchase, 'fromMasters': false});
-      case 'delete': _confirmDelete(context, ref);
-    }
   }
 
   void _confirmDelete(BuildContext context, WidgetRef ref) {
@@ -250,7 +319,18 @@ class _PurchaseCard extends ConsumerWidget {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel', style: TextStyle(color: cs.onSurfaceVariant))),
           TextButton(
-            onPressed: () { ref.read(purchasesProvider.notifier).deletePurchase(purchase.id); Navigator.pop(context); },
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await ref.read(purchasesProvider.notifier).deletePurchase(purchase.id);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+                  );
+                }
+              }
+            },
             child: Text('Delete', style: TextStyle(color: AppColors.accentRose, fontWeight: FontWeight.w700)),
           ),
         ],
@@ -274,22 +354,9 @@ class _StatusChip extends StatelessWidget {
   const _StatusChip({required this.status, required this.color});
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20), border: Border.all(color: color.withValues(alpha: 0.3))),
-    child: Text(status, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20)),
+    child: Text(status, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.white)),
   );
 }
 
-class _AmountChip extends StatelessWidget {
-  final String label, value; final Color color; final bool bold;
-  const _AmountChip({required this.label, required this.value, required this.color, this.bold = false});
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(color: color.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: TextStyle(fontSize: 9, color: color.withValues(alpha: 0.7), fontWeight: FontWeight.w500)),
-      Text(value, style: TextStyle(fontSize: 12, fontWeight: bold ? FontWeight.w700 : FontWeight.w600, color: color)),
-    ]),
-  );
-}

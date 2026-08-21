@@ -1,6 +1,10 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/services/token_service.dart';
+import '../../data/datasources/auth_remote_datasource.dart';
 import '../../domain/entities/user_role.dart';
 import 'auth_state.dart';
+
+final authCubit = AuthCubit();
 
 class AuthCubit extends Cubit<AuthState> {
   AuthCubit() : super(const AuthInitial());
@@ -11,20 +15,35 @@ class AuthCubit extends Cubit<AuthState> {
   }) async {
     emit(const AuthLoading());
     try {
-      // TODO: replace with real API call; role comes from response payload
-      await Future.delayed(const Duration(seconds: 1));
-      final role = UserRoleX.fromString(_mockRole(email));
-      emit(AuthAuthenticated(role: role));
+      final result = await authRemoteDatasource.login(
+        email: email,
+        password: password,
+      );
+      await TokenService.save(
+        token: result['token']!,
+        role: result['role']!,
+        refreshToken: result['refreshToken'],
+      );
+      final role = UserRoleX.fromString(result['role']);
+      emit(AuthAuthenticated(role: role, hasPin: result['hasPin'] == true));
     } catch (e) {
       emit(AuthError(e.toString()));
     }
   }
 
-  // Temporary mock — remove when API is integrated
-  String _mockRole(String email) {
-    if (email.contains('super')) return 'super_admin';
-    if (email.contains('admin')) return 'company_admin';
-    return 'employee';
+  Future<void> signOut() async {
+    await TokenService.clear();
+    emit(const AuthUnauthenticated());
+  }
+
+  /// Called by splash to auto-login from stored token.
+  void checkAuthStatus() {
+    if (TokenService.isLoggedIn) {
+      final role = UserRoleX.fromString(TokenService.role);
+      emit(AuthAuthenticated(role: role));
+    } else {
+      emit(const AuthUnauthenticated());
+    }
   }
 
   Future<void> signUp({
@@ -35,7 +54,7 @@ class AuthCubit extends Cubit<AuthState> {
   }) async {
     emit(const AuthLoading());
     try {
-      // TODO: inject and call AuthRepository
+      // TODO: integrate sign-up API when available
       await Future.delayed(const Duration(seconds: 2));
       emit(const AuthAuthenticated());
     } catch (e) {

@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
 
 enum AttendanceStatus { present, absent, leave, halfDay }
 
@@ -15,10 +16,10 @@ extension AttendanceStatusX on AttendanceStatus {
 
   Color get color {
     switch (this) {
-      case AttendanceStatus.present:  return const Color(0xFF059669); // deep emerald
-      case AttendanceStatus.absent:   return const Color(0xFFBE185D); // deep rose
-      case AttendanceStatus.leave:    return const Color(0xFFB45309); // antique gold
-      case AttendanceStatus.halfDay:  return const Color(0xFF4361EE); // deep indigo
+      case AttendanceStatus.present:  return AppColors.positive;
+      case AttendanceStatus.absent:   return AppColors.ink;
+      case AttendanceStatus.leave:    return AppColors.brandLight;
+      case AttendanceStatus.halfDay:  return AppColors.brand;
     }
   }
 

@@ -5,8 +5,12 @@ class Company extends Equatable {
   final String name;
   final String? code;
   final String ownerName;
-  final String email;
+  final String? email;
   final String? phone;
+  final String? secondaryEmail;
+  final String? website;
+  final String? gstNumber;
+  final String? panNumber;
   final String? address;
   final String? city;
   final String? state;
@@ -14,8 +18,8 @@ class Company extends Equatable {
   final String? pincode;
   final String? industryType;
   final String? entityType;
-  final String? panNumber;
   final String? subscriptionPlan;
+  final String? onboardingStatus;
   final bool isActive;
   final DateTime createdAt;
 
@@ -24,8 +28,12 @@ class Company extends Equatable {
     required this.name,
     this.code,
     required this.ownerName,
-    required this.email,
+    this.email,
     this.phone,
+    this.secondaryEmail,
+    this.website,
+    this.gstNumber,
+    this.panNumber,
     this.address,
     this.city,
     this.state,
@@ -33,8 +41,8 @@ class Company extends Equatable {
     this.pincode,
     this.industryType,
     this.entityType,
-    this.panNumber,
     this.subscriptionPlan,
+    this.onboardingStatus,
     this.isActive = true,
     required this.createdAt,
   });
@@ -47,22 +55,47 @@ class Company extends Equatable {
     return name.substring(0, name.length.clamp(0, 2)).toUpperCase();
   }
 
-  Company copyWith({bool? isActive}) => Company(
+  Company copyWith({
+    String? name,
+    String? code,
+    String? ownerName,
+    String? email,
+    String? phone,
+    String? secondaryEmail,
+    String? website,
+    String? gstNumber,
+    String? panNumber,
+    String? address,
+    String? city,
+    String? state,
+    String? country,
+    String? pincode,
+    String? industryType,
+    String? entityType,
+    String? subscriptionPlan,
+    String? onboardingStatus,
+    bool? isActive,
+  }) =>
+      Company(
         id: id,
-        name: name,
-        code: code,
-        ownerName: ownerName,
-        email: email,
-        phone: phone,
-        address: address,
-        city: city,
-        state: state,
-        country: country,
-        pincode: pincode,
-        industryType: industryType,
-        entityType: entityType,
-        panNumber: panNumber,
-        subscriptionPlan: subscriptionPlan,
+        name: name ?? this.name,
+        code: code ?? this.code,
+        ownerName: ownerName ?? this.ownerName,
+        email: email ?? this.email,
+        phone: phone ?? this.phone,
+        secondaryEmail: secondaryEmail ?? this.secondaryEmail,
+        website: website ?? this.website,
+        gstNumber: gstNumber ?? this.gstNumber,
+        panNumber: panNumber ?? this.panNumber,
+        address: address ?? this.address,
+        city: city ?? this.city,
+        state: state ?? this.state,
+        country: country ?? this.country,
+        pincode: pincode ?? this.pincode,
+        industryType: industryType ?? this.industryType,
+        entityType: entityType ?? this.entityType,
+        subscriptionPlan: subscriptionPlan ?? this.subscriptionPlan,
+        onboardingStatus: onboardingStatus ?? this.onboardingStatus,
         isActive: isActive ?? this.isActive,
         createdAt: createdAt,
       );

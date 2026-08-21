@@ -15,6 +15,10 @@ class CompaniesNotifier extends AsyncNotifier<List<Company>> {
     return _all;
   }
 
+  /// Fetches full details for a single company (used by the "View" action).
+  Future<Company> fetchCompanyDetail(String id) =>
+      ref.read(companiesRepositoryProvider).getCompanyById(id);
+
   void search(String query) {
     final q = query.trim().toLowerCase();
     state = AsyncData(
@@ -23,58 +27,77 @@ class CompaniesNotifier extends AsyncNotifier<List<Company>> {
           : _all
               .where((c) =>
                   c.name.toLowerCase().contains(q) ||
-                  c.email.toLowerCase().contains(q))
+                  (c.email?.toLowerCase().contains(q) ?? false) ||
+                  (c.code?.toLowerCase().contains(q) ?? false))
               .toList(),
     );
   }
 
-  Future<void> addCompany(Company company) async {
-    try {
-      final created =
-          await ref.read(companiesRepositoryProvider).createCompany(company);
-      _all = [..._all, created];
-      state = AsyncData(List.from(_all));
-    } catch (_) {
-      // optimistic fallback: add locally
-      _all = [..._all, company];
-      state = AsyncData(List.from(_all));
-    }
+  // ── Multi-step creation ───────────────────────────────────────────────────
+
+  /// Step 1: POST — creates the company, returns it with the server-generated id/code.
+  Future<Company> createStep1(Company company) async {
+    final created = await ref.read(companiesRepositoryProvider).createCompany(company);
+    _all = [..._all, created];
+    state = AsyncData(List.from(_all));
+    return created;
   }
 
+  /// Step 2: PUT /step2 — updates contact & owner info.
+  Future<Company> updateStep2(String id, Company company) async {
+    final updated =
+        await ref.read(companiesRepositoryProvider).updateCompanyStep2(id, company);
+    _replace(updated);
+    return updated;
+  }
+
+  /// Step 3: PUT /step3 — updates location info.
+  Future<Company> updateStep3(String id, Company company) async {
+    final updated =
+        await ref.read(companiesRepositoryProvider).updateCompanyStep3(id, company);
+    _replace(updated);
+    return updated;
+  }
+
+  // ── General mutations ─────────────────────────────────────────────────────
+
   Future<void> updateCompany(Company company) async {
-    try {
-      final updated = await ref
-          .read(companiesRepositoryProvider)
-          .updateCompany(company.id, company);
-      _all = _all.map((c) => c.id == company.id ? updated : c).toList();
-      state = AsyncData(List.from(_all));
-    } catch (_) {
-      _all = _all.map((c) => c.id == company.id ? company : c).toList();
-      state = AsyncData(List.from(_all));
-    }
+    final updated = await ref
+        .read(companiesRepositoryProvider)
+        .updateCompany(company.id, company);
+    _replace(updated);
   }
 
   Future<void> deleteCompany(String id) async {
-    try {
-      await ref.read(companiesRepositoryProvider).deleteCompany(id);
-    } catch (_) {}
+    await ref.read(companiesRepositoryProvider).deleteCompany(id);
     _all = _all.where((c) => c.id != id).toList();
     state = AsyncData(List.from(_all));
   }
 
-  Future<void> toggleStatus(String id) async {
+  /// Returns null on success, or an error message string on failure.
+  Future<String?> toggleStatus(String id) async {
     final idx = _all.indexWhere((c) => c.id == id);
-    if (idx == -1) return;
-    final toggled = _all[idx].copyWith(isActive: !_all[idx].isActive);
-    _all = List.from(_all)..[idx] = toggled;
+    if (idx == -1) return null;
+    final original = _all[idx];
+    // Optimistic update
+    _all = List.from(_all)..[idx] = original.copyWith(isActive: !original.isActive);
     state = AsyncData(List.from(_all));
     try {
-      await ref.read(companiesRepositoryProvider).updateCompany(id, toggled);
-    } catch (_) {
-      // revert on error
-      final original = _all[idx];
-      _all = List.from(_all)..[idx] = original.copyWith(isActive: !original.isActive);
+      final updated = await ref
+          .read(companiesRepositoryProvider)
+          .updateCompanyStatus(id, !original.isActive);
+      _replace(updated);
+      return null;
+    } catch (e) {
+      // Revert on failure (includes 400 from backend when onboarding incomplete)
+      _all = List.from(_all)..[idx] = original;
       state = AsyncData(List.from(_all));
+      return e.toString();
     }
+  }
+
+  void _replace(Company updated) {
+    _all = _all.map((c) => c.id == updated.id ? updated : c).toList();
+    state = AsyncData(List.from(_all));
   }
 }

@@ -5,7 +5,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 final themeCubit = ThemeCubit();
 
 class ThemeCubit extends Cubit<ThemeMode> {
-  ThemeCubit() : super(ThemeMode.dark);
+  // Brixen is single-mode now (blue/white/green/black) — always light.
+  ThemeCubit() : super(ThemeMode.light);
 
   void toggle() => emit(
         state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark,

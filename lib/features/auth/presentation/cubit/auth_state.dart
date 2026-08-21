@@ -18,10 +18,13 @@ class AuthLoading extends AuthState {
 
 class AuthAuthenticated extends AuthState {
   final UserRole role;
-  const AuthAuthenticated({this.role = UserRole.employee});
+  /// Whether this account already has a PIN set server-side.
+  /// Drives sign-in routing: false → create-PIN screen, true → enter-PIN screen.
+  final bool hasPin;
+  const AuthAuthenticated({this.role = UserRole.employee, this.hasPin = false});
 
   @override
-  List<Object?> get props => [role];
+  List<Object?> get props => [role, hasPin];
 }
 
 class AuthUnauthenticated extends AuthState {

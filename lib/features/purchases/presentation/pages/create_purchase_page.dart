@@ -157,7 +157,7 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               gradient: isDark ? AppColors.silverGradient : null,
-              color: isDark ? null : AppColors.lightTextPrimary,
+              color: isDark ? null : AppColors.lightPrimary,
               borderRadius: BorderRadius.circular(10),
               boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.2), blurRadius: 6, offset: const Offset(0, 2))],
             ),
@@ -465,7 +465,7 @@ class _ImagePicker extends StatelessWidget {
       onTap: onPick,
       child: Container(
         width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 22),
-        decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: (isDark ? AppColors.silver : AppColors.lightTextPrimary).withValues(alpha: 0.25), width: 1.5)),
+        decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: (isDark ? AppColors.silver : AppColors.lightPrimary).withValues(alpha: 0.25), width: 1.5)),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Icon(Icons.upload_file_outlined, size: 32, color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
           const SizedBox(height: 8),
@@ -488,7 +488,7 @@ class _SourceTile extends StatelessWidget {
     return GestureDetector(onTap: onTap, child: Container(
       padding: const EdgeInsets.symmetric(vertical: 18),
       decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(14), border: Border.all(color: Theme.of(context).dividerColor)),
-      child: Column(children: [Icon(icon, size: 28, color: isDark ? AppColors.silver : AppColors.lightTextPrimary), const SizedBox(height: 8), Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface))]),
+      child: Column(children: [Icon(icon, size: 28, color: isDark ? AppColors.silver : AppColors.lightPrimary), const SizedBox(height: 8), Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface))]),
     ));
   }
 }

@@ -8,6 +8,14 @@ abstract class MasterState extends Equatable {
 
 class MasterLoading extends MasterState {}
 
+class MasterError extends MasterState {
+  final String message;
+  MasterError(this.message);
+
+  @override
+  List<Object?> get props => [message];
+}
+
 class MasterLoaded extends MasterState {
   final String typeKey;
   final List<MasterItem> items;

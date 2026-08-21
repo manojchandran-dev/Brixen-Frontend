@@ -5,7 +5,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/router/app_router.dart';
+import '../../../../shared/widgets/brixen_button.dart';
+import '../../../../shared/widgets/brixen_text_field.dart';
+import '../../../../shared/widgets/brixen_dropdown.dart';
+import '../../../masters/domain/entities/master_item.dart';
+import '../../../masters/presentation/cubit/master_cubit.dart';
 import '../../domain/entities/expense.dart';
 import '../providers/expenses_provider.dart';
 
@@ -26,30 +30,65 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
   final _amountCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
 
-  String? _selectedCategory;
+  // Category/unit are selected as full MasterItem objects (not just a name
+  // string) since the API needs their ids (category_id/unit_id), not names.
+  MasterItem? _selectedCategory;
+  MasterItem? _selectedUnit;
   String? _selectedPaymentMethod;
   DateTime _expenseDate = DateTime.now();
   XFile? _receiptImage;
   final _picker = ImagePicker();
+  bool _submitting = false;
 
-  static const _categories = [
-    'Rent', 'Salary', 'Utilities', 'Travel', 'Food',
-    'Office Supplies', 'Marketing', 'Maintenance', 'Other',
-  ];
-  static const _paymentMethods = ['Cash', 'UPI', 'Card', 'Bank Transfer', 'Cheque'];
+  // Sourced from Masters (Expense Category / Unit) — loaded independently
+  // since MasterCubit only tracks one "active" master type's stream at a
+  // time, and this screen needs two lists live at once.
+  List<MasterItem> _categories = [];
+  List<MasterItem> _units = [];
+  bool _loadingCategories = true;
+  bool _loadingUnits = true;
+
+  static const _paymentMethods = ['Cash', 'Card', 'UPI', 'Bank Transfer', 'Cheque', 'Other'];
 
   @override
   void initState() {
     super.initState();
+    _loadCategories();
+    _loadUnits();
     if (_isEditing) {
       final e = widget.editExpense!;
       _titleCtrl.text = e.title;
       _amountCtrl.text = e.amount.toStringAsFixed(2);
       _notesCtrl.text = e.notes ?? '';
-      _selectedCategory = e.category;
       _selectedPaymentMethod = e.paymentMethod;
       _expenseDate = e.expenseDate;
     }
+  }
+
+  Future<void> _loadCategories() async {
+    await masterCubit.load('expenseCategory');
+    if (!mounted) return;
+    setState(() {
+      _categories = masterCubit.itemsOfType('expenseCategory');
+      _loadingCategories = false;
+      if (_isEditing) {
+        final id = widget.editExpense!.categoryId;
+        _selectedCategory = _categories.where((c) => c.id == id).firstOrNull;
+      }
+    });
+  }
+
+  Future<void> _loadUnits() async {
+    await masterCubit.load('unit');
+    if (!mounted) return;
+    setState(() {
+      _units = masterCubit.itemsOfType('unit');
+      _loadingUnits = false;
+      if (_isEditing && widget.editExpense!.unitId != null) {
+        final id = widget.editExpense!.unitId;
+        _selectedUnit = _units.where((u) => u.id == id).firstOrNull;
+      }
+    });
   }
 
   @override
@@ -64,19 +103,18 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
   }
 
   void _showImageSourceSheet() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => SafeArea(child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(width: 36, height: 4, decoration: BoxDecoration(color: Theme.of(context).dividerColor, borderRadius: BorderRadius.circular(2))),
+          Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2))),
           const SizedBox(height: 20),
-          _SourceTile(icon: Icons.camera_alt_outlined, label: 'Camera', isDark: isDark, onTap: () { Navigator.pop(context); _pickImage(ImageSource.camera); }),
+          _SourceTile(icon: Icons.camera_alt_outlined, label: 'Camera', accentColor: AppColors.brand, onTap: () { Navigator.pop(context); _pickImage(ImageSource.camera); }),
           const SizedBox(height: 10),
-          _SourceTile(icon: Icons.photo_library_outlined, label: 'Gallery', isDark: isDark, onTap: () { Navigator.pop(context); _pickImage(ImageSource.gallery); }),
+          _SourceTile(icon: Icons.photo_library_outlined, label: 'Gallery', accentColor: AppColors.positive, onTap: () { Navigator.pop(context); _pickImage(ImageSource.gallery); }),
         ]),
       )),
     );
@@ -90,7 +128,7 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
     if (picked != null) setState(() => _expenseDate = picked);
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCategory == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a category'), behavior: SnackBarBehavior.floating));
@@ -98,8 +136,11 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
     }
     final now = DateTime.now();
     final expense = Expense(
-      id: _isEditing ? widget.editExpense!.id : now.millisecondsSinceEpoch.toString(),
-      category: _selectedCategory!,
+      id: _isEditing ? widget.editExpense!.id : '',
+      categoryId: _selectedCategory!.id,
+      category: _selectedCategory!.name,
+      unitId: _selectedUnit?.id,
+      unit: _selectedUnit?.name,
       title: _titleCtrl.text.trim(),
       amount: double.tryParse(_amountCtrl.text.replaceAll(',', '')) ?? 0,
       expenseDate: _expenseDate,
@@ -108,37 +149,53 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
       notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
       createdAt: _isEditing ? widget.editExpense!.createdAt : now,
     );
-    if (_isEditing) {
-      ref.read(expensesProvider.notifier).updateExpense(expense);
-    } else {
-      ref.read(expensesProvider.notifier).addExpense(expense);
+    setState(() => _submitting = true);
+    try {
+      if (_isEditing) {
+        await ref.read(expensesProvider.notifier).updateExpense(expense);
+      } else {
+        await ref.read(expensesProvider.notifier).addExpense(expense);
+      }
+      if (mounted) context.pop();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
-    context.pop();
   }
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final accentColor = AppColors.accentRose;
-
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: AppColors.background,
         elevation: 0, shadowColor: Colors.transparent, surfaceTintColor: Colors.transparent,
-        bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(height: 1, color: Theme.of(context).dividerColor)),
+        bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(height: 1, color: AppColors.border)),
         leading: GestureDetector(
           onTap: () => context.pop(),
           child: Container(
+            width: 40, height: 40,
             margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(gradient: isDark ? AppColors.silverGradient : null, color: isDark ? null : AppColors.lightTextPrimary, borderRadius: BorderRadius.circular(10), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.2), blurRadius: 6, offset: const Offset(0, 2))]),
-            child: Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: isDark ? AppColors.black : AppColors.white),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
+                BoxShadow(color: AppColors.white.withValues(alpha: 0.8), blurRadius: 4, offset: const Offset(-2, -2)),
+              ],
+            ),
+            child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
           ),
         ),
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(_isEditing ? 'Edit Expense' : 'New Expense', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: cs.onSurface)),
-          Text(_isEditing ? 'Update expense details' : 'Log an expense', style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+          Text(_isEditing ? 'Edit Expense' : 'New Expense', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.ink)),
+          Text(_isEditing ? 'Update expense details' : 'Log an expense', style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
         ]),
       ),
       body: Form(
@@ -146,44 +203,60 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
           children: [
-            // Category Dropdown
+            // Category — sourced from the Expense Category master data
             _SectionLabel('Category *'),
             const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: Theme.of(context).dividerColor)),
-              child: DropdownButtonHideUnderline(
-                child: ButtonTheme(
-                  alignedDropdown: true,
-                  child: DropdownButton<String>(
-                    value: _selectedCategory,
-                    hint: Text('Select category', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14)),
-                    dropdownColor: Theme.of(context).scaffoldBackgroundColor,
-                    borderRadius: BorderRadius.circular(12),
-                    style: TextStyle(fontSize: 14, color: cs.onSurface),
-                    isExpanded: true,
-                    items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                    onChanged: (v) => setState(() => _selectedCategory = v),
-                  ),
-                ),
-              ),
+            BrixenDropdown<MasterItem>(
+              hint: _loadingCategories ? 'Loading categories…' : _categories.isEmpty ? 'No categories yet' : 'Select category',
+              value: _categories.contains(_selectedCategory) ? _selectedCategory : null,
+              items: _categories,
+              labelOf: (c) => c.name,
+              icon: Icons.category_rounded,
+              iconColor: AppColors.brand,
+              onChanged: (v) => setState(() => _selectedCategory = v),
+            ),
+            const SizedBox(height: 18),
+
+            // Unit — sourced from the Unit master data
+            _SectionLabel('Unit'),
+            const SizedBox(height: 8),
+            BrixenDropdown<MasterItem>(
+              hint: _loadingUnits ? 'Loading units…' : _units.isEmpty ? 'No units yet' : 'Select unit',
+              value: _units.contains(_selectedUnit) ? _selectedUnit : null,
+              items: _units,
+              labelOf: (u) => u.name,
+              icon: Icons.straighten_rounded,
+              iconColor: AppColors.positive,
+              onChanged: (v) => setState(() => _selectedUnit = v),
             ),
             const SizedBox(height: 18),
 
             // Title
-            _SectionLabel('Title *'),
-            const SizedBox(height: 8),
-            _Field(ctrl: _titleCtrl, hint: 'e.g. Monthly office rent', isDark: isDark, validator: (v) => (v == null || v.trim().isEmpty) ? 'Title is required' : null),
+            BrixenTextField(
+              label: 'Title *',
+              hint: 'e.g. Monthly office rent',
+              controller: _titleCtrl,
+              prefixIcon: const Icon(Icons.receipt_long_rounded),
+              iconColor: AppColors.brandDeep,
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Title is required' : null,
+            ),
             const SizedBox(height: 18),
 
             // Amount
-            _SectionLabel('Amount *'),
-            const SizedBox(height: 8),
-            _Field(ctrl: _amountCtrl, hint: '0.00', isDark: isDark, keyboardType: const TextInputType.numberWithOptions(decimal: true), validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'Amount is required';
-              final n = double.tryParse(v.replaceAll(',', ''));
-              if (n == null || n <= 0) return 'Enter a valid amount';
-              return null;
-            }),
+            BrixenTextField(
+              label: 'Amount *',
+              hint: '0.00',
+              controller: _amountCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              prefixIcon: const Icon(Icons.currency_rupee_rounded),
+              iconColor: AppColors.brand,
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return 'Amount is required';
+                final n = double.tryParse(v.replaceAll(',', ''));
+                if (n == null || n <= 0) return 'Enter a valid amount';
+                return null;
+              },
+            ),
             const SizedBox(height: 18),
 
             // Expense Date
@@ -192,14 +265,31 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
             GestureDetector(
               onTap: _pickDate,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: Theme.of(context).dividerColor)),
+                height: 56,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
+                    BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+                  ],
+                ),
                 child: Row(children: [
-                  Icon(Icons.calendar_today_outlined, size: 18, color: cs.onSurfaceVariant),
-                  const SizedBox(width: 10),
-                  Text(DateFormat('dd MMM yyyy').format(_expenseDate), style: TextStyle(fontSize: 14, color: cs.onSurface)),
+                  Container(
+                    width: 34, height: 34,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.brandLight, AppColors.brand]),
+                      boxShadow: [BoxShadow(color: AppColors.brandLight.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3))],
+                    ),
+                    child: const Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.white),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(DateFormat('dd MMM yyyy').format(_expenseDate), style: const TextStyle(fontSize: 15, color: AppColors.ink)),
                   const Spacer(),
-                  Icon(Icons.chevron_right_rounded, size: 20, color: cs.onSurfaceVariant),
+                  const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textHint),
                 ]),
               ),
             ),
@@ -208,23 +298,14 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
             // Payment Method
             _SectionLabel('Payment Method'),
             const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: Theme.of(context).dividerColor)),
-              child: DropdownButtonHideUnderline(
-                child: ButtonTheme(
-                  alignedDropdown: true,
-                  child: DropdownButton<String>(
-                    value: _selectedPaymentMethod,
-                    hint: Text('Select payment method', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14)),
-                    dropdownColor: Theme.of(context).scaffoldBackgroundColor,
-                    borderRadius: BorderRadius.circular(12),
-                    style: TextStyle(fontSize: 14, color: cs.onSurface),
-                    isExpanded: true,
-                    items: _paymentMethods.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                    onChanged: (v) => setState(() => _selectedPaymentMethod = v),
-                  ),
-                ),
-              ),
+            BrixenDropdown<String>(
+              hint: 'Select payment method',
+              value: _selectedPaymentMethod,
+              items: _paymentMethods,
+              labelOf: (m) => m,
+              icon: Icons.credit_card_rounded,
+              iconColor: AppColors.ink,
+              onChanged: (v) => setState(() => _selectedPaymentMethod = v),
             ),
             const SizedBox(height: 18),
 
@@ -234,30 +315,27 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
             _ReceiptImagePicker(
               image: _receiptImage,
               existingPath: _isEditing ? widget.editExpense!.receiptImagePath : null,
-              isDark: isDark,
               onPickImage: _showImageSourceSheet,
               onRemoveImage: () => setState(() => _receiptImage = null),
             ),
             const SizedBox(height: 18),
 
             // Notes
-            _SectionLabel('Notes (Optional)'),
-            const SizedBox(height: 8),
-            _NotesField(ctrl: _notesCtrl, isDark: isDark),
+            BrixenTextField(
+              label: 'Notes (Optional)',
+              hint: 'Additional details…',
+              controller: _notesCtrl,
+              prefixIcon: const Icon(Icons.notes_rounded),
+              iconColor: AppColors.brandDeep,
+              maxLines: 4,
+            ),
             const SizedBox(height: 32),
 
             // Submit
-            GestureDetector(
-              onTap: _submit,
-              child: Container(
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [accentColor, accentColor.withValues(alpha: 0.8)]),
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [BoxShadow(color: accentColor.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4))],
-                ),
-                child: Center(child: Text(_isEditing ? 'Save Changes' : 'Log Expense', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white))),
-              ),
+            BrixenButton(
+              label: _isEditing ? 'Save Changes' : 'Log Expense',
+              onPressed: _submitting ? null : _submit,
+              isLoading: _submitting,
             ),
           ],
         ),
@@ -272,67 +350,17 @@ class _SectionLabel extends StatelessWidget {
   final String text;
   const _SectionLabel(this.text);
   @override
-  Widget build(BuildContext context) => Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurfaceVariant));
-}
-
-class _Field extends StatelessWidget {
-  final TextEditingController ctrl;
-  final String hint;
-  final bool isDark;
-  final TextInputType? keyboardType;
-  final String? Function(String?)? validator;
-  const _Field({required this.ctrl, required this.hint, required this.isDark, this.keyboardType, this.validator});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return TextFormField(
-      controller: ctrl, validator: validator, keyboardType: keyboardType,
-      style: TextStyle(color: cs.onSurface, fontSize: 14),
-      decoration: InputDecoration(
-        hintText: hint, hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
-        filled: true, fillColor: cs.surfaceContainerHighest, contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).dividerColor)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).dividerColor)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? AppColors.silver : AppColors.lightTextPrimary, width: 1.5)),
-        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).colorScheme.error)),
-        focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).colorScheme.error, width: 1.5)),
-      ),
-    );
-  }
-}
-
-class _NotesField extends StatelessWidget {
-  final TextEditingController ctrl;
-  final bool isDark;
-  const _NotesField({required this.ctrl, required this.isDark});
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return TextFormField(
-      controller: ctrl, maxLines: 4,
-      style: TextStyle(color: cs.onSurface, fontSize: 14),
-      decoration: InputDecoration(
-        hintText: 'Additional details…', hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
-        filled: true, fillColor: cs.surfaceContainerHighest, contentPadding: const EdgeInsets.all(14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).dividerColor)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).dividerColor)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? AppColors.silver : AppColors.lightTextPrimary, width: 1.5)),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textHint));
 }
 
 class _ReceiptImagePicker extends StatelessWidget {
   final XFile? image;
   final String? existingPath;
-  final bool isDark;
   final VoidCallback onPickImage, onRemoveImage;
-  const _ReceiptImagePicker({required this.image, required this.existingPath, required this.isDark, required this.onPickImage, required this.onRemoveImage});
+  const _ReceiptImagePicker({required this.image, required this.existingPath, required this.onPickImage, required this.onRemoveImage});
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final hasImage = image != null || existingPath != null;
 
     if (!hasImage) {
@@ -341,14 +369,27 @@ class _ReceiptImagePicker extends StatelessWidget {
         child: Container(
           height: 110,
           decoration: BoxDecoration(
-            color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Theme.of(context).dividerColor, style: BorderStyle.solid),
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
+              BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+            ],
           ),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Icons.upload_file_outlined, size: 32, color: AppColors.accentRose.withValues(alpha: 0.6)),
+            Container(
+              width: 40, height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.brand, AppColors.brandDeep]),
+                boxShadow: [BoxShadow(color: AppColors.brand.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))],
+              ),
+              child: const Icon(Icons.upload_file_rounded, size: 20, color: AppColors.white),
+            ),
             const SizedBox(height: 8),
-            Text('Tap to upload receipt', style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
-            Text('Camera or Gallery', style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant.withValues(alpha: 0.6))),
+            const Text('Tap to upload receipt', style: TextStyle(fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w500)),
+            Text('Camera or Gallery', style: TextStyle(fontSize: 11, color: AppColors.textHint.withValues(alpha: 0.8))),
           ]),
         ),
       );
@@ -358,31 +399,55 @@ class _ReceiptImagePicker extends StatelessWidget {
         ? Image.file(File(image!.path), fit: BoxFit.cover, width: double.infinity, height: 180)
         : Image.file(File(existingPath!), fit: BoxFit.cover, width: double.infinity, height: 180);
 
-    return Stack(children: [
-      ClipRRect(borderRadius: BorderRadius.circular(12), child: imgWidget),
-      Positioned(top: 8, right: 8, child: GestureDetector(
-        onTap: onRemoveImage,
-        child: Container(width: 28, height: 28, decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), shape: BoxShape.circle), child: const Icon(Icons.close_rounded, size: 16, color: Colors.white)),
-      )),
-    ]);
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: AppColors.ink.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, 6)),
+          BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+        ],
+      ),
+      child: Stack(children: [
+        ClipRRect(borderRadius: BorderRadius.circular(16), child: imgWidget),
+        Positioned(top: 8, right: 8, child: GestureDetector(
+          onTap: onRemoveImage,
+          child: Container(width: 28, height: 28, decoration: BoxDecoration(color: AppColors.ink.withValues(alpha: 0.6), shape: BoxShape.circle), child: const Icon(Icons.close_rounded, size: 16, color: AppColors.white)),
+        )),
+      ]),
+    );
   }
 }
 
 class _SourceTile extends StatelessWidget {
-  final IconData icon; final String label; final bool isDark; final VoidCallback onTap;
-  const _SourceTile({required this.icon, required this.label, required this.isDark, required this.onTap});
+  final IconData icon; final String label; final Color accentColor; final VoidCallback onTap;
+  const _SourceTile({required this.icon, required this.label, required this.accentColor, required this.onTap});
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: Theme.of(context).dividerColor)),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
+            BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+          ],
+        ),
         child: Row(children: [
-          Icon(icon, size: 20, color: cs.onSurface),
+          Container(
+            width: 34, height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [accentColor, accentColor.withValues(alpha: 0.75)]),
+              boxShadow: [BoxShadow(color: accentColor.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3))],
+            ),
+            child: Icon(icon, size: 17, color: AppColors.white),
+          ),
           const SizedBox(width: 14),
-          Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: cs.onSurface)),
+          Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.ink)),
         ]),
       ),
     );

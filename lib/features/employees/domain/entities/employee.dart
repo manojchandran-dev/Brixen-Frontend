@@ -23,6 +23,7 @@ class Employee {
   final String? emergencyContactName;
   final String? emergencyContactPhone;
   final String status;
+  final String? onboardingStatus;
   final DateTime createdAt;
 
   const Employee({
@@ -50,6 +51,7 @@ class Employee {
     this.emergencyContactName,
     this.emergencyContactPhone,
     this.status = 'Active',
+    this.onboardingStatus,
     required this.createdAt,
   });
 
@@ -80,6 +82,7 @@ class Employee {
     String? emergencyContactName,
     String? emergencyContactPhone,
     String? status,
+    String? onboardingStatus,
     DateTime? createdAt,
   }) {
     return Employee(
@@ -107,6 +110,7 @@ class Employee {
       emergencyContactName: emergencyContactName ?? this.emergencyContactName,
       emergencyContactPhone: emergencyContactPhone ?? this.emergencyContactPhone,
       status: status ?? this.status,
+      onboardingStatus: onboardingStatus ?? this.onboardingStatus,
       createdAt: createdAt ?? this.createdAt,
     );
   }

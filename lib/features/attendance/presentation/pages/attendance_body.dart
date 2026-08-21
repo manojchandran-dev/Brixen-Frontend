@@ -192,7 +192,7 @@ class _TodayBanner extends StatelessWidget {
                         horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
                       gradient: isDark ? AppColors.silverGradient : null,
-                      color: isDark ? null : AppColors.lightTextPrimary,
+                      color: isDark ? null : AppColors.lightPrimary,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
@@ -356,7 +356,7 @@ class _NavArrow extends StatelessWidget {
         height: 34,
         decoration: BoxDecoration(
           gradient: isDark ? AppColors.silverGradient : null,
-          color: isDark ? null : AppColors.lightTextPrimary,
+          color: isDark ? null : AppColors.lightPrimary,
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
@@ -1167,7 +1167,7 @@ class _AttendanceSheetState extends ConsumerState<_AttendanceSheet> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: isDark
                             ? AppColors.silver
-                            : AppColors.lightTextPrimary,
+                            : AppColors.lightPrimary,
                         foregroundColor:
                             isDark ? AppColors.black : AppColors.white,
                         elevation: 0,

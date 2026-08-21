@@ -4,17 +4,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'core/router/app_router.dart';
+import 'core/services/token_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_cubit.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await TokenService.init();
   GoogleFonts.config.allowRuntimeFetching = false;
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
+      statusBarIconBrightness: Brightness.dark,
     ),
   );
   runApp(const ProviderScope(child: BrixenApp()));
@@ -50,8 +52,8 @@ class _BrixenAppState extends State<BrixenApp> {
       title: 'Brixen',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: themeCubit.state,
+      darkTheme: AppTheme.light,
+      themeMode: ThemeMode.light,
       routerConfig: AppRouter.router,
     );
   }

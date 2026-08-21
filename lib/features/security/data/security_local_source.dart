@@ -1,7 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SecurityLocalSource {
-  static const _pinKey = 'sec_pin';
+  static const _pinKey        = 'sec_pin';
   static const _pinEnabledKey = 'sec_pin_enabled';
   static const _bioEnabledKey = 'sec_bio_enabled';
 
@@ -14,6 +14,9 @@ class SecurityLocalSource {
   }
 
   Future<String?> getPin() async => (await _prefs).getString(_pinKey);
+
+  Future<void> setPinEnabled(bool value) async =>
+      (await _prefs).setBool(_pinEnabledKey, value);
 
   Future<bool> isPinEnabled() async =>
       (await _prefs).getBool(_pinEnabledKey) ?? false;

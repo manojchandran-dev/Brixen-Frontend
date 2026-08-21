@@ -4,31 +4,38 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/theme_cubit.dart';
 import '../../../../core/router/app_router.dart';
-import '../../../../shared/widgets/brixen_logo.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
+import '../../../../shared/widgets/brixen_text_field.dart';
+import '../../../../shared/widgets/brixen_button.dart';
 import '../../domain/entities/company.dart';
 import '../providers/companies_provider.dart';
 import '../widgets/company_card.dart';
+import '../../../../shared/widgets/rich_card_shell.dart';
+import '../../../../shared/widgets/app_drawer.dart';
+import '../../../../shared/widgets/coming_soon_view.dart';
+import '../../../../shared/widgets/welcome_dashboard_view.dart';
 import '../../../masters/domain/entities/master_item.dart';
 import '../../../masters/domain/entities/master_type.dart';
+import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../masters/presentation/cubit/master_cubit.dart';
 import '../../../masters/presentation/cubit/master_state.dart';
-import '../../../attendance/presentation/pages/attendance_body.dart';
-import '../../../reports/presentation/pages/reports_body.dart';
+// Attendance module disabled for now — uncomment to re-enable.
+// import '../../../attendance/presentation/pages/attendance_body.dart';
 
 class CompaniesPage extends StatelessWidget {
-  const CompaniesPage({super.key});
+  final String? initialSection;
+  const CompaniesPage({super.key, this.initialSection});
 
   @override
   Widget build(BuildContext context) {
-    return const _CompaniesView();
+    return _CompaniesView(initialSection: initialSection);
   }
 }
 
 class _CompaniesView extends ConsumerStatefulWidget {
-  const _CompaniesView();
+  final String? initialSection;
+  const _CompaniesView({this.initialSection});
 
   @override
   ConsumerState<_CompaniesView> createState() => _CompaniesViewState();
@@ -46,6 +53,31 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
   final List<String> _stack = [];
 
   bool get _inMenuSub => _navIndex == 3 && _stack.isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialSection != null) {
+      _navIndex = 3;
+      _stack.addAll(widget.initialSection!.split('/'));
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _CompaniesView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // GoRouter reuses this State when navigating to the same `/companies`
+    // route with new `extra` (e.g. re-tapping a drawer item while already
+    // here) — initState() won't run again, so re-apply the section here.
+    if (widget.initialSection != null && widget.initialSection != oldWidget.initialSection) {
+      setState(() {
+        _navIndex = 3;
+        _stack
+          ..clear()
+          ..addAll(widget.initialSection!.split('/'));
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -82,6 +114,7 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
         value: masterCubit,
         child: Scaffold(
           extendBody: true,
+          drawer: _inMenuSub ? null : const AppDrawer(),
           appBar: AppBar(
             backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             elevation: 0,
@@ -93,35 +126,35 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
               preferredSize: const Size.fromHeight(1),
               child: Container(height: 1, color: Theme.of(context).dividerColor),
             ),
-            leading: _inMenuSub
-                ? GestureDetector(
-                    onTap: _pop,
-                    child: Container(
-                      margin: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        gradient: isDark ? AppColors.silverGradient : null,
-                        color: isDark ? null : AppColors.lightTextPrimary,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.2),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+            leading: Builder(
+              builder: (ctx) => Center(
+                child: Material(
+                  color: isDark ? AppColors.surface : AppColors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  elevation: 2,
+                  shadowColor: AppColors.ink.withValues(alpha: 0.3),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: _inMenuSub ? _pop : () => Scaffold.of(ctx).openDrawer(),
+                    child: SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: Icon(
+                        _inMenuSub ? Icons.arrow_back_ios_new_rounded : Icons.menu_rounded,
+                        size: _inMenuSub ? 16 : 18,
+                        color: AppColors.ink,
                       ),
-                      child: Icon(Icons.arrow_back_ios_new_rounded, size: 16,
-                          color: isDark ? AppColors.black : AppColors.white),
                     ),
-                  )
-                : null,
-            title: _inMenuSub ? _buildBreadcrumb(cs) : Row(
-              children: [
-                const BrixenLogo(size: 32, animate: false),
-                const SizedBox(width: 10),
-                Text(_navLabel(_navIndex), style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.w700)),
-              ],
+                  ),
+                ),
+              ),
             ),
+            title: _inMenuSub
+                ? _buildBreadcrumb(cs)
+                : Text(
+                    _navLabel(_navIndex),
+                    style: const TextStyle(color: AppColors.ink, fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.4),
+                  ),
             actions: [_buildAction(cs, isDark)],
           ),
           body: _buildBody(),
@@ -132,13 +165,17 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
   }
 
   Widget _buildBreadcrumb(ColorScheme cs) {
-    final crumbs = <_Crumb>[_Crumb('Menu', () => _popTo(0))];
+    final crumbs = <_Crumb>[_Crumb('More', () => _popTo(0))];
     for (int i = 0; i < _stack.length; i++) {
       final seg = _stack[i];
       final depth = i + 1;
       final isLast = i == _stack.length - 1;
       final label = _segLabel(seg);
-      crumbs.add(_Crumb(label, isLast ? null : () => _popTo(depth)));
+      // 'masters' has no standalone page of its own anymore — it's just a
+      // breadcrumb label, not a tappable stop, since every drawer link now
+      // goes straight to a specific master type (companyCategory/etc).
+      final tappable = !isLast && seg != 'masters';
+      crumbs.add(_Crumb(label, tappable ? () => _popTo(depth) : null));
     }
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -202,21 +239,15 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 36, height: 36,
+        width: 38, height: 38,
         margin: const EdgeInsets.only(right: 12),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
-          gradient: isDark ? AppColors.silverGradient : null,
-          color: isDark ? null : AppColors.lightTextPrimary,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.2),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          gradient: isDark ? AppColors.silverGradient : const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.brand, AppColors.brandDeep]),
+          borderRadius: BorderRadius.circular(13),
+          boxShadow: [BoxShadow(color: AppColors.brand.withValues(alpha: isDark ? 0.0 : 0.4), blurRadius: 10, offset: const Offset(0, 4))],
         ),
-        child: Icon(Icons.add, size: 18, color: isDark ? AppColors.black : AppColors.white),
+        child: Icon(Icons.add_rounded, size: 20, color: isDark ? AppColors.black : AppColors.white),
       ),
     );
   }
@@ -227,12 +258,6 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
     if (_navIndex == 3 && _stack.isNotEmpty) {
       final path = _stack.join('/');
       if (path == 'companies') return _CompaniesListBody(searchCtrl: _searchCtrl);
-      if (path == 'masters') {
-        return _MastersListBody(
-          onTypeTap: (key) => _push(key),
-          onCreateTap: (key) { _push(key); _push('create'); },
-        );
-      }
 
       // ── masterMenu: 2-level drill-down ──────────────────────────────────────
       if (path == 'masters/masterMenu') {
@@ -267,19 +292,22 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
       }
     }
     switch (_navIndex) {
-      case 0: return const _DashboardBody();
-      case 1: return const AttendanceBody();
-      case 2: return const ReportsBody();
-      case 3: return _MenuBody(
-        onCompaniesTap: () => _push('companies'),
-        onEmployeesTap: () => context.push(AppRouter.employees),
-        onMastersTap: () => _push('masters'),
-      );
+      case 0:
+        return const WelcomeDashboardView();
+      // Attendance module disabled for now — uncomment to re-enable.
+      // case 1: return const AttendanceBody();
+      case 2:
+        return const ComingSoonView(
+          icon: Icons.bar_chart_rounded,
+          title: 'Reports',
+          subtitle: 'Company-wide reports are on the way.',
+        );
+      case 3: return const _MenuBody();
       default: return const SizedBox.shrink();
     }
   }
 
-  String _navLabel(int i) => ['Dashboard', 'Attendance', 'Reports', 'Menu'][i];
+  String _navLabel(int i) => ['Dashboard', 'Attendance', 'Reports', 'More'][i];
 }
 
 class _Crumb {
@@ -304,24 +332,27 @@ class _CompaniesListBody extends ConsumerWidget {
         return Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 8, 14, 6),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
               child: Row(
                 children: [
                   Expanded(
                     child: Container(
-                      height: 42,
+                      height: 46,
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Theme.of(context).dividerColor),
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
+                          BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+                        ],
                       ),
                       child: TextField(
                         controller: searchCtrl,
-                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 13),
+                        style: const TextStyle(color: AppColors.ink, fontSize: 13),
                         decoration: InputDecoration(
                           hintText: 'Search companies...',
-                          hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
-                          prefixIcon: Icon(Icons.search, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 18),
+                          hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 13),
+                          prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textHint, size: 20),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(vertical: 11),
                         ),
@@ -329,27 +360,35 @@ class _CompaniesListBody extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Container(
-                    width: 42, height: 42,
+                    width: 46, height: 46,
+                    alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Theme.of(context).dividerColor),
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
+                        BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+                      ],
                     ),
-                    child: Icon(Icons.filter_list, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 18),
+                    child: const Icon(Icons.tune_rounded, color: AppColors.brand, size: 19),
                   ),
                 ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 2, 14, 8),
+              padding: const EdgeInsets.fromLTRB(14, 2, 14, 10),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Total Companies', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
-                  Text(companies.length.toString().padLeft(2, '0'),
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 12)),
+                  const Text('Total Companies', style: TextStyle(color: AppColors.textHint, fontSize: 12.5)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(color: AppColors.brand.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
+                    child: Text(companies.length.toString(),
+                        style: const TextStyle(color: AppColors.brand, fontWeight: FontWeight.w800, fontSize: 12)),
+                  ),
                 ],
               ),
             ),
@@ -363,9 +402,19 @@ class _CompaniesListBody extends ConsumerWidget {
                         final c = companies[i];
                         return CompanyCard(
                           company: c,
-                          onToggleStatus: () => ref.read(companiesProvider.notifier).toggleStatus(c.id),
+                          index: i,
+                          onToggleStatus: () {
+                            ref.read(companiesProvider.notifier).toggleStatus(c.id).then((err) {
+                              if (err != null && context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(err), backgroundColor: AppColors.ink),
+                                );
+                              }
+                            });
+                          },
                           onDelete: () => ref.read(companiesProvider.notifier).deleteCompany(c.id),
-                          onView: () => _showCompanyDetail(context, c),
+                          onView: () => _viewCompanyDetail(context, ref, c.id),
+                          onEdit: () => context.push(AppRouter.createCompany, extra: {'edit': c}),
                         );
                       },
                     ),
@@ -379,111 +428,249 @@ class _CompaniesListBody extends ConsumerWidget {
 
 // ── Company detail sheet ──────────────────────────────────────────────────────
 
-void _showCompanyDetail(BuildContext context, dynamic company) {
+Future<void> _viewCompanyDetail(BuildContext context, WidgetRef ref, String id) async {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const Center(child: CircularProgressIndicator(color: AppColors.silver)),
+  );
+  try {
+    final company = await ref.read(companiesProvider.notifier).fetchCompanyDetail(id);
+    if (!context.mounted) return;
+    Navigator.of(context, rootNavigator: true).pop();
+    _showCompanyDetail(context, ref, company);
+  } catch (e) {
+    if (!context.mounted) return;
+    Navigator.of(context, rootNavigator: true).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+    );
+  }
+}
+
+void _showCompanyDetail(BuildContext context, WidgetRef ref, Company company) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     isDismissible: true,
     enableDrag: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _CompanyDetailSheet(company: company),
+    builder: (ctx) => GestureDetector(
+      onTap: () => Navigator.of(ctx).pop(),
+      behavior: HitTestBehavior.opaque,
+      child: _CompanyDetailSheet(
+        company: company,
+        onEdit: () {
+          Navigator.of(ctx).pop();
+          ctx.push(AppRouter.createCompany, extra: {'edit': company});
+        },
+        onDelete: () async {
+          final confirmed = await showDialog<bool>(
+            context: ctx,
+            builder: (dCtx) => AlertDialog(
+              title: const Text('Delete company?'),
+              content: Text('This will permanently remove "${company.name}". This can\'t be undone.'),
+              actions: [
+                TextButton(onPressed: () => Navigator.of(dCtx).pop(false), child: const Text('Cancel')),
+                TextButton(
+                  onPressed: () => Navigator.of(dCtx).pop(true),
+                  child: const Text('Delete', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+          );
+          if (confirmed == true) {
+            await ref.read(companiesProvider.notifier).deleteCompany(company.id);
+            if (ctx.mounted) Navigator.of(ctx).pop();
+          }
+        },
+        onToggleStatus: () async {
+          final err = await ref.read(companiesProvider.notifier).toggleStatus(company.id);
+          if (ctx.mounted) {
+            Navigator.of(ctx).pop();
+            if (err != null) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err), backgroundColor: AppColors.ink));
+            }
+          }
+        },
+      ),
+    ),
   );
 }
 
 class _CompanyDetailSheet extends StatelessWidget {
-  final dynamic company;
-  const _CompanyDetailSheet({required this.company});
+  final Company company;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback onToggleStatus;
+  const _CompanyDetailSheet({
+    required this.company,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onToggleStatus,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final c = company;
+    final c = company; // Company — all fields are typed with null safety
+    final isPending = c.onboardingStatus != null && c.onboardingStatus != 'completed';
     return DraggableScrollableSheet(
-      initialChildSize: 0.75,
+      initialChildSize: 0.8,
       minChildSize: 0.4,
       maxChildSize: 0.95,
-      builder: (_, controller) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      builder: (_, controller) => GestureDetector(
+        onTap: () {}, // absorb taps so the outer dismiss handler ignores sheet touches
+        child: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            children: [
+              // Handle
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 36, height: 4,
+                decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+              ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 52, height: 52,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [AppColors.brand, AppColors.brandDeep],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [BoxShadow(color: AppColors.brand.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 5))],
+                      ),
+                      child: Text(c.initials, style: const TextStyle(color: AppColors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(c.name, style: const TextStyle(color: AppColors.ink, fontSize: 17, fontWeight: FontWeight.w800), overflow: TextOverflow.ellipsis),
+                          if (c.industryType != null)
+                            Text(c.industryType!, style: const TextStyle(color: AppColors.textHint, fontSize: 12.5)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _SheetIconButton(icon: Icons.edit_outlined, color: AppColors.brand, onTap: onEdit),
+                    const SizedBox(width: 8),
+                    _SheetIconButton(icon: Icons.delete_outline_rounded, color: AppColors.ink, onTap: onDelete),
+                  ],
+                ),
+              ),
+              // Status row — tap to toggle
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: onToggleStatus,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                          decoration: BoxDecoration(
+                            color: c.isActive ? AppColors.positive : AppColors.ink,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(c.isActive ? Icons.check_circle_rounded : Icons.pause_circle_filled_rounded, color: AppColors.white, size: 18),
+                              const SizedBox(width: 8),
+                              Text(c.isActive ? 'Active' : 'Inactive',
+                                  style: const TextStyle(color: AppColors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+                              const Spacer(),
+                              Text('Tap to ${c.isActive ? 'deactivate' : 'activate'}',
+                                  style: const TextStyle(color: AppColors.white, fontSize: 11.5, fontWeight: FontWeight.w500)),
+                              const SizedBox(width: 4),
+                              const Icon(Icons.sync_alt_rounded, color: AppColors.white, size: 15),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (isPending) ...[
+                      const SizedBox(width: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                        decoration: BoxDecoration(color: AppColors.brandLight, borderRadius: BorderRadius.circular(16)),
+                        child: const Text('Setup Pending', style: TextStyle(color: AppColors.white, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              // Details list
+              Expanded(
+                child: ListView(
+                  controller: controller,
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 32),
+                  children: [
+                    _DetailSection(title: 'Contact Information', items: [
+                      if (c.ownerName.isNotEmpty)
+                        _DetailRow(icon: Icons.person_outline, label: 'Owner', value: c.ownerName),
+                      if (c.email != null && c.email!.isNotEmpty)
+                        _DetailRow(icon: Icons.mail_outline_rounded, label: 'Email', value: c.email!, iconColor: AppColors.positive),
+                      if (c.phone != null && c.phone!.isNotEmpty)
+                        _DetailRow(icon: Icons.phone_outlined, label: 'Phone', value: c.phone!),
+                    ]),
+                    const SizedBox(height: 18),
+                    _DetailSection(title: 'Location', items: [
+                      if (c.address != null)  _DetailRow(icon: Icons.location_on_outlined,   label: 'Address', value: c.address!, iconColor: AppColors.positive),
+                      if (c.city != null)     _DetailRow(icon: Icons.location_city_outlined, label: 'City',    value: c.city!),
+                      if (c.state != null)    _DetailRow(icon: Icons.map_outlined,           label: 'State',   value: c.state!, iconColor: AppColors.positive),
+                      if (c.country != null)  _DetailRow(icon: Icons.language_outlined,      label: 'Country', value: c.country!),
+                      if (c.pincode != null)  _DetailRow(icon: Icons.pin_outlined,           label: 'Pincode', value: c.pincode!, iconColor: AppColors.positive),
+                    ]),
+                    const SizedBox(height: 18),
+                    _DetailSection(title: 'Business', items: [
+                      if (c.industryType != null)     _DetailRow(icon: Icons.work_outline,             label: 'Industry',     value: c.industryType!),
+                      if (c.subscriptionPlan != null) _DetailRow(icon: Icons.card_membership_outlined, label: 'Plan',         value: c.subscriptionPlan!, iconColor: AppColors.positive),
+                      _DetailRow(icon: Icons.calendar_today_outlined, label: 'Created', value: '${c.createdAt.day}/${c.createdAt.month}/${c.createdAt.year}'),
+                    ]),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-        child: Column(
-          children: [
-            // Handle
-            Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 8),
-              width: 36, height: 4,
-              decoration: BoxDecoration(color: Theme.of(context).dividerColor, borderRadius: BorderRadius.circular(2)),
-            ),
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 48, height: 48,
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Theme.of(context).dividerColor),
-                    ),
-                    child: Center(child: Text(c.initials, style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w700, fontSize: 15))),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(c.name, style: TextStyle(color: cs.onSurface, fontSize: 16, fontWeight: FontWeight.w700)),
-                        if (c.industryType != null)
-                          Text(c.industryType!, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: c.isActive ? AppColors.accentEmerald.withValues(alpha: 0.12) : cs.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: c.isActive ? AppColors.accentEmerald.withValues(alpha: 0.4) : Theme.of(context).dividerColor),
-                    ),
-                    child: Text(c.isActive ? 'Active' : 'Inactive',
-                        style: TextStyle(color: c.isActive ? AppColors.accentEmerald : cs.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600)),
-                  ),
-                ],
-              ),
-            ),
-            Divider(height: 1, color: Theme.of(context).dividerColor),
-            // Details list
-            Expanded(
-              child: ListView(
-                controller: controller,
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                children: [
-                  _DetailSection(title: 'Contact Information', items: [
-                    _DetailRow(icon: Icons.person_outline,     label: 'Owner',  value: c.ownerName),
-                    _DetailRow(icon: Icons.mail_outline_rounded, label: 'Email', value: c.email),
-                    if (c.phone != null)    _DetailRow(icon: Icons.phone_outlined,     label: 'Phone',   value: c.phone!),
-                  ]),
-                  const SizedBox(height: 16),
-                  _DetailSection(title: 'Location', items: [
-                    if (c.address != null)  _DetailRow(icon: Icons.location_on_outlined,   label: 'Address', value: c.address!),
-                    if (c.city != null)     _DetailRow(icon: Icons.location_city_outlined, label: 'City',    value: c.city!),
-                    if (c.state != null)    _DetailRow(icon: Icons.map_outlined,           label: 'State',   value: c.state!),
-                    if (c.country != null)  _DetailRow(icon: Icons.language_outlined,      label: 'Country', value: c.country!),
-                    if (c.pincode != null)  _DetailRow(icon: Icons.pin_outlined,           label: 'Pincode', value: c.pincode!),
-                  ]),
-                  const SizedBox(height: 16),
-                  _DetailSection(title: 'Business', items: [
-                    if (c.industryType != null)     _DetailRow(icon: Icons.work_outline,             label: 'Industry',     value: c.industryType!),
-                    if (c.subscriptionPlan != null) _DetailRow(icon: Icons.card_membership_outlined, label: 'Plan',         value: c.subscriptionPlan!),
-                    _DetailRow(icon: Icons.calendar_today_outlined, label: 'Created', value: '${c.createdAt.day}/${c.createdAt.month}/${c.createdAt.year}'),
-                  ]),
-                ],
-              ),
-            ),
+      ),
+    );
+  }
+}
+
+class _SheetIconButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  const _SheetIconButton({required this.icon, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 38, height: 38,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(color: AppColors.ink.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 4)),
           ],
         ),
+        child: Icon(icon, size: 18, color: color),
       ),
     );
   }
@@ -500,19 +687,22 @@ class _DetailSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.8)),
+        Text(title, style: const TextStyle(color: AppColors.textHint, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Theme.of(context).dividerColor),
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 16, offset: const Offset(0, 6)),
+              BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-2, -2)),
+            ],
           ),
           child: Column(
             children: items.asMap().entries.map((e) => Column(
               children: [
                 e.value,
-                if (e.key < items.length - 1) Divider(height: 1, color: Theme.of(context).dividerColor, indent: 48),
+                if (e.key < items.length - 1) const Divider(height: 1, color: AppColors.border, indent: 60),
               ],
             )).toList(),
           ),
@@ -525,20 +715,33 @@ class _DetailSection extends StatelessWidget {
 class _DetailRow extends StatelessWidget {
   final IconData icon;
   final String label, value;
-  const _DetailRow({required this.icon, required this.label, required this.value});
+  final Color iconColor;
+  const _DetailRow({required this.icon, required this.label, required this.value, this.iconColor = AppColors.brand});
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: cs.onSurfaceVariant),
+          Container(
+            width: 32, height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [iconColor, iconColor.withValues(alpha: 0.75)],
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: iconColor.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3))],
+            ),
+            child: Icon(icon, size: 16, color: AppColors.white),
+          ),
           const SizedBox(width: 12),
-          Text(label, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
+          Text(label, style: const TextStyle(color: AppColors.textHint, fontSize: 12)),
           const SizedBox(width: 8),
-          Expanded(child: Text(value, textAlign: TextAlign.end, style: TextStyle(color: cs.onSurface, fontSize: 13, fontWeight: FontWeight.w500))),
+          Expanded(child: Text(value, textAlign: TextAlign.end, style: const TextStyle(color: AppColors.ink, fontSize: 13, fontWeight: FontWeight.w600))),
         ],
       ),
     );
@@ -549,210 +752,139 @@ class _DetailRow extends StatelessWidget {
 // ── Menu full page ────────────────────────────────────────────────────────────
 
 class _MenuBody extends StatelessWidget {
-  final VoidCallback onCompaniesTap;
-  final VoidCallback onEmployeesTap;
-  final VoidCallback onMastersTap;
-  const _MenuBody({required this.onCompaniesTap, required this.onEmployeesTap, required this.onMastersTap});
+  const _MenuBody();
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       children: [
         // ── Premium profile card ──────────────────────────────────
         Container(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            gradient: isDark
-                ? AppColors.silverGradient
-                : const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF1C1C1C), Color(0xFF0D0D0D)],
-                  ),
-            borderRadius: BorderRadius.circular(18),
+            gradient: const LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [AppColors.brand, AppColors.positive],
+            ),
+            borderRadius: BorderRadius.circular(24),
             boxShadow: [
-              BoxShadow(
-                color: isDark
-                    ? AppColors.silver.withValues(alpha: 0.18)
-                    : Colors.black.withValues(alpha: 0.28),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
+              BoxShadow(color: AppColors.ink.withValues(alpha: 0.25), blurRadius: 20, offset: const Offset(0, 10)),
             ],
           ),
           child: Row(
             children: [
               Container(
-                width: 52, height: 52,
+                width: 56, height: 56,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
+                  color: Colors.white.withValues(alpha: 0.16),
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.5),
                 ),
-                child: Center(
-                  child: Text('AD',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                          color: isDark ? AppColors.black : AppColors.white)),
+                child: const Center(
+                  child: Text('AD', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: AppColors.white)),
                 ),
               ),
-              const SizedBox(width: 14),
-              Expanded(
+              const SizedBox(width: 16),
+              const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Admin',
-                        style: TextStyle(
-                            color: isDark ? AppColors.black : AppColors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16)),
-                    const SizedBox(height: 5),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: isDark ? 0.25 : 0.18),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text('Super Admin',
-                          style: TextStyle(
-                              color: (isDark ? AppColors.black : AppColors.white)
-                                  .withValues(alpha: 0.85),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600)),
-                    ),
+                    Text('Admin', style: TextStyle(color: AppColors.white, fontWeight: FontWeight.w800, fontSize: 17)),
+                    SizedBox(height: 6),
+                    _RoleBadge(),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right,
-                  color: (isDark ? AppColors.black : AppColors.white).withValues(alpha: 0.6),
-                  size: 20),
+              Container(
+                width: 34, height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), shape: BoxShape.circle),
+                child: const Icon(Icons.chevron_right_rounded, color: AppColors.white, size: 18),
+              ),
             ],
           ),
         ),
-        const SizedBox(height: 24),
-
-        // ── Navigation ────────────────────────────────────────────
-        _MenuSectionLabel('Navigation'),
-        const SizedBox(height: 8),
-        _MenuSection(items: [
-          _MenuItem(icon: Icons.business_rounded,         label: 'Companies',    color: AppColors.accentIndigo,  onTap: onCompaniesTap),
-          _MenuItem(icon: Icons.badge_rounded,            label: 'Employees',    color: AppColors.accentTeal,    onTap: onEmployeesTap),
-          _MenuItem(icon: Icons.receipt_long_rounded,     label: 'Sales',        color: AppColors.accentViolet,  onTap: () => context.push(AppRouter.sales)),
-          _MenuItem(icon: Icons.people_alt_rounded,       label: 'Customers',    color: AppColors.accentGold,    onTap: () => context.push(AppRouter.customers)),
-          _MenuItem(icon: Icons.receipt_outlined,         label: 'Expense',      color: AppColors.accentRose,    onTap: () => context.push(AppRouter.expenses)),
-          _MenuItem(icon: Icons.people_rounded,           label: 'Users',        color: AppColors.accentViolet,  onTap: () {}),
-          _MenuItem(icon: Icons.card_membership_rounded,  label: 'Subscriptions',color: AppColors.accentGold,    onTap: () {}),
-          _MenuItem(icon: Icons.track_changes_rounded,    label: 'Activity Log', color: AppColors.accentSlate,   onTap: () {}),
-        ]),
-        const SizedBox(height: 16),
-
-        // ── Masters ───────────────────────────────────────────────
-        _MenuSectionLabel('Masters'),
-        const SizedBox(height: 8),
-        _MenuSection(items: [
-          _MenuItem(icon: Icons.list_alt_rounded, label: 'Masters', color: AppColors.silverDark, onTap: onMastersTap),
-        ]),
-        const SizedBox(height: 16),
+        const SizedBox(height: 26),
 
         // ── Preferences ───────────────────────────────────────────
         _MenuSectionLabel('Preferences'),
-        const SizedBox(height: 8),
-        _MenuSection(items: [
-          _MenuItem(icon: Icons.settings_rounded, label: 'Settings', color: AppColors.accentSlate,  onTap: () {}),
-          _MenuItem(icon: Icons.help_rounded,     label: 'Support',  color: AppColors.accentTeal,   onTap: () {}),
-        ]),
-        const SizedBox(height: 16),
-
-        // ── Theme toggle ──────────────────────────────────────────
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Theme.of(context).dividerColor),
-          ),
-          child: BlocBuilder<ThemeCubit, ThemeMode>(
-            bloc: themeCubit,
-            builder: (context, mode) {
-              final dark = mode == ThemeMode.dark;
-              return Row(
-                children: [
-                  Container(
-                    width: 34, height: 34,
-                    decoration: BoxDecoration(
-                      color: AppColors.accentGold.withValues(alpha: 0.13),
-                      borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: Icon(dark ? Icons.dark_mode_rounded : Icons.wb_sunny_rounded,
-                        size: 18, color: AppColors.accentGold),
-                  ),
-                  const SizedBox(width: 14),
-                  Text(dark ? 'Dark Mode' : 'Light Mode',
-                      style: TextStyle(color: cs.onSurface, fontSize: 14, fontWeight: FontWeight.w500)),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () => themeCubit.toggle(),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      width: 46, height: 26,
-                      decoration: BoxDecoration(
-                        color: dark ? AppColors.silver.withValues(alpha: 0.25) : Theme.of(context).dividerColor,
-                        borderRadius: BorderRadius.circular(13),
-                        border: Border.all(color: AppColors.silver.withValues(alpha: 0.4)),
-                      ),
-                      child: AnimatedAlign(
-                        duration: const Duration(milliseconds: 250),
-                        alignment: dark ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          width: 20, height: 20,
-                          margin: const EdgeInsets.symmetric(horizontal: 3),
-                          decoration: const BoxDecoration(color: AppColors.silver, shape: BoxShape.circle),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
         const SizedBox(height: 10),
+        _MenuSection(items: [
+          _MenuItem(icon: Icons.settings_rounded, label: 'Settings', color: AppColors.brand,    onTap: () => context.push(AppRouter.security)),
+          _MenuItem(icon: Icons.help_rounded,     label: 'Support',  color: AppColors.positive, onTap: () {}),
+        ]),
+        const SizedBox(height: 24),
 
         // ── Logout ────────────────────────────────────────────────
         GestureDetector(
-          onTap: () => context.go(AppRouter.signIn),
+          onTap: () async {
+            await authCubit.signOut();
+            if (context.mounted) context.go(AppRouter.signIn);
+          },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Theme.of(context).dividerColor),
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(color: AppColors.ink.withValues(alpha: 0.08), blurRadius: 20, offset: const Offset(0, 10)),
+                BoxShadow(color: AppColors.white.withValues(alpha: 0.9), blurRadius: 10, offset: const Offset(-4, -4)),
+              ],
             ),
             child: Row(
               children: [
                 Container(
-                  width: 34, height: 34,
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: const Icon(Icons.logout_rounded, size: 18, color: AppColors.error),
+                  width: 36, height: 36,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: AppColors.ink.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(11)),
+                  child: const Icon(Icons.logout_rounded, size: 18, color: AppColors.ink),
                 ),
                 const SizedBox(width: 14),
-                const Text('Logout',
-                    style: TextStyle(color: AppColors.error, fontSize: 14, fontWeight: FontWeight.w600)),
+                const Text('Logout', style: TextStyle(color: AppColors.ink, fontSize: 14, fontWeight: FontWeight.w700)),
                 const Spacer(),
-                Icon(Icons.chevron_right, color: AppColors.error.withValues(alpha: 0.5), size: 20),
+                Icon(Icons.chevron_right_rounded, color: AppColors.ink.withValues(alpha: 0.35), size: 20),
               ],
             ),
           ),
         ),
+        const SizedBox(height: 48),
+
+        // ── Footer ────────────────────────────────────────────────
+        Center(
+          child: Column(
+            children: [
+              Text.rich(
+                TextSpan(children: [
+                  const TextSpan(text: 'Brix', style: TextStyle(color: AppColors.brand)),
+                  const TextSpan(text: 'en', style: TextStyle(color: AppColors.positive)),
+                ]),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: -0.4),
+              ),
+              const SizedBox(height: 4),
+              const Text('Version 1.0.0', style: TextStyle(color: AppColors.textHint, fontSize: 11.5)),
+            ],
+          ),
+        ),
       ],
+    );
+  }
+}
+
+class _RoleBadge extends StatelessWidget {
+  const _RoleBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(20)),
+      child: const Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.verified_rounded, size: 12, color: AppColors.white),
+        SizedBox(width: 4),
+        Text('Super Admin', style: TextStyle(color: AppColors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+      ]),
     );
   }
 }
@@ -765,11 +897,11 @@ class _MenuSectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(width: 3, height: 13, decoration: BoxDecoration(color: AppColors.silver, borderRadius: BorderRadius.circular(2))),
+        Container(width: 3, height: 13, decoration: BoxDecoration(color: AppColors.brand, borderRadius: BorderRadius.circular(2))),
         const SizedBox(width: 8),
         Text(label.toUpperCase(),
-            style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+            style: const TextStyle(
+                color: AppColors.textHint,
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.2)),
@@ -786,9 +918,12 @@ class _MenuSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(color: AppColors.ink.withValues(alpha: 0.08), blurRadius: 20, offset: const Offset(0, 10)),
+          BoxShadow(color: AppColors.white.withValues(alpha: 0.9), blurRadius: 10, offset: const Offset(-4, -4)),
+        ],
       ),
       child: Column(
         children: items.asMap().entries.map((entry) {
@@ -800,33 +935,34 @@ class _MenuSection extends StatelessWidget {
                 onTap: item.onTap,
                 behavior: HitTestBehavior.opaque,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   child: Row(
                     children: [
                       Container(
-                        width: 34, height: 34,
+                        width: 36, height: 36,
+                        alignment: Alignment.center,
                         decoration: BoxDecoration(
                           color: item.color.withValues(alpha: 0.13),
-                          borderRadius: BorderRadius.circular(9),
+                          borderRadius: BorderRadius.circular(11),
                         ),
                         child: Icon(item.icon, size: 18, color: item.color),
                       ),
-                      const SizedBox(width: 13),
+                      const SizedBox(width: 14),
                       Text(item.label,
-                          style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
+                          style: const TextStyle(
+                              color: AppColors.ink,
                               fontSize: 14,
-                              fontWeight: FontWeight.w500)),
+                              fontWeight: FontWeight.w600)),
                       const Spacer(),
-                      Icon(Icons.chevron_right,
-                          size: 17,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      Icon(Icons.chevron_right_rounded,
+                          size: 18,
+                          color: AppColors.ink.withValues(alpha: 0.3)),
                     ],
                   ),
                 ),
               ),
               if (i < items.length - 1)
-                Divider(height: 1, color: Theme.of(context).dividerColor, indent: 61),
+                const Divider(height: 1, color: AppColors.border, indent: 66),
             ],
           );
         }).toList(),
@@ -852,28 +988,38 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      color: Colors.transparent,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-          child: Container(
-            height: 64,
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.surface : AppColors.lightSurface,
-              borderRadius: BorderRadius.circular(36),
-              border: Border.all(color: Theme.of(context).dividerColor),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 20, offset: const Offset(0, 6))],
-            ),
-            child: Row(
-              children: [
-                _NavBtn(icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard_rounded, label: 'Dashboard', isActive: currentIndex == 0, onTap: () => onTap(0)),
-                _NavBtn(icon: Icons.access_time_outlined, activeIcon: Icons.access_time_filled_rounded, label: 'Attendance', isActive: currentIndex == 1, onTap: () => onTap(1)),
-                _NavBtn(icon: Icons.bar_chart_outlined, activeIcon: Icons.bar_chart_rounded, label: 'Report', isActive: currentIndex == 2, onTap: () => onTap(2)),
-                _NavBtn(icon: Icons.grid_view_outlined, activeIcon: Icons.grid_view_rounded, label: 'Menu', isActive: currentIndex == 3, onTap: () => onTap(3)),
-              ],
-            ),
+    // NOTE: no transparent ColoredBox wrapper here — with `extendBody: true`
+    // this widget is stretched to the full Scaffold height, and a
+    // Container(color: ...) — even fully transparent — always intercepts
+    // hit-testing across its whole bounds, silently swallowing every tap
+    // (including the AppBar's hamburger) outside the actual nav pill.
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Container(
+          height: 60,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: AppColors.ink,
+            borderRadius: BorderRadius.circular(32),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _NavBtn(icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard_rounded, isActive: currentIndex == 0, onTap: () => onTap(0)),
+              // Attendance module disabled for now — uncomment to re-enable.
+              // _NavBtn(icon: Icons.access_time_outlined, activeIcon: Icons.access_time_filled_rounded, isActive: currentIndex == 1, onTap: () => onTap(1)),
+              _NavBtn(icon: Icons.bar_chart_outlined, activeIcon: Icons.bar_chart_rounded, isActive: currentIndex == 2, onTap: () => onTap(2)),
+              _NavBtn(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, isActive: currentIndex == 3, onTap: () => onTap(3)),
+            ],
           ),
         ),
       ),
@@ -884,63 +1030,31 @@ class _BottomNav extends StatelessWidget {
 class _NavBtn extends StatelessWidget {
   final IconData icon;
   final IconData activeIcon;
-  final String label;
   final bool isActive;
   final VoidCallback onTap;
 
-  const _NavBtn({required this.icon, required this.activeIcon, required this.label, required this.isActive, required this.onTap});
+  const _NavBtn({required this.icon, required this.activeIcon, required this.isActive, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final inactiveColor = isDark ? AppColors.textSecondary : AppColors.lightTextHint;
+    // Black pill bar, active icon shown inside a filled green circle.
+    final iconColor = isActive ? AppColors.white : Colors.white.withValues(alpha: 0.5);
 
-    // Active: silver-gradient pill (dark) / near-black pill (light)
-    final activePillColor = isDark ? null : const Color(0xFF111111);
-    final activeContentColor = isDark ? AppColors.black : AppColors.white;
-
-    return Expanded(
+    return SizedBox(
+      width: 50,
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            gradient: (isActive && isDark) ? AppColors.silverGradient : null,
-            color: isActive ? activePillColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: isActive
-                ? [
-                    BoxShadow(
-                      color: isDark
-                          ? AppColors.silver.withValues(alpha: 0.22)
-                          : Colors.black.withValues(alpha: 0.25),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                isActive ? activeIcon : icon,
-                size: 20,
-                color: isActive ? activeContentColor : inactiveColor,
-              ),
-              const SizedBox(height: 3),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isActive ? activeContentColor : inactiveColor,
-                  fontSize: 10,
-                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-                  letterSpacing: isActive ? 0.2 : 0,
-                ),
-              ),
-            ],
+        child: Center(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: isActive ? AppColors.positive : null,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(isActive ? activeIcon : icon, size: 18, color: iconColor),
           ),
         ),
       ),
@@ -952,134 +1066,10 @@ class _NavBtn extends StatelessWidget {
 
 // ── Masters List ─────────────────────────────────────────────────────────────
 
-class _MastersListBody extends StatelessWidget {
-  final void Function(String key) onTypeTap;
-  final void Function(String key) onCreateTap;
-  const _MastersListBody({required this.onTypeTap, required this.onCreateTap});
-
-  static const _typeColors = {
-    'companyCategory': AppColors.accentIndigo,
-    'masterMenu':      AppColors.accentTeal,
-    'expenseCategory': AppColors.accentRose,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-      children: [
-        ...kMasterTypes.map((t) {
-          final color = _typeColors[t.key] ?? AppColors.silver;
-          return _MasterHubTile(
-            label: t.name,
-            icon: t.icon,
-            color: color,
-            isDark: isDark,
-            onTap: () => onTypeTap(t.key),
-            onCreateTap: () => onCreateTap(t.key),
-          );
-        }),
-      ],
-    );
-  }
-}
-
-// ── Masters Hub Tile ──────────────────────────────────────────────────────────
-
-class _MasterHubTile extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color color;
-  final bool isDark;
-  final VoidCallback onTap;
-  final VoidCallback onCreateTap;
-
-  const _MasterHubTile({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.isDark,
-    required this.onTap,
-    required this.onCreateTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: isDark ? cs.surfaceContainerHighest : AppColors.lightSurface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Theme.of(context).dividerColor),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(13),
-          child: Row(
-            children: [
-              Container(width: 3, color: color),
-              Container(
-                width: 52,
-                height: 60,
-                color: color.withValues(alpha: 0.10),
-                alignment: Alignment.center,
-                child: Icon(icon, size: 22, color: color),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(label,
-                        style: TextStyle(
-                            color: cs.onSurface,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600)),
-                    Text('Tap to view all',
-                        style: TextStyle(
-                            color: cs.onSurfaceVariant, fontSize: 11)),
-                  ],
-                ),
-              ),
-              GestureDetector(
-                onTap: onCreateTap,
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  margin: const EdgeInsets.only(right: 6),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(9),
-                    border: Border.all(color: color.withValues(alpha: 0.3)),
-                  ),
-                  child: Icon(Icons.add_rounded, size: 18, color: color),
-                ),
-              ),
-              Container(
-                width: 34,
-                height: 34,
-                margin: const EdgeInsets.only(right: 12),
-                child: Icon(Icons.chevron_right_rounded,
-                    size: 20, color: cs.onSurfaceVariant),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+// Individual item cards within a master list cycle through the full 5-color
+// brand palette by index (same pattern as the Companies list) instead of all
+// sharing one flat color per master type.
+const _masterCardAccentColors = [AppColors.brand, AppColors.positive, AppColors.brandDeep, AppColors.brandLight, AppColors.ink];
 
 // ── Generic Master Items List ─────────────────────────────────────────────────
 
@@ -1105,6 +1095,17 @@ class _MasterItemsBodyState extends State<_MasterItemsBody> {
   }
 
   @override
+  void didUpdateWidget(covariant _MasterItemsBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // No Key on this widget, so Flutter reuses this State when navigating
+    // between different master types in the same slot — initState won't
+    // re-run, so reload explicitly when the type actually changes.
+    if (oldWidget.typeKey != widget.typeKey || oldWidget.filterCategoryId != widget.filterCategoryId) {
+      masterCubit.load(widget.typeKey);
+    }
+  }
+
+  @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
@@ -1117,6 +1118,9 @@ class _MasterItemsBodyState extends State<_MasterItemsBody> {
     return BlocBuilder<MasterCubit, MasterState>(
       bloc: masterCubit,
       builder: (context, state) {
+        if (state is MasterError) {
+          return Center(child: Text(state.message, style: TextStyle(color: cs.onSurfaceVariant)));
+        }
         if (state is! MasterLoaded) {
           return const Center(child: CircularProgressIndicator(color: AppColors.silver));
         }
@@ -1151,21 +1155,24 @@ class _MasterItemsBodyState extends State<_MasterItemsBody> {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
               child: Container(
-                height: 42,
+                height: 48,
                 decoration: BoxDecoration(
-                  color: cs.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Theme.of(context).dividerColor),
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
+                    BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+                  ],
                 ),
                 child: TextField(
                   controller: _searchCtrl,
-                  style: TextStyle(color: cs.onSurface, fontSize: 13),
+                  style: const TextStyle(color: AppColors.ink, fontSize: 14),
                   decoration: InputDecoration(
                     hintText: 'Search ${typeCfg?.name ?? 'items'}...',
-                    hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
-                    prefixIcon: Icon(Icons.search, color: cs.onSurfaceVariant, size: 18),
+                    hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 14),
+                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textHint, size: 20),
                     border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 13),
                   ),
                   onChanged: masterCubit.search,
                 ),
@@ -1206,13 +1213,53 @@ class _MasterItemsBodyState extends State<_MasterItemsBody> {
                   : ListView.builder(
                       padding: const EdgeInsets.fromLTRB(14, 4, 14, 100),
                       itemCount: items.length,
-                      itemBuilder: (_, i) => _MasterCard(
+                      itemBuilder: (_, i) {
+                        final itemColor = _masterCardAccentColors[i % _masterCardAccentColors.length];
+                        return _MasterCard(
                         item: items[i],
                         icon: typeCfg?.icon ?? Icons.list_alt_outlined,
+                        color: itemColor,
+                        onView: () => _showMasterDetail(
+                          context,
+                          items[i],
+                          typeCfg?.icon ?? Icons.list_alt_outlined,
+                          itemColor,
+                        ),
                         onEdit: () => widget.onEdit(items[i].id),
-                        onToggle: () => masterCubit.toggleStatus(items[i].id),
-                        onDelete: () => masterCubit.delete(items[i].id),
-                      ),
+                        onDelete: () async {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              backgroundColor: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                              title: Text('Delete ${typeCfg?.name ?? 'item'}?',
+                                  style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface)),
+                              content: Text(
+                                'This will permanently delete "${items[i].name}". This action cannot be undone.',
+                                style: TextStyle(color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(false),
+                                  child: Text('Cancel', style: TextStyle(color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(true),
+                                  child: const Text('Delete', style: TextStyle(color: AppColors.error)),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirmed != true || !context.mounted) return;
+                          masterCubit.delete(items[i].id).then((err) {
+                            if (err != null && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(err), backgroundColor: AppColors.ink),
+                              );
+                            }
+                          });
+                        },
+                        );
+                      },
                     ),
             ),
           ],
@@ -1271,72 +1318,182 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-class _MasterCard extends StatelessWidget {
+// ── Master item detail sheet ────────────────────────────────────────────────
+
+void _showMasterDetail(BuildContext context, MasterItem item, IconData icon, Color color) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    isDismissible: true,
+    enableDrag: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => GestureDetector(
+      onTap: () => Navigator.of(ctx).pop(),
+      behavior: HitTestBehavior.opaque,
+      child: _MasterDetailSheet(item: item, icon: icon, color: color),
+    ),
+  );
+}
+
+class _MasterDetailSheet extends StatelessWidget {
   final MasterItem item;
   final IconData icon;
-  final VoidCallback onEdit, onToggle, onDelete;
-  const _MasterCard({required this.item, required this.icon, required this.onEdit, required this.onToggle, required this.onDelete});
+  final Color color;
+  const _MasterDetailSheet({required this.item, required this.icon, required this.color});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(10)),
-            child: Center(child: Icon(icon, size: 18, color: AppColors.silver)),
+    final details = <MapEntry<String, String>>[
+      if (item.fullForm != null && item.fullForm!.isNotEmpty) MapEntry('Full Form', item.fullForm!),
+      if (item.assignedCategoryName != null) MapEntry('Category', item.assignedCategoryName!),
+      if (item.description != null && item.description!.isNotEmpty) MapEntry('Description', item.description!),
+    ];
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.5,
+      minChildSize: 0.3,
+      maxChildSize: 0.9,
+      builder: (_, controller) => GestureDetector(
+        onTap: () {}, // absorb taps so the outer dismiss handler ignores sheet touches
+        child: Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 36, height: 4,
+                decoration: BoxDecoration(color: Theme.of(context).dividerColor, borderRadius: BorderRadius.circular(2)),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48, height: 48,
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.13),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: color.withValues(alpha: 0.3)),
+                      ),
+                      child: Icon(icon, color: color, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(item.name, style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.w700)),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: Theme.of(context).dividerColor),
+              Expanded(
+                child: details.isEmpty
+                    ? Center(child: Text('No additional details', style: TextStyle(color: cs.onSurfaceVariant)))
+                    : ListView(
+                        controller: controller,
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                        children: details.map((e) => Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(e.key.toUpperCase(), style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.6)),
+                              const SizedBox(height: 4),
+                              Text(e.value, style: TextStyle(color: cs.onSurface, fontSize: 14, height: 1.4)),
+                            ],
+                          ),
+                        )).toList(),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MasterCard extends StatelessWidget {
+  final MasterItem item;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onView, onEdit, onDelete;
+  const _MasterCard({required this.item, required this.icon, required this.color, required this.onView, required this.onEdit, required this.onDelete});
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = Color.lerp(AppColors.surface, color, 0.32)!;
+    final fgMuted = AppColors.ink.withValues(alpha: 0.6);
+    final statusColor = item.isActive ? AppColors.positive : AppColors.ink.withValues(alpha: 0.35);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: SwipeActions(
+        onTap: onView,
+        actions: [
+          SwipeAction(icon: Icons.edit_outlined, label: 'Edit', color: AppColors.brand, onTap: onEdit),
+          SwipeAction(icon: Icons.delete_outline, label: 'Delete', color: AppColors.error, onTap: onDelete),
+        ],
+        child: RichCardShell(
+          accentColor: color,
+          backgroundColor: bg,
+          showAccentBar: false,
+          edgeColor: color,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
               children: [
-                Text(item.name, style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w600, fontSize: 14)),
-                if (item.assignedCategoryName != null)
-                  Row(children: [
-                    Icon(Icons.category_outlined, size: 11, color: AppColors.silver),
-                    const SizedBox(width: 3),
-                    Text(item.assignedCategoryName!, style: TextStyle(color: AppColors.silver, fontSize: 11, fontWeight: FontWeight.w500)),
-                  ]),
-                if (item.description != null)
-                  Text(item.description!, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
+                Container(
+                  width: 46, height: 46,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [color, color.withValues(alpha: 0.75)]),
+                    shape: BoxShape.circle,
+                    boxShadow: [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))],
+                  ),
+                  child: Icon(icon, size: 20, color: AppColors.white),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Expanded(
+                          child: Text(item.name,
+                              style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, fontSize: 15),
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(width: 7, height: 7, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
+                      ]),
+                      if (item.fullForm != null && item.fullForm!.isNotEmpty)
+                        Text(item.fullForm!, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600)),
+                      if (item.assignedCategoryName != null)
+                        Row(children: [
+                          Icon(Icons.category_rounded, size: 11, color: color),
+                          const SizedBox(width: 3),
+                          Text(item.assignedCategoryName!, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600)),
+                        ]),
+                      if (item.description != null)
+                        Text(item.description!, style: TextStyle(color: fgMuted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  width: 26, height: 26,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: AppColors.ink.withValues(alpha: 0.08), shape: BoxShape.circle),
+                  child: Icon(Icons.chevron_right_rounded, size: 16, color: fgMuted),
+                ),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: item.isActive ? AppColors.accentEmerald.withValues(alpha: 0.12) : AppColors.accentRose.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: item.isActive ? AppColors.accentEmerald.withValues(alpha: 0.35) : AppColors.accentRose.withValues(alpha: 0.35)),
-            ),
-            child: Text(item.isActive ? 'Active' : 'Inactive',
-                style: TextStyle(color: item.isActive ? AppColors.accentEmerald : AppColors.accentRose, fontSize: 10, fontWeight: FontWeight.w600)),
-          ),
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: cs.onSurfaceVariant, size: 20),
-            color: cs.surfaceContainerHighest,
-            onSelected: (v) {
-              if (v == 'edit') onEdit();
-              if (v == 'toggle') onToggle();
-              if (v == 'delete') onDelete();
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16, color: cs.onSurface), const SizedBox(width: 10), Text('Edit', style: TextStyle(color: cs.onSurface, fontSize: 13))])),
-              PopupMenuItem(value: 'toggle', child: Row(children: [Icon(item.isActive ? Icons.block_outlined : Icons.check_circle_outline, size: 16, color: cs.onSurface), const SizedBox(width: 10), Text(item.isActive ? 'Mark Inactive' : 'Mark Active', style: TextStyle(color: cs.onSurface, fontSize: 13))])),
-              PopupMenuItem(value: 'delete', child: Row(children: [const Icon(Icons.delete_outline, size: 16, color: AppColors.error), const SizedBox(width: 10), const Text('Delete', style: TextStyle(color: AppColors.error, fontSize: 13))])),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1358,29 +1515,33 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
+  final _fullFormCtrl = TextEditingController(); // Unit type only
   bool _isActive = true;
   bool _saving = false;
+  bool _loadingItem = false;
+  String? _loadError;
   String? _selectedCategoryId;
   String? _selectedCategoryName;
 
   bool get _isEdit => widget.editId != null;
   bool get _needsCategory => masterTypeFor(widget.typeKey)?.hasParentAssignment ?? false;
+  bool get _isRemote => masterCubit.remoteDatasourceFor(widget.typeKey) != null;
+  bool get _isUnit => widget.typeKey == 'unit';
 
   @override
   void initState() {
     super.initState();
     masterCubit.itemsOfType('companyCategory');
     if (_isEdit) {
-      final state = masterCubit.state;
-      if (state is MasterLoaded) {
-        try {
-          final item = state.items.firstWhere((c) => c.id == widget.editId);
-          _nameCtrl.text = item.name;
-          _descCtrl.text = item.description ?? '';
-          _isActive = item.isActive;
-          _selectedCategoryId = item.assignedCategoryId;
-          _selectedCategoryName = item.assignedCategoryName;
-        } catch (_) {}
+      if (_isRemote) {
+        _loadItemFromApi();
+      } else {
+        final state = masterCubit.state;
+        if (state is MasterLoaded) {
+          try {
+            _fillFrom(state.items.firstWhere((c) => c.id == widget.editId));
+          } catch (_) {}
+        }
       }
     } else if (widget.defaultCategoryId != null) {
       // Pre-fill category when navigating from drill-down
@@ -1392,14 +1553,37 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
     }
   }
 
+  void _fillFrom(MasterItem item) {
+    _nameCtrl.text = item.name;
+    _descCtrl.text = item.description ?? '';
+    _fullFormCtrl.text = item.fullForm ?? '';
+    _isActive = item.isActive;
+    _selectedCategoryId = item.assignedCategoryId;
+    _selectedCategoryName = item.assignedCategoryName;
+  }
+
+  Future<void> _loadItemFromApi() async {
+    setState(() => _loadingItem = true);
+    try {
+      final item = await masterCubit.remoteDatasourceFor(widget.typeKey)!.getById(widget.editId!);
+      if (!mounted) return;
+      setState(() => _fillFrom(item));
+    } catch (e) {
+      if (mounted) setState(() => _loadError = e.toString());
+    } finally {
+      if (mounted) setState(() => _loadingItem = false);
+    }
+  }
+
   @override
   void dispose() {
     _nameCtrl.dispose();
     _descCtrl.dispose();
+    _fullFormCtrl.dispose();
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_needsCategory && _selectedCategoryId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1408,29 +1592,41 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
       return;
     }
     setState(() => _saving = true);
-    if (_isEdit) {
-      final state = masterCubit.state as MasterLoaded;
-      final existing = state.items.firstWhere((c) => c.id == widget.editId!);
-      masterCubit.update(existing.copyWith(
-        name: _nameCtrl.text.trim(),
-        description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-        isActive: _isActive,
-        assignedCategoryId: _selectedCategoryId,
-        assignedCategoryName: _selectedCategoryName,
-      ));
-    } else {
-      masterCubit.add(MasterItem(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        typeKey: widget.typeKey,
-        name: _nameCtrl.text.trim(),
-        description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-        isActive: _isActive,
-        createdAt: DateTime.now(),
-        assignedCategoryId: _selectedCategoryId,
-        assignedCategoryName: _selectedCategoryName,
-      ));
+    try {
+      if (_isEdit) {
+        final state = masterCubit.state as MasterLoaded;
+        final existing = state.items.firstWhere((c) => c.id == widget.editId!);
+        await masterCubit.update(existing.copyWith(
+          name: _nameCtrl.text.trim(),
+          description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
+          isActive: _isActive,
+          assignedCategoryId: _selectedCategoryId,
+          assignedCategoryName: _selectedCategoryName,
+          fullForm: _isUnit && _fullFormCtrl.text.trim().isNotEmpty ? _fullFormCtrl.text.trim() : null,
+        ));
+      } else {
+        await masterCubit.add(MasterItem(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          typeKey: widget.typeKey,
+          name: _nameCtrl.text.trim(),
+          description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
+          isActive: _isActive,
+          createdAt: DateTime.now(),
+          fullForm: _isUnit && _fullFormCtrl.text.trim().isNotEmpty ? _fullFormCtrl.text.trim() : null,
+          assignedCategoryId: _selectedCategoryId,
+          assignedCategoryName: _selectedCategoryName,
+        ));
+      }
+      if (mounted) widget.onSaved();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
-    widget.onSaved();
   }
 
   @override
@@ -1438,6 +1634,13 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
     final cs = Theme.of(context).colorScheme;
     final typeCfg = masterTypeFor(widget.typeKey);
     final categories = masterCubit.itemsOfType('companyCategory');
+
+    if (_loadingItem) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.silver));
+    }
+    if (_loadError != null) {
+      return Center(child: Text(_loadError!, style: TextStyle(color: cs.onSurfaceVariant)));
+    }
 
     return Column(
       children: [
@@ -1447,42 +1650,57 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
               children: [
-                TextFormField(
-                  controller: _nameCtrl,
-                  style: TextStyle(color: cs.onSurface, fontSize: 15),
-                  decoration: InputDecoration(
-                    labelText: '${typeCfg?.name ?? 'Item'} Name *',
-                    hintText: 'Enter name',
-                    prefixIcon: Icon(typeCfg?.icon ?? Icons.list_alt_outlined),
+                if (_isUnit) ...[
+                  BrixenTextField(
+                    label: 'Unit *',
+                    hint: 'e.g. pcs',
+                    controller: _nameCtrl,
+                    prefixIcon: const Icon(Icons.straighten_rounded),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                ),
-                const SizedBox(height: 20),
-                if (_needsCategory) ...[
-                  _CategoryDropdown(
-                    categories: categories,
-                    selectedId: _selectedCategoryId,
-                    onChanged: (id, name) => setState(() {
-                      _selectedCategoryId = id;
-                      _selectedCategoryName = name;
-                    }),
+                  const SizedBox(height: 18),
+                  BrixenTextField(
+                    label: 'Full Form',
+                    hint: 'e.g. Pieces',
+                    controller: _fullFormCtrl,
+                    prefixIcon: const Icon(Icons.text_fields_rounded),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
+                  BrixenTextField(
+                    label: 'Description',
+                    hint: 'e.g. Number of garments',
+                    controller: _descCtrl,
+                    prefixIcon: const Icon(Icons.notes_rounded),
+                    maxLines: 3,
+                  ),
+                ] else ...[
+                  BrixenTextField(
+                    label: '${typeCfg?.name ?? 'Item'} Name *',
+                    hint: 'Enter name',
+                    controller: _nameCtrl,
+                    prefixIcon: Icon(typeCfg?.icon ?? Icons.list_alt_rounded),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 18),
+                  if (_needsCategory) ...[
+                    _CategoryDropdown(
+                      categories: categories,
+                      selectedId: _selectedCategoryId,
+                      onChanged: (id, name) => setState(() {
+                        _selectedCategoryId = id;
+                        _selectedCategoryName = name;
+                      }),
+                    ),
+                    const SizedBox(height: 18),
+                  ],
+                  BrixenTextField(
+                    label: 'Description',
+                    hint: 'Optional description',
+                    controller: _descCtrl,
+                    prefixIcon: const Icon(Icons.notes_rounded),
+                    maxLines: 3,
+                  ),
                 ],
-                _MultilineField(
-                  controller: _descCtrl,
-                  label: 'Description',
-                  hint: 'Optional description',
-                  icon: Icons.notes_outlined,
-                ),
-                const SizedBox(height: 20),
-                Text('Status', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w500)),
-                const SizedBox(height: 8),
-                Row(children: [
-                  _MasterStatusBtn(label: 'Active',   selected: _isActive,  isActive: true,  onTap: () => setState(() => _isActive = true)),
-                  const SizedBox(width: 12),
-                  _MasterStatusBtn(label: 'Inactive', selected: !_isActive, isActive: false, onTap: () => setState(() => _isActive = false)),
-                ]),
               ],
             ),
           ),
@@ -1490,84 +1708,20 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
         Container(
           padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 24),
           decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+            color: AppColors.background,
+            border: const Border(top: BorderSide(color: AppColors.border)),
           ),
-          child: Builder(builder: (context) {
-            final isDark = Theme.of(context).brightness == Brightness.dark;
-            return ElevatedButton(
-              onPressed: _saving ? null : _save,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDark ? AppColors.silver : AppColors.lightTextPrimary,
-                foregroundColor: isDark ? AppColors.black : AppColors.white,
-                minimumSize: const Size.fromHeight(52),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: _saving
-                  ? SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: isDark ? AppColors.black : AppColors.white))
-                  : Text(_isEdit ? 'Save Changes' : 'Create ${typeCfg?.name ?? 'Item'}',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-            );
-          }),
+          child: BrixenButton(
+            label: _isEdit ? 'Save Changes' : 'Create ${typeCfg?.name ?? 'Item'}',
+            onPressed: _saving ? null : _save,
+            isLoading: _saving,
+          ),
         ),
       ],
     );
   }
 }
 
-class _MasterStatusBtn extends StatelessWidget {
-  final String label;
-  final bool selected, isActive;
-  final VoidCallback onTap;
-  const _MasterStatusBtn({required this.label, required this.selected, required this.isActive, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    const green = AppColors.accentEmerald;
-    const red   = AppColors.accentRose;
-
-    final Color fillColor  = isActive ? green : red;
-    final IconData icon    = selected
-        ? (isActive ? Icons.check_circle_rounded : Icons.cancel_rounded)
-        : (isActive ? Icons.check_circle_outline : Icons.cancel_outlined);
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: selected ? fillColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: selected ? fillColor : Theme.of(context).dividerColor,
-              width: selected ? 0 : 1,
-            ),
-            boxShadow: selected
-                ? [BoxShadow(color: fillColor.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 3))]
-                : [],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 15,
-                  color: selected ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant),
-              const SizedBox(width: 6),
-              Text(label, style: TextStyle(
-                color: selected ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-                fontSize: 13,
-                letterSpacing: 0.2,
-              )),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ── Company Category Dropdown ─────────────────────────────────────────────────
 
@@ -1603,109 +1757,6 @@ class _CategoryDropdown extends StatelessWidget {
 }
 
 // ── Multiline field with top-left icon ────────────────────────────────────────
-
-class _MultilineField extends StatefulWidget {
-  final TextEditingController controller;
-  final String label;
-  final String hint;
-  final IconData icon;
-  const _MultilineField({
-    required this.controller,
-    required this.label,
-    required this.hint,
-    required this.icon,
-  });
-
-  @override
-  State<_MultilineField> createState() => _MultilineFieldState();
-}
-
-class _MultilineFieldState extends State<_MultilineField> {
-  final _focus = FocusNode();
-  bool _focused = false;
-  bool _hasText = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _hasText = widget.controller.text.isNotEmpty;
-    _focus.addListener(() => setState(() => _focused = _focus.hasFocus));
-    widget.controller.addListener(() {
-      final has = widget.controller.text.isNotEmpty;
-      if (has != _hasText) setState(() => _hasText = has);
-    });
-  }
-
-  @override
-  void dispose() {
-    _focus.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final showLabel = _focused || _hasText;
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: isDark ? cs.surfaceContainerHighest : AppColors.lightSurface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _focused ? AppColors.silver : Theme.of(context).dividerColor,
-              width: _focused ? 1.5 : 1,
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 14, top: 14),
-                child: Icon(widget.icon, color: cs.onSurfaceVariant, size: 20),
-              ),
-              Expanded(
-                child: TextFormField(
-                  controller: widget.controller,
-                  focusNode: _focus,
-                  maxLines: 3,
-                  style: TextStyle(color: cs.onSurface, fontSize: 15),
-                  decoration: InputDecoration(
-                    hintText: showLabel ? widget.hint : widget.label,
-                    hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: showLabel ? 14 : 15),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.fromLTRB(8, 14, 16, 14),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (showLabel)
-          Positioned(
-            top: -9,
-            left: 12,
-            child: Container(
-              color: isDark ? cs.surfaceContainerHighest : AppColors.lightSurface,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                widget.label,
-                style: TextStyle(
-                  color: _focused ? AppColors.silver : cs.onSurfaceVariant,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
 
 // ── Master Menu Category View ─────────────────────────────────────────────────
 
@@ -1914,7 +1965,6 @@ class _DashboardBody extends ConsumerWidget {
       error: (e, _) => Center(child: Text(e.toString(), style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))),
       data: (all) {
         final active = all.where((c) => c.isActive).length;
-        final inactive = all.length - active;
 
         // Subscription breakdown
         final planCount = <String, int>{};
@@ -1934,6 +1984,25 @@ class _DashboardBody extends ConsumerWidget {
         final recent = ([...all]..sort((a, b) => b.createdAt.compareTo(a.createdAt))).take(4).toList();
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final cs = Theme.of(context).colorScheme;
+
+        // Month-over-month new-company growth (only shown when computable).
+        final now = DateTime.now();
+        final thisMonth = all.where((c) => c.createdAt.year == now.year && c.createdAt.month == now.month).length;
+        final lastMonthDate = DateTime(now.year, now.month - 1);
+        final lastMonth = all.where((c) => c.createdAt.year == lastMonthDate.year && c.createdAt.month == lastMonthDate.month).length;
+        final growthPct = lastMonth > 0 ? (((thisMonth - lastMonth) / lastMonth) * 100).round() : null;
+
+        // 11 weekly buckets (oldest → newest) of how many companies signed up —
+        // drives the hero card's dot-column chart bar heights (1–3 dots each).
+        final weekly = List.generate(11, (i) {
+          final weeksAgo = 10 - i;
+          final start = now.subtract(Duration(days: (weeksAgo + 1) * 7));
+          final end = now.subtract(Duration(days: weeksAgo * 7));
+          return all.where((c) => c.createdAt.isAfter(start) && c.createdAt.isBefore(end)).length;
+        });
+
+        final activePct = all.isNotEmpty ? (active / all.length * 100).round() : 0;
+        final inactivePct = all.isNotEmpty ? 100 - activePct : 0;
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
@@ -1965,16 +2034,12 @@ class _DashboardBody extends ConsumerWidget {
             ),
             const SizedBox(height: 14),
 
-            // ── Stat cards ───────────────────────────────────────────
-            Row(
-              children: [
-                Expanded(child: _StatCard(value: all.length, label: 'Companies', icon: Icons.business_outlined, accent: AppColors.silver, isDark: isDark)),
-                const SizedBox(width: 8),
-                Expanded(child: _StatCard(value: active, label: 'Active', icon: Icons.check_circle_outline, accent: AppColors.accentEmerald, isDark: isDark)),
-                const SizedBox(width: 8),
-                Expanded(child: _StatCard(value: inactive, label: 'Inactive', icon: Icons.remove_circle_outline, accent: AppColors.accentRose, isDark: isDark)),
-              ],
-            ),
+            // ── Hero stat card ───────────────────────────────────────
+            _HeroStatCard(total: all.length, weekly: weekly, growthPct: growthPct),
+            const SizedBox(height: 14),
+
+            // ── Active / Inactive split card ──────────────────────────
+            _SplitStatCard(activePct: activePct, inactivePct: inactivePct),
             const SizedBox(height: 16),
 
             // ── Revenue Overview ─────────────────────────────────────
@@ -2010,7 +2075,7 @@ class _DashSectionLabel extends StatelessWidget {
     return Text(
       label.toUpperCase(),
       style: TextStyle(
-        color: isDark ? AppColors.silver : AppColors.lightTextPrimary,
+        color: isDark ? AppColors.silver : AppColors.lightPrimary,
         fontSize: 10,
         fontWeight: FontWeight.w700,
         letterSpacing: 1.3,
@@ -2019,55 +2084,175 @@ class _DashSectionLabel extends StatelessWidget {
   }
 }
 
-class _StatCard extends StatelessWidget {
-  final int value;
-  final String label;
-  final IconData icon;
-  final Color accent;
-  final bool isDark;
+class _HeroStatCard extends StatelessWidget {
+  final int total;
+  final List<int> weekly; // new-signup count per weekly bucket, oldest → newest
+  final int? growthPct; // null when not computable (no data for previous month)
 
-  const _StatCard({
-    required this.value,
-    required this.label,
-    required this.icon,
-    required this.accent,
-    required this.isDark,
+  const _HeroStatCard({
+    required this.total,
+    required this.weekly,
+    required this.growthPct,
   });
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final up = (growthPct ?? 0) >= 0;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surface : AppColors.lightSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: accent.withValues(alpha: 0.35)),
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(26),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                total.toString(),
+                style: const TextStyle(color: AppColors.ink, fontSize: 42, fontWeight: FontWeight.w800, letterSpacing: -1, height: 1),
+              ),
+              if (growthPct != null) ...[
+                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: up ? AppColors.positive : AppColors.ink,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text('${growthPct!.abs()}%', style: const TextStyle(color: AppColors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                    const SizedBox(width: 4),
+                    Container(
+                      width: 16, height: 16,
+                      decoration: const BoxDecoration(color: AppColors.white, shape: BoxShape.circle),
+                      child: Icon(up ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                          size: 11, color: up ? AppColors.positive : AppColors.ink),
+                    ),
+                  ]),
+                ),
+              ],
+              const Spacer(),
+              Container(
+                width: 44, height: 44,
+                decoration: const BoxDecoration(color: AppColors.brand, shape: BoxShape.circle),
+                child: const Center(
+                  child: Text('B', style: TextStyle(color: AppColors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text('Total companies · vs previous 3 months', style: TextStyle(color: AppColors.textHint, fontSize: 12.5)),
+          if (weekly.isNotEmpty) ...[
+            const SizedBox(height: 22),
+            _DotColumnChart(weekly: weekly),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DotColumnChart extends StatelessWidget {
+  final List<int> weekly;
+  const _DotColumnChart({required this.weekly});
+
+  @override
+  Widget build(BuildContext context) {
+    const rows = 3;
+    const dot = 10.0;
+    const gap = 6.0;
+
+    return SizedBox(
+      height: rows * dot + (rows - 1) * gap,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: List.generate(weekly.length, (i) {
+          final height = weekly[i].clamp(0, rows) == 0 ? 1 : weekly[i].clamp(1, rows);
+          final light = height <= 1 || (i.isEven && height < rows);
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(height, (r) {
+              return Padding(
+                padding: EdgeInsets.only(top: r == 0 ? 0 : gap),
+                child: Container(
+                  width: dot, height: dot,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: light ? AppColors.brandLight : AppColors.brand),
+                ),
+              );
+            }),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _SplitStatCard extends StatelessWidget {
+  final int activePct;
+  final int inactivePct;
+
+  const _SplitStatCard({required this.activePct, required this.inactivePct});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: AppColors.brand, width: 1.5),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            Expanded(child: _SplitHalf(filled: true, icon: Icons.groups_rounded, pct: activePct, label: 'Active')),
+            const SizedBox(width: 8),
+            Expanded(child: _SplitHalf(filled: false, icon: Icons.person_off_rounded, pct: inactivePct, label: 'Inactive')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SplitHalf extends StatelessWidget {
+  final bool filled; // left/blue-filled half vs right/white half
+  final IconData icon;
+  final int pct;
+  final String label;
+
+  const _SplitHalf({required this.filled, required this.icon, required this.pct, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = filled ? AppColors.white : AppColors.ink;
+    final iconBg = filled ? Colors.white.withValues(alpha: 0.16) : AppColors.brand.withValues(alpha: 0.1);
+    final iconFg = filled ? AppColors.white : AppColors.brand;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: filled ? AppColors.brand : AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 30, height: 30,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.13),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: accent, size: 16),
+            decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+            child: Icon(icon, size: 15, color: iconFg),
           ),
-          const SizedBox(height: 12),
-          Text(
-            value.toString().padLeft(2, '0'),
-            style: TextStyle(
-              color: cs.onSurface,
-              fontSize: 32,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -1,
-              height: 1,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(label, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w500)),
+          const SizedBox(height: 14),
+          Text('$pct%', style: TextStyle(color: fg, fontSize: 27, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+          const SizedBox(height: 2),
+          Text(label, style: TextStyle(color: fg.withValues(alpha: 0.8), fontSize: 12)),
         ],
       ),
     );

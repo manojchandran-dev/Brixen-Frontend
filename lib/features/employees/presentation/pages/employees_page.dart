@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../shared/widgets/action_sheet.dart';
 import '../../../../shared/widgets/app_bottom_nav.dart';
+import '../../../../shared/widgets/app_drawer.dart';
+import '../../../../shared/widgets/rich_card_shell.dart';
 import '../../domain/entities/employee.dart';
 import '../providers/employees_provider.dart';
 
@@ -32,6 +36,7 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
 
     return Scaffold(
       extendBody: true,
+      drawer: widget.fromMasters ? null : const AppDrawer(),
       bottomNavigationBar: const AppBottomNav(activeIndex: 3),
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -42,26 +47,43 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: Theme.of(context).dividerColor),
         ),
-        leading: GestureDetector(
-          onTap: () => widget.fromMasters ? context.pop() : context.go(AppRouter.companies),
-          child: Container(
-            margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              gradient: isDark ? AppColors.silverGradient : null,
-              color: isDark ? null : AppColors.lightTextPrimary,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.2),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
+        leading: widget.fromMasters
+            ? GestureDetector(
+                onTap: () => context.pop(),
+                child: Container(
+                  width: 40, height: 40,
+                  margin: const EdgeInsets.all(8),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: isDark ? cs.surfaceContainerHighest : AppColors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
+                      BoxShadow(color: AppColors.white.withValues(alpha: 0.8), blurRadius: 4, offset: const Offset(-2, -2)),
+                    ],
+                  ),
+                  child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
                 ),
-              ],
-            ),
-            child: Icon(Icons.arrow_back_ios_new_rounded, size: 16,
-                color: isDark ? AppColors.black : AppColors.white),
-          ),
-        ),
+              )
+            : Builder(
+                builder: (ctx) => GestureDetector(
+                  onTap: () => Scaffold.of(ctx).openDrawer(),
+                  child: Container(
+                    width: 40, height: 40,
+                    margin: const EdgeInsets.all(8),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isDark ? cs.surfaceContainerHighest : AppColors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
+                        BoxShadow(color: AppColors.white.withValues(alpha: 0.8), blurRadius: 4, offset: const Offset(-2, -2)),
+                      ],
+                    ),
+                    child: const Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
+                  ),
+                ),
+              ),
         title: widget.fromMasters
             ? SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -102,18 +124,16 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
             onTap: () => context.push(AppRouter.createEmployee, extra: widget.fromMasters ? 'masters' : null),
             child: Container(
               margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
-              width: 36,
-              height: 36,
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
-                gradient: isDark ? AppColors.silverGradient : null,
-                color: isDark ? null : AppColors.lightTextPrimary,
-                borderRadius: BorderRadius.circular(10),
+                gradient: isDark
+                    ? AppColors.silverGradient
+                    : const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.brand, AppColors.brandDeep]),
+                borderRadius: BorderRadius.circular(13),
                 boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.2),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
+                  BoxShadow(color: AppColors.brand.withValues(alpha: isDark ? 0.0 : 0.4), blurRadius: 10, offset: const Offset(0, 4)),
                 ],
               ),
               child: Icon(Icons.add_rounded, size: 20,
@@ -126,30 +146,28 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: TextField(
-              controller: _searchCtrl,
-              onChanged: (_) => setState(() {}),
-              style: TextStyle(color: cs.onSurface, fontSize: 14),
-              decoration: InputDecoration(
-                hintText: 'Search by name, code or department…',
-                hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
-                prefixIcon: Icon(Icons.search_rounded, color: cs.onSurfaceVariant, size: 20),
-                filled: true,
-                fillColor: cs.surfaceContainerHighest,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Theme.of(context).dividerColor),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Theme.of(context).dividerColor),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                      color: isDark ? AppColors.silver : AppColors.lightTextPrimary,
-                      width: 1.5),
+            child: Container(
+              height: 48,
+              decoration: BoxDecoration(
+                color: isDark ? cs.surfaceContainerHighest : AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: isDark
+                    ? null
+                    : [
+                        BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
+                        BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+                      ],
+              ),
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (_) => setState(() {}),
+                style: TextStyle(color: cs.onSurface, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Search by name, code or department…',
+                  hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
+                  prefixIcon: Icon(Icons.search_rounded, color: cs.onSurfaceVariant, size: 20),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 13),
                 ),
               ),
             ),
@@ -194,7 +212,7 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                   itemCount: filtered.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) => _EmployeeCard(employee: filtered[i], isDark: isDark),
+                  itemBuilder: (_, i) => _EmployeeCard(employee: filtered[i], index: i),
                 );
               },
             ),
@@ -205,109 +223,161 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
   }
 }
 
+class _StatSummaryCard extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  const _StatSummaryCard({required this.label, required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          color: isDark ? cs.surfaceContainerHighest : AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: isDark
+              ? null
+              : [
+                  BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
+                  BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+                ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [color, color.withValues(alpha: 0.75)]),
+                shape: BoxShape.circle,
+                boxShadow: [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3))],
+              ),
+              child: Icon(icon, size: 16, color: AppColors.white),
+            ),
+            const SizedBox(height: 8),
+            Text(label, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant), overflow: TextOverflow.ellipsis),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _EmployeeCard extends ConsumerWidget {
   final Employee employee;
-  final bool isDark;
-  const _EmployeeCard({required this.employee, required this.isDark});
+  final int index;
+  const _EmployeeCard({required this.employee, this.index = 0});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs = Theme.of(context).colorScheme;
     final statusColor = _statusColor(employee.status);
 
-    return GestureDetector(
+    // Cycle each card's own background through pale tints of the same 5
+    // colours used elsewhere (drawer icons, Companies list) — an opaque
+    // blend toward white, not a translucent alpha colour, so the swipe
+    // buttons underneath stay hidden until the card is actually swiped.
+    const accentColors = [AppColors.brand, AppColors.positive, AppColors.brandDeep, AppColors.brandLight, AppColors.ink];
+    final accent = accentColors[index % accentColors.length];
+    final bg = Color.lerp(AppColors.surface, accent, 0.32)!;
+
+    const fg = AppColors.ink;
+    final fgMuted = AppColors.ink.withValues(alpha: 0.6);
+    final fgFaint = AppColors.ink.withValues(alpha: 0.5);
+
+    return SwipeActions(
       onTap: () => context.push(AppRouter.employeeDetail, extra: employee),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? cs.surfaceContainerHighest : AppColors.lightSurface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Theme.of(context).dividerColor),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.18 : 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+      actions: [
+        SwipeAction(
+          icon: Icons.sync_alt_rounded,
+          label: 'Status',
+          color: AppColors.accentGold,
+          onTap: () => _openStatusPicker(context, ref),
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(13),
+        SwipeAction(
+          icon: Icons.edit_outlined,
+          label: 'Edit',
+          color: AppColors.accentIndigo,
+          onTap: () => context.push(AppRouter.createEmployee, extra: employee),
+        ),
+        SwipeAction(
+          icon: Icons.delete_outline,
+          label: 'Delete',
+          color: AppColors.error,
+          onTap: () => _confirmDelete(context, ref),
+        ),
+      ],
+      child: RichCardShell(
+        accentColor: statusColor,
+        backgroundColor: bg,
+        showAccentBar: false,
+        edgeColor: accent,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(width: 3, color: AppColors.accentEmerald),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: AppColors.accentEmerald.withValues(alpha: 0.12),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.accentEmerald.withValues(alpha: 0.3)),
-                        ),
-                        child: Center(
-                          child: Text(
-                            employee.firstName.isNotEmpty ? employee.firstName[0].toUpperCase() : '?',
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.accentEmerald),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(children: [
-                              Expanded(child: Text(employee.fullName,
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: cs.onSurface),
-                                  overflow: TextOverflow.ellipsis)),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20), border: Border.all(color: statusColor.withValues(alpha: 0.35))),
-                                child: Text(employee.status, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: statusColor)),
-                              ),
-                            ]),
-                            const SizedBox(height: 3),
-                            Row(children: [
-                              Icon(Icons.badge_outlined, size: 11, color: cs.onSurfaceVariant),
-                              const SizedBox(width: 4),
-                              Text(employee.employeeCode, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-                              if (employee.designation != null) ...[
-                                const SizedBox(width: 8),
-                                Text('•', style: TextStyle(color: cs.onSurfaceVariant)),
-                                const SizedBox(width: 8),
-                                Expanded(child: Text(employee.designation!, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant), overflow: TextOverflow.ellipsis)),
-                              ],
-                            ]),
-                            if (employee.department != null) ...[
-                              const SizedBox(height: 2),
-                              Row(children: [
-                                Icon(Icons.apartment_outlined, size: 11, color: cs.onSurfaceVariant),
-                                const SizedBox(width: 4),
-                                Text(employee.department!, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-                              ]),
-                            ],
-                          ],
-                        ),
-                      ),
-                      PopupMenuButton<String>(
-                        onSelected: (v) => _onAction(context, ref, v),
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        icon: Icon(Icons.more_vert_rounded, size: 18, color: cs.onSurfaceVariant),
-                        itemBuilder: (_) => [
-                          PopupMenuItem(value: 'view', child: Row(children: [Icon(Icons.visibility_outlined, size: 16, color: cs.onSurface), const SizedBox(width: 10), Text('View', style: TextStyle(fontSize: 13, color: cs.onSurface))])),
-                          PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16, color: AppColors.accentIndigo), const SizedBox(width: 10), Text('Edit', style: TextStyle(fontSize: 13, color: AppColors.accentIndigo))])),
-                          PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.accentRose), const SizedBox(width: 10), Text('Delete', style: TextStyle(fontSize: 13, color: AppColors.accentRose))])),
-                        ],
-                      ),
-                    ],
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [accent, accent.withValues(alpha: 0.75)],
                   ),
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))],
+                ),
+                child: Text(
+                  employee.fullName.trim().isNotEmpty ? employee.fullName.trim()[0].toUpperCase() : '?',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.white),
                 ),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(employee.fullName,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg),
+                        overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Text(employee.designation ?? '—',
+                        style: TextStyle(fontSize: 12, color: fgMuted), overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Text('${employee.employeeCode} • ${employee.department ?? '—'}',
+                        style: TextStyle(fontSize: 11, color: fgFaint),
+                        overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('Joined', style: TextStyle(fontSize: 10, color: fgFaint)),
+                  Text(
+                    employee.joiningDate != null ? DateFormat('dd MMM yyyy').format(employee.joiningDate!) : '—',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: fg),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(20)),
+                    child: Text(employee.status,
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.white)),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right_rounded, size: 18, color: fgFaint),
             ],
           ),
         ),
@@ -323,15 +393,32 @@ class _EmployeeCard extends ConsumerWidget {
     }
   }
 
-  void _onAction(BuildContext context, WidgetRef ref, String action) {
-    switch (action) {
-      case 'view':
-        context.push(AppRouter.employeeDetail, extra: employee);
-      case 'edit':
-        context.push(AppRouter.createEmployee, extra: employee);
-      case 'delete':
-        _confirmDelete(context, ref);
-    }
+  static const _statuses = ['Active', 'Inactive', 'On Leave'];
+
+  void _openStatusPicker(BuildContext context, WidgetRef ref) {
+    showActionSheet(
+      context,
+      title: 'Change Status',
+      subtitle: employee.fullName,
+      items: _statuses.map((s) => ActionSheetItem(
+        icon: Icons.circle,
+        label: s,
+        color: _statusColor(s),
+        selected: s == employee.status,
+        onTap: () async {
+          if (s == employee.status) return;
+          try {
+            await ref.read(employeesProvider.notifier).updateEmployee(employee.copyWith(status: s));
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+              );
+            }
+          }
+        },
+      )).toList(),
+    );
   }
 
   void _confirmDelete(BuildContext context, WidgetRef ref) {
@@ -346,9 +433,17 @@ class _EmployeeCard extends ConsumerWidget {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel', style: TextStyle(color: cs.onSurfaceVariant))),
           TextButton(
-            onPressed: () {
-              ref.read(employeesProvider.notifier).deleteEmployee(employee.id);
+            onPressed: () async {
               Navigator.pop(context);
+              try {
+                await ref.read(employeesProvider.notifier).deleteEmployee(employee.id);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+                  );
+                }
+              }
             },
             child: Text('Delete', style: TextStyle(color: AppColors.accentRose, fontWeight: FontWeight.w700)),
           ),

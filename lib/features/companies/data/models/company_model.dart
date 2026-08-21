@@ -6,8 +6,12 @@ class CompanyModel extends Company {
     required super.name,
     super.code,
     required super.ownerName,
-    required super.email,
+    super.email,
     super.phone,
+    super.secondaryEmail,
+    super.website,
+    super.gstNumber,
+    super.panNumber,
     super.address,
     super.city,
     super.state,
@@ -15,8 +19,8 @@ class CompanyModel extends Company {
     super.pincode,
     super.industryType,
     super.entityType,
-    super.panNumber,
     super.subscriptionPlan,
+    super.onboardingStatus,
     super.isActive = true,
     required super.createdAt,
   });
@@ -24,11 +28,15 @@ class CompanyModel extends Company {
   factory CompanyModel.fromJson(Map<String, dynamic> json) {
     return CompanyModel(
       id: json['id'].toString(),
-      name: json['name'] ?? '',
-      code: json['code'],
+      name: json['company_name'] ?? json['name'] ?? '',
+      code: json['company_code'] ?? json['code'],
       ownerName: json['owner_name'] ?? json['ownerName'] ?? '',
-      email: json['email'] ?? '',
+      email: json['email'],
       phone: json['phone'],
+      secondaryEmail: json['secondary_email'] ?? json['secondaryEmail'],
+      website: json['website'],
+      gstNumber: json['gst_number'] ?? json['gstNumber'],
+      panNumber: json['pan_card'] ?? json['pan_number'] ?? json['panNumber'],
       address: json['address'],
       city: json['city'],
       state: json['state'],
@@ -36,30 +44,20 @@ class CompanyModel extends Company {
       pincode: json['pincode'],
       industryType: json['industry_type'] ?? json['industryType'],
       entityType: json['entity_type'] ?? json['entityType'],
-      panNumber: json['pan_number'] ?? json['panNumber'],
       subscriptionPlan: json['subscription_plan'] ?? json['subscriptionPlan'],
-      isActive: json['is_active'] ?? json['isActive'] ?? true,
+      onboardingStatus: json['onboarding_status'] ?? json['onboardingStatus'],
+      isActive: _parseStatus(json['status']) ??
+          (json['is_active'] ?? json['isActive'] ?? true),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'name': name,
-        'owner_name': ownerName,
-        'email': email,
-        if (code != null) 'code': code,
-        if (phone != null) 'phone': phone,
-        if (address != null) 'address': address,
-        if (city != null) 'city': city,
-        if (state != null) 'state': state,
-        if (country != null) 'country': country,
-        if (pincode != null) 'pincode': pincode,
-        if (industryType != null) 'industry_type': industryType,
-        if (entityType != null) 'entity_type': entityType,
-        if (panNumber != null) 'pan_number': panNumber,
-        if (subscriptionPlan != null) 'subscription_plan': subscriptionPlan,
-        'is_active': isActive,
-      };
+  static bool? _parseStatus(dynamic value) {
+    if (value == null) return null;
+    if (value is bool) return value;
+    if (value is String) return value.toLowerCase() == 'active';
+    return null;
+  }
 }

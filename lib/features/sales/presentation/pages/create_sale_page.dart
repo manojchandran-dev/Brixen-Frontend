@@ -91,7 +91,7 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
     'Cash', 'Card', 'UPI', 'Bank Transfer', 'Cheque', 'Other',
   ];
   static const _paymentStatuses = [
-    'Paid', 'Pending', 'Partial', 'Cancelled',
+    'Pending', 'Paid', 'Partial',
   ];
 
   @override
@@ -179,33 +179,42 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
   Future<void> _submit() async {
     if (!_currentFormKey.currentState!.validate()) return;
     setState(() => _submitting = true);
-    await Future.delayed(const Duration(milliseconds: 400));
+    final sub = double.tryParse(_subtotalCtrl.text) ?? 0;
+    final tax = double.tryParse(_taxAmountCtrl.text) ?? 0;
     final sale = Sale(
-      id: _isEditing ? widget.editSale!.id : DateTime.now().millisecondsSinceEpoch.toString(),
-      companyId: null,
+      id: _isEditing ? widget.editSale!.id : '',
       customerId: _selectedCustomer?.id,
-      billNo: _isEditing ? widget.editSale!.billNo : '',
       billDate: _billDate,
       invoiceType: _invoiceType,
-      subtotal: double.tryParse(_subtotalCtrl.text) ?? 0,
-      taxAmount: double.tryParse(_taxAmountCtrl.text) ?? 0,
-      totalAmount: double.tryParse(_totalAmountCtrl.text) ?? 0,
+      subtotal: sub,
+      taxAmount: tax,
+      totalAmount: double.tryParse(_totalAmountCtrl.text) ?? (sub + tax),
       paymentType: _paymentType,
       paymentStatus: _paymentStatus ?? 'Pending',
       notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
       billImagePath: _billImage?.path,
       createdAt: _isEditing ? widget.editSale!.createdAt : DateTime.now(),
     );
-    if (_isEditing) {
-      ref.read(salesProvider.notifier).updateSale(sale);
-    } else {
-      ref.read(salesProvider.notifier).addSale(sale);
-    }
-    if (!mounted) return;
-    if (widget.fromMenu || widget.fromMasters) {
-      context.pop();
-    } else {
-      context.go(AppRouter.sales);
+    try {
+      if (_isEditing) {
+        await ref.read(salesProvider.notifier).updateSale(sale);
+      } else {
+        await ref.read(salesProvider.notifier).addSale(sale);
+      }
+      if (!mounted) return;
+      if (widget.fromMenu || widget.fromMasters) {
+        context.pop();
+      } else {
+        context.go(AppRouter.sales);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
@@ -236,7 +245,7 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               gradient: isDark ? AppColors.silverGradient : null,
-              color: isDark ? null : AppColors.lightTextPrimary,
+              color: isDark ? null : AppColors.lightPrimary,
               borderRadius: BorderRadius.circular(10),
               boxShadow: [
                 BoxShadow(
@@ -434,9 +443,9 @@ class _SaleStepIndicator extends StatelessWidget {
     final labels = ['Bill Info', 'Amounts', 'Notes'];
 
     final activeCircleGradient = isDark ? AppColors.silverGradient : null;
-    final activeCircleColor = isDark ? null : AppColors.lightTextPrimary;
+    final activeCircleColor = isDark ? null : AppColors.lightPrimary;
     final activeContentColor = isDark ? AppColors.black : AppColors.white;
-    final activeLineColor = isDark ? AppColors.silver : AppColors.lightTextPrimary;
+    final activeLineColor = isDark ? AppColors.silver : AppColors.lightPrimary;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
@@ -1030,7 +1039,7 @@ class _BillImagePicker extends StatelessWidget {
           color: cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: (isDark ? AppColors.silver : AppColors.lightTextPrimary)
+            color: (isDark ? AppColors.silver : AppColors.lightPrimary)
                 .withValues(alpha: 0.25),
             width: 1.5,
             strokeAlign: BorderSide.strokeAlignInside,
@@ -1088,7 +1097,7 @@ class _SourceTile extends StatelessWidget {
           children: [
             Icon(icon,
                 size: 28,
-                color: isDark ? AppColors.silver : AppColors.lightTextPrimary),
+                color: isDark ? AppColors.silver : AppColors.lightPrimary),
             const SizedBox(height: 8),
             Text(label,
                 style: TextStyle(

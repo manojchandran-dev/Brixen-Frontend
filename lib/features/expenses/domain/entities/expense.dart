@@ -1,6 +1,9 @@
 class Expense {
   final String id;
-  final String category;
+  final String categoryId;
+  final String category; // display name, resolved client-side from Masters
+  final String? unitId;
+  final String? unit; // display name, resolved client-side from Masters
   final String title;
   final double amount;
   final DateTime expenseDate;
@@ -11,7 +14,10 @@ class Expense {
 
   const Expense({
     required this.id,
+    required this.categoryId,
     required this.category,
+    this.unitId,
+    this.unit,
     required this.title,
     required this.amount,
     required this.expenseDate,
@@ -23,7 +29,10 @@ class Expense {
 
   Expense copyWith({
     String? id,
+    String? categoryId,
     String? category,
+    String? unitId,
+    String? unit,
     String? title,
     double? amount,
     DateTime? expenseDate,
@@ -34,7 +43,10 @@ class Expense {
   }) {
     return Expense(
       id: id ?? this.id,
+      categoryId: categoryId ?? this.categoryId,
       category: category ?? this.category,
+      unitId: unitId ?? this.unitId,
+      unit: unit ?? this.unit,
       title: title ?? this.title,
       amount: amount ?? this.amount,
       expenseDate: expenseDate ?? this.expenseDate,

@@ -43,9 +43,47 @@ class CompaniesRemoteDatasource {
     }
   }
 
+  // Step 1 — identity fields only; server auto-generates company_code
   Future<CompanyModel> createCompany(Map<String, dynamic> body) async {
     try {
       final resp = await _dio.post(ApiEndpoints.companies, data: body);
+      final data = resp.data['data'] ?? resp.data;
+      return CompanyModel.fromJson(data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  // Step 2 — contact & owner
+  Future<CompanyModel> updateCompanyStep2(
+      String id, Map<String, dynamic> body) async {
+    try {
+      final resp = await _dio.put(ApiEndpoints.companyStep2(id), data: body);
+      final data = resp.data['data'] ?? resp.data;
+      return CompanyModel.fromJson(data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  // Step 3 — location
+  Future<CompanyModel> updateCompanyStep3(
+      String id, Map<String, dynamic> body) async {
+    try {
+      final resp = await _dio.put(ApiEndpoints.companyStep3(id), data: body);
+      final data = resp.data['data'] ?? resp.data;
+      return CompanyModel.fromJson(data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  Future<CompanyModel> updateCompanyStatus(String id, String status) async {
+    try {
+      final resp = await _dio.put(
+        ApiEndpoints.companyStatus(id),
+        data: {'status': status},
+      );
       final data = resp.data['data'] ?? resp.data;
       return CompanyModel.fromJson(data as Map<String, dynamic>);
     } on DioException catch (e) {

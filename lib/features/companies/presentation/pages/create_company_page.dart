@@ -11,7 +11,8 @@ import '../providers/companies_provider.dart';
 
 class CreateCompanyPage extends ConsumerStatefulWidget {
   final bool fromMenu;
-  const CreateCompanyPage({super.key, this.fromMenu = false});
+  final Company? editCompany;
+  const CreateCompanyPage({super.key, this.fromMenu = false, this.editCompany});
 
   @override
   ConsumerState<CreateCompanyPage> createState() => _CreateCompanyPageState();
@@ -24,6 +25,7 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
 
   int _currentStep = 0;
   bool _submitting = false;
+  String? _createdId; // set after Step 1 API call succeeds
 
   // Step 1 — Company Identity
   final _nameCtrl = TextEditingController();
@@ -72,6 +74,34 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    final e = widget.editCompany;
+    if (e == null) return;
+    _createdId = e.id;
+    // Step 1 — Identity
+    _nameCtrl.text = e.name;
+    if (e.gstNumber != null) _gstCtrl.text = e.gstNumber!;
+    if (e.panNumber != null) _panCtrl.text = e.panNumber!;
+    _industry = e.industryType;
+    _entityType = e.entityType;
+    // Step 2 — Contact
+    _ownerCtrl.text = e.ownerName;
+    if (e.email != null) _emailCtrl.text = e.email!;
+    if (e.phone != null) _phoneCtrl.text = e.phone!;
+    if (e.secondaryEmail != null) _secondaryEmailCtrl.text = e.secondaryEmail!;
+    if (e.website != null) _websiteCtrl.text = e.website!;
+    // Step 3 — Location
+    if (e.address != null) _addressCtrl.text = e.address!;
+    if (e.city != null) _cityCtrl.text = e.city!;
+    if (e.state != null) _stateCtrl.text = e.state!;
+    if (e.pincode != null) _pincodeCtrl.text = e.pincode!;
+    _country = e.country;
+    _plan = e.subscriptionPlan;
+    _isActive = e.isActive;
+  }
+
+  @override
   void dispose() {
     _nameCtrl.dispose(); _gstCtrl.dispose(); _panCtrl.dispose();
     _foundedCtrl.dispose(); _ownerCtrl.dispose(); _emailCtrl.dispose();
@@ -83,43 +113,86 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
 
   GlobalKey<FormState> get _currentFormKey => [_step1Key, _step2Key, _step3Key][_currentStep];
 
-  void _next() {
-    if (!_currentFormKey.currentState!.validate()) return;
-    if (_currentStep < 2) setState(() => _currentStep++);
-  }
-
   void _back() {
     if (_currentStep > 0) setState(() => _currentStep--);
   }
 
-  void _submit() async {
+  Future<void> _handleNext() async {
     if (!_currentFormKey.currentState!.validate()) return;
     setState(() => _submitting = true);
-    await Future.delayed(const Duration(milliseconds: 500));
-    ref.read(companiesProvider.notifier).addCompany(Company(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: _nameCtrl.text.trim(),
-      code: null,
-      ownerName: _ownerCtrl.text.trim(),
-      email: _emailCtrl.text.trim(),
-      phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
-      address: _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
-      city: _cityCtrl.text.trim().isEmpty ? null : _cityCtrl.text.trim(),
-      state: _stateCtrl.text.trim().isEmpty ? null : _stateCtrl.text.trim(),
-      country: _country,
-      pincode: _pincodeCtrl.text.trim().isEmpty ? null : _pincodeCtrl.text.trim(),
-      industryType: _industry,
-      entityType: _entityType,
-      panNumber: _panCtrl.text.trim().isEmpty ? null : _panCtrl.text.trim().toUpperCase(),
-      subscriptionPlan: _plan,
-      isActive: _isActive,
-      createdAt: DateTime.now(),
-    ));
-    if (!mounted) return;
-    if (widget.fromMenu) {
-      context.pop();
-    } else {
-      context.go(AppRouter.companies);
+    try {
+      switch (_currentStep) {
+        case 0:
+          if (widget.editCompany != null) {
+            await ref.read(companiesProvider.notifier).updateCompany(
+              widget.editCompany!.copyWith(
+                name: _nameCtrl.text.trim(),
+                gstNumber: _gstCtrl.text.trim().isEmpty ? null : _gstCtrl.text.trim(),
+                panNumber: _panCtrl.text.trim().isEmpty ? null : _panCtrl.text.trim().toUpperCase(),
+                industryType: _industry,
+                entityType: _entityType,
+              ),
+            );
+            setState(() => _currentStep = 1);
+          } else {
+            final created = await ref.read(companiesProvider.notifier).createStep1(
+              Company(
+                id: '',
+                name: _nameCtrl.text.trim(),
+                ownerName: '',
+                gstNumber: _gstCtrl.text.trim().isEmpty ? null : _gstCtrl.text.trim(),
+                panNumber: _panCtrl.text.trim().isEmpty ? null : _panCtrl.text.trim().toUpperCase(),
+                industryType: _industry,
+                entityType: _entityType,
+                createdAt: DateTime.now(),
+              ),
+            );
+            _createdId = created.id;
+            setState(() => _currentStep = 1);
+          }
+        case 1:
+          await ref.read(companiesProvider.notifier).updateStep2(
+            _createdId!,
+            Company(
+              id: _createdId!,
+              name: '',
+              ownerName: _ownerCtrl.text.trim(),
+              email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
+              phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+              secondaryEmail: _secondaryEmailCtrl.text.trim().isEmpty ? null : _secondaryEmailCtrl.text.trim(),
+              website: _websiteCtrl.text.trim().isEmpty ? null : _websiteCtrl.text.trim(),
+              createdAt: DateTime.now(),
+            ),
+          );
+          setState(() => _currentStep = 2);
+        case 2:
+          await ref.read(companiesProvider.notifier).updateStep3(
+            _createdId!,
+            Company(
+              id: _createdId!,
+              name: '',
+              ownerName: '',
+              address: _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
+              city: _cityCtrl.text.trim().isEmpty ? null : _cityCtrl.text.trim(),
+              state: _stateCtrl.text.trim().isEmpty ? null : _stateCtrl.text.trim(),
+              pincode: _pincodeCtrl.text.trim().isEmpty ? null : _pincodeCtrl.text.trim(),
+              createdAt: DateTime.now(),
+            ),
+          );
+          if (!mounted) return;
+          if (widget.fromMenu) {
+            context.pop();
+          } else {
+            context.go(AppRouter.companies);
+          }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
@@ -153,7 +226,7 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               gradient: isDark ? AppColors.silverGradient : null,
-              color: isDark ? null : AppColors.lightTextPrimary,
+              color: isDark ? null : AppColors.lightPrimary,
               borderRadius: BorderRadius.circular(10),
               boxShadow: [
                 BoxShadow(
@@ -269,7 +342,7 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
             child: BrixenButton(
               label: _currentStep == 2 ? 'Create Company' : 'Continue',
               isLoading: _submitting,
-              onPressed: _submitting ? null : (_currentStep == 2 ? _submit : _next),
+              onPressed: _submitting ? null : _handleNext,
             ),
           ),
         ],
@@ -292,9 +365,9 @@ class _StepIndicator extends StatelessWidget {
 
     // Active/done: silver gradient in dark, near-black in light
     final activeCircleGradient = isDark ? AppColors.silverGradient : null;
-    final activeCircleColor = isDark ? null : AppColors.lightTextPrimary;
+    final activeCircleColor = isDark ? null : AppColors.lightPrimary;
     final activeContentColor = isDark ? AppColors.black : AppColors.white;
-    final activeLineColor = isDark ? AppColors.silver : AppColors.lightTextPrimary;
+    final activeLineColor = isDark ? AppColors.silver : AppColors.lightPrimary;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),

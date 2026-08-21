@@ -7,6 +7,7 @@ class BrixenDropdown<T> extends StatefulWidget {
   final List<T> items;
   final String Function(T) labelOf;
   final IconData icon;
+  final Color iconColor;
   final void Function(T?) onChanged;
 
   const BrixenDropdown({
@@ -16,6 +17,7 @@ class BrixenDropdown<T> extends StatefulWidget {
     required this.items,
     required this.labelOf,
     required this.icon,
+    this.iconColor = AppColors.brand,
     required this.onChanged,
   });
 
@@ -119,22 +121,43 @@ class _BrixenDropdownState<T> extends State<BrixenDropdown<T>>
         onTap: _toggle,
         child: Container(
           height: 56,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: isDark ? cs.surfaceContainerHighest : AppColors.lightSurface,
+            color: isDark ? cs.surfaceContainerHighest : AppColors.surface,
             borderRadius: _isOpen
-                ? const BorderRadius.vertical(top: Radius.circular(12))
-                : BorderRadius.circular(12),
-            border: Border.all(
-              color: _isOpen
-                  ? AppColors.silver
-                  : Theme.of(context).dividerColor,
-              width: _isOpen ? 1.5 : 1,
-            ),
+                ? const BorderRadius.vertical(top: Radius.circular(16))
+                : BorderRadius.circular(16),
+            border: isDark
+                ? Border.all(color: _isOpen ? AppColors.silver : Theme.of(context).dividerColor, width: _isOpen ? 1.5 : 1)
+                : null,
+            boxShadow: isDark
+                ? null
+                : [
+                    BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
+                    BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+                  ],
           ),
           child: Row(
             children: [
-              Icon(widget.icon, size: 20, color: cs.onSurfaceVariant),
+              isDark
+                  ? Icon(widget.icon, size: 20, color: cs.onSurfaceVariant)
+                  : Container(
+                      width: 34,
+                      height: 34,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [widget.iconColor, widget.iconColor.withValues(alpha: 0.75)],
+                        ),
+                        boxShadow: [
+                          BoxShadow(color: widget.iconColor.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3)),
+                        ],
+                      ),
+                      child: Icon(widget.icon, size: 17, color: AppColors.white),
+                    ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -251,7 +274,7 @@ class _BrixenDropdownPanel<T> extends StatelessWidget {
                             color: selected
                                 ? (isDark
                                     ? AppColors.silver
-                                    : AppColors.lightTextPrimary)
+                                    : AppColors.lightPrimary)
                                 : cs.onSurface,
                             fontSize: 15,
                             fontWeight: selected
@@ -265,7 +288,7 @@ class _BrixenDropdownPanel<T> extends StatelessWidget {
                             size: 16,
                             color: isDark
                                 ? AppColors.silver
-                                : AppColors.lightTextPrimary),
+                                : AppColors.lightPrimary),
                     ],
                   ),
                 ),

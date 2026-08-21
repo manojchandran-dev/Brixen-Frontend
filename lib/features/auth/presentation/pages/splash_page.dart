@@ -1,9 +1,10 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/constants/app_strings.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/services/token_service.dart';
 import '../../../../shared/widgets/brixen_logo.dart';
 import '../../../security/presentation/cubit/security_cubit.dart';
 
@@ -15,17 +16,18 @@ class SplashPage extends StatefulWidget {
 }
 
 class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
-  late final AnimationController _shimmerController;
+  late final AnimationController _glowController;
   late final AnimationController _fadeController;
   late final AnimationController _progressController;
   late final Animation<double> _fadeAnim;
+  late final Animation<double> _scaleAnim;
 
   @override
   void initState() {
     super.initState();
-    _shimmerController = AnimationController(
+    _glowController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2200),
+      duration: const Duration(milliseconds: 2400),
     )..repeat();
     _fadeController = AnimationController(
       vsync: this,
@@ -36,6 +38,7 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 2800),
     );
     _fadeAnim = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
+    _scaleAnim = CurvedAnimation(parent: _fadeController, curve: Curves.easeOutBack);
     _runSequence();
   }
 
@@ -45,13 +48,22 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
     _progressController.forward();
     await Future.delayed(const Duration(milliseconds: 3400));
     if (!mounted) return;
-    final locked = await securityCubit.isLockActive();
-    if (mounted) context.go(locked ? AppRouter.lockScreen : AppRouter.signIn);
+    if (TokenService.isLoggedIn) {
+      final pinEnabled = await securityCubit.isLockActive();
+      if (!mounted) return;
+      if (pinEnabled) {
+        context.go(AppRouter.lockScreen);
+      } else {
+        context.go(AppRouter.pinSetup);
+      }
+    } else {
+      context.go(AppRouter.signIn);
+    }
   }
 
   @override
   void dispose() {
-    _shimmerController.dispose();
+    _glowController.dispose();
     _fadeController.dispose();
     _progressController.dispose();
     super.dispose();
@@ -59,132 +71,107 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: isDark
-              ? AppColors.backgroundGradient
-              : AppColors.lightBackgroundGradient,
-        ),
-        child: Stack(
-          children: [
-            Positioned(top: -100, right: -80, child: _Orb(size: 300)),
-            Positioned(bottom: -120, left: -60, child: _Orb(size: 240)),
+      backgroundColor: AppColors.background,
+      body: Stack(
+        children: [
+          Positioned(top: -100, right: -80, child: _Orb(size: 300, color: AppColors.brand)),
+          Positioned(bottom: -120, left: -60, child: _Orb(size: 240, color: AppColors.positive)),
 
-            Center(
-              child: FadeTransition(
-                opacity: _fadeAnim,
+          Center(
+            child: FadeTransition(
+              opacity: _fadeAnim,
+              child: ScaleTransition(
+                scale: _scaleAnim,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Animated assembled logo with glow
+                    // Pulsing brand-colour glow behind the assembling mark
                     Stack(
                       alignment: Alignment.center,
                       children: [
-                        Container(
-                          width: 180,
-                          height: 180,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [
-                                AppColors.silver.withValues(alpha: 0.15),
-                                AppColors.silver.withValues(alpha: 0.03),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
+                        AnimatedBuilder(
+                          animation: _glowController,
+                          builder: (context, child) {
+                            final pulse = (math.sin(_glowController.value * 2 * math.pi) + 1) / 2;
+                            return Container(
+                              width: 190,
+                              height: 190,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: RadialGradient(
+                                  colors: [
+                                    Color.lerp(AppColors.brand, AppColors.positive, pulse)!.withValues(alpha: 0.16),
+                                    Color.lerp(AppColors.brand, AppColors.positive, pulse)!.withValues(alpha: 0.03),
+                                    Colors.transparent,
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
                         ),
                         const BrixenLogo(size: 140, animate: true),
                       ],
                     ),
                     const SizedBox(height: 28),
 
-                    _PulseText(
-                      text: AppStrings.appName,
-                      shimmer: _shimmerController,
-                      style: TextStyle(
-                        fontSize: 44,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 14,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
+                    Text.rich(
+                      TextSpan(children: [
+                        const TextSpan(text: 'Brix', style: TextStyle(color: AppColors.brand)),
+                        const TextSpan(text: 'en', style: TextStyle(color: AppColors.positive)),
+                      ]),
+                      style: GoogleFonts.spaceGrotesk(fontSize: 36, fontWeight: FontWeight.w700, letterSpacing: -1),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
 
-                    Text(
-                      AppStrings.tagline,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        letterSpacing: 3,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    Text.rich(
+                      TextSpan(children: [
+                        const TextSpan(text: 'Work smart. ', style: TextStyle(color: AppColors.ink)),
+                        TextSpan(text: 'Grow together.', style: TextStyle(color: AppColors.positive.withValues(alpha: 0.9))),
+                      ]),
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
               ),
             ),
+          ),
 
-            Positioned(
-              bottom: 56,
-              left: 0,
-              right: 0,
-              child: FadeTransition(
-                opacity: _fadeAnim,
-                child: Center(
-                  child: SizedBox(
-                    width: 100,
-                    child: AnimatedBuilder(
-                      animation: _progressController,
-                      builder: (context, child) => LinearProgressIndicator(
+          Positioned(
+            bottom: 56,
+            left: 0,
+            right: 0,
+            child: FadeTransition(
+              opacity: _fadeAnim,
+              child: Center(
+                child: SizedBox(
+                  width: 120,
+                  child: AnimatedBuilder(
+                    animation: _progressController,
+                    builder: (context, child) => ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
                         value: _progressController.value,
-                        backgroundColor: Theme.of(context).dividerColor,
-                        valueColor:
-                            const AlwaysStoppedAnimation(AppColors.silver),
-                        borderRadius: BorderRadius.circular(4),
-                        minHeight: 2,
+                        backgroundColor: AppColors.surfaceElevated,
+                        valueColor: const AlwaysStoppedAnimation(AppColors.brand),
+                        minHeight: 3,
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
-}
-
-class _PulseText extends StatelessWidget {
-  final String text;
-  final AnimationController shimmer;
-  final TextStyle style;
-
-  const _PulseText({
-    required this.text,
-    required this.shimmer,
-    required this.style,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: shimmer,
-      builder: (context, child) {
-        final pulse = (math.sin(shimmer.value * 2 * math.pi) + 1) / 2;
-        final color = Color.lerp(AppColors.silver, AppColors.white, pulse)!;
-        return Text(text, style: style.copyWith(color: color));
-      },
     );
   }
 }
 
 class _Orb extends StatelessWidget {
   final double size;
-  const _Orb({required this.size});
+  final Color color;
+  const _Orb({required this.size, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -195,8 +182,8 @@ class _Orb extends StatelessWidget {
         shape: BoxShape.circle,
         gradient: RadialGradient(
           colors: [
-            AppColors.silver.withValues(alpha: 0.06),
-            AppColors.silver.withValues(alpha: 0.01),
+            color.withValues(alpha: 0.08),
+            color.withValues(alpha: 0.02),
             Colors.transparent,
           ],
         ),

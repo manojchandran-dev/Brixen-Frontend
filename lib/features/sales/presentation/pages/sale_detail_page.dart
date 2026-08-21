@@ -12,58 +12,93 @@ class SaleDetailPage extends ConsumerWidget {
   final Sale sale;
   const SaleDetailPage({super.key, required this.sale});
 
+  Color _statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'paid': return AppColors.positive;
+      case 'pending': return AppColors.brandLight;
+      case 'partial': return AppColors.brand;
+      case 'cancelled': return AppColors.ink;
+      default: return AppColors.brandDeep;
+    }
+  }
+
+  void _confirmDelete(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Sale', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.ink)),
+        content: const Text('Delete this sale? This cannot be undone.', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary))),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await ref.read(salesProvider.notifier).deleteSale(sale.id);
+                if (context.mounted) context.go(AppRouter.sales);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+                  );
+                }
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final fmt = NumberFormat('#,##,##0.00', 'en_IN');
     final statusColor = _statusColor(sale.paymentStatus);
+    final title = sale.customerName ?? sale.invoiceType ?? 'Sale';
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: AppColors.background,
         elevation: 0,
         shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: Theme.of(context).dividerColor),
+          child: Container(height: 1, color: AppColors.border),
         ),
         leading: GestureDetector(
           onTap: () => context.pop(),
           child: Container(
+            width: 40, height: 40,
             margin: const EdgeInsets.all(8),
+            alignment: Alignment.center,
             decoration: BoxDecoration(
-              gradient: isDark ? AppColors.silverGradient : null,
-              color: isDark ? null : AppColors.lightTextPrimary,
-              borderRadius: BorderRadius.circular(10),
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(12),
               boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.2),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
+                BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
+                BoxShadow(color: AppColors.white.withValues(alpha: 0.8), blurRadius: 4, offset: const Offset(-2, -2)),
               ],
             ),
-            child: Icon(Icons.arrow_back_ios_new_rounded, size: 16,
-                color: isDark ? AppColors.black : AppColors.white),
+            child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
           ),
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(sale.billNo,
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: cs.onSurface)),
-            Text(DateFormat('dd MMM yyyy').format(sale.billDate),
-                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
-          ],
-        ),
+        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          GestureDetector(
+            onTap: () => context.pop(),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Text('Sales', style: TextStyle(fontSize: 12, color: AppColors.textHint, fontWeight: FontWeight.w500)),
+              const Icon(Icons.chevron_right_rounded, size: 14, color: AppColors.textHint),
+              Flexible(child: Text(title, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.ink))),
+            ]),
+          ),
+          Text(DateFormat('dd MMM yyyy').format(sale.billDate), style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
+        ]),
         actions: [
-          // Edit button
           GestureDetector(
             onTap: () => context.push(
               AppRouter.createSale,
@@ -71,39 +106,34 @@ class SaleDetailPage extends ConsumerWidget {
             ),
             child: Container(
               margin: const EdgeInsets.fromLTRB(0, 8, 8, 8),
-              width: 36,
-              height: 36,
+              width: 38, height: 38,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: AppColors.accentIndigo.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                    color: AppColors.accentIndigo.withValues(alpha: 0.3)),
+                gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.brand, AppColors.brandDeep]),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [BoxShadow(color: AppColors.brand.withValues(alpha: 0.4), blurRadius: 10, offset: const Offset(0, 4))],
               ),
-              child: Icon(Icons.edit_outlined,
-                  size: 18, color: AppColors.accentIndigo),
+              child: const Icon(Icons.edit_outlined, size: 18, color: AppColors.white),
             ),
           ),
-          // Delete button
           GestureDetector(
             onTap: () => _confirmDelete(context, ref),
             child: Container(
-              margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
-              width: 36,
-              height: 36,
+              margin: const EdgeInsets.fromLTRB(0, 8, 12, 8),
+              width: 38, height: 38,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: AppColors.accentRose.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                    color: AppColors.accentRose.withValues(alpha: 0.3)),
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [BoxShadow(color: AppColors.ink.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 4))],
               ),
-              child: Icon(Icons.delete_outline_rounded,
-                  size: 18, color: AppColors.accentRose),
+              child: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.ink),
             ),
           ),
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
         children: [
           // Status badge row
           Row(
@@ -115,12 +145,12 @@ class SaleDetailPage extends ConsumerWidget {
               ],
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
 
           // Bill image
           if (sale.billImagePath != null) ...[
             ClipRRect(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(18),
               child: Image.file(
                 File(sale.billImagePath!),
                 width: double.infinity,
@@ -128,145 +158,61 @@ class SaleDetailPage extends ConsumerWidget {
                 fit: BoxFit.cover,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
           ],
 
           // Amount breakdown card
           _SectionCard(
-            isDark: isDark,
             child: Column(
               children: [
-                _DetailRow(
-                  label: 'Subtotal',
-                  value: '₹${fmt.format(sale.subtotal)}',
-                  valueColor: cs.onSurface,
-                ),
+                _DetailRow(icon: Icons.receipt_long_rounded, iconColor: AppColors.brand, label: 'Subtotal', value: '₹${fmt.format(sale.subtotal)}', valueColor: AppColors.ink),
                 _Divider(),
-                _DetailRow(
-                  label: 'Tax Amount',
-                  value: '₹${fmt.format(sale.taxAmount)}',
-                  valueColor: AppColors.accentGold,
-                ),
+                _DetailRow(icon: Icons.percent_rounded, iconColor: AppColors.brandLight, label: 'Tax Amount', value: '₹${fmt.format(sale.taxAmount)}', valueColor: AppColors.brand),
                 _Divider(),
-                _DetailRow(
-                  label: 'Total Amount',
-                  value: '₹${fmt.format(sale.totalAmount)}',
-                  valueColor: AppColors.accentEmerald,
-                  bold: true,
-                  large: true,
-                ),
+                _DetailRow(icon: Icons.payments_rounded, iconColor: AppColors.positive, label: 'Total Amount', value: '₹${fmt.format(sale.totalAmount)}', valueColor: AppColors.positive, bold: true, large: true),
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
 
           // Payment info
           _SectionCard(
-            isDark: isDark,
             child: Column(
               children: [
-                _DetailRow(
-                  label: 'Payment Type',
-                  value: sale.paymentType ?? '—',
-                  valueColor: cs.onSurface,
-                ),
+                if (sale.customerName != null) ...[
+                  _DetailRow(icon: Icons.person_rounded, iconColor: AppColors.brand, label: 'Customer', value: sale.customerName!, valueColor: AppColors.ink),
+                  _Divider(),
+                ],
+                _DetailRow(icon: Icons.credit_card_rounded, iconColor: AppColors.positive, label: 'Payment Type', value: sale.paymentType ?? '—', valueColor: AppColors.ink),
                 _Divider(),
-                _DetailRow(
-                  label: 'Payment Status',
-                  value: sale.paymentStatus,
-                  valueColor: statusColor,
-                  bold: true,
-                ),
+                _DetailRow(icon: Icons.sync_alt_rounded, iconColor: AppColors.brandDeep, label: 'Payment Status', value: sale.paymentStatus, valueColor: statusColor, bold: true),
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
 
           // Notes
           if (sale.notes != null && sale.notes!.isNotEmpty) ...[
             _SectionCard(
-              isDark: isDark,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Notes',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: cs.onSurfaceVariant)),
+                  const Text('Notes', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textHint, letterSpacing: 0.3)),
                   const SizedBox(height: 8),
-                  Text(sale.notes!,
-                      style: TextStyle(fontSize: 14, color: cs.onSurface)),
+                  Text(sale.notes!, style: const TextStyle(fontSize: 14, color: AppColors.ink)),
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
           ],
 
           // Meta info
           _SectionCard(
-            isDark: isDark,
-            child: Column(
-              children: [
-                _DetailRow(
-                  label: 'Created',
-                  value: DateFormat('dd MMM yyyy, hh:mm a').format(sale.createdAt),
-                  valueColor: cs.onSurfaceVariant,
-                ),
-              ],
-            ),
+            child: _DetailRow(icon: Icons.history_rounded, iconColor: AppColors.brandLight, label: 'Created', value: DateFormat('dd MMM yyyy, hh:mm a').format(sale.createdAt), valueColor: AppColors.textSecondary),
           ),
         ],
       ),
     );
-  }
-
-  void _confirmDelete(BuildContext context, WidgetRef ref) {
-    final cs = Theme.of(context).colorScheme;
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Delete Sale',
-            style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface)),
-        content: Text(
-          'Delete "${sale.billNo}"? This cannot be undone.',
-          style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel',
-                style: TextStyle(color: cs.onSurfaceVariant)),
-          ),
-          TextButton(
-            onPressed: () {
-              ref.read(salesProvider.notifier).deleteSale(sale.id);
-              Navigator.pop(context);
-              context.go(AppRouter.sales);
-            },
-            child: Text('Delete',
-                style: TextStyle(
-                    color: AppColors.accentRose,
-                    fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _statusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'paid':      return AppColors.accentEmerald;
-      case 'pending':   return AppColors.accentGold;
-      case 'partial':   return AppColors.accentIndigo;
-      case 'cancelled': return AppColors.accentRose;
-      default:          return AppColors.accentSlate;
-    }
   }
 }
 
@@ -274,26 +220,19 @@ class SaleDetailPage extends ConsumerWidget {
 
 class _SectionCard extends StatelessWidget {
   final Widget child;
-  final bool isDark;
-  const _SectionCard({required this.child, required this.isDark});
+  const _SectionCard({required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: isDark
-            ? Theme.of(context).colorScheme.surfaceContainerHighest
-            : AppColors.lightSurface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
+          BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 16, offset: const Offset(0, 6)),
+          BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
         ],
       ),
       child: child,
@@ -302,12 +241,16 @@ class _SectionCard extends StatelessWidget {
 }
 
 class _DetailRow extends StatelessWidget {
+  final IconData? icon;
+  final Color iconColor;
   final String label;
   final String value;
   final Color valueColor;
   final bool bold;
   final bool large;
   const _DetailRow({
+    this.icon,
+    this.iconColor = AppColors.brand,
     required this.label,
     required this.value,
     required this.valueColor,
@@ -317,17 +260,30 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label,
-            style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
-        Text(value,
-            style: TextStyle(
-                fontSize: large ? 15 : 13,
-                fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-                color: valueColor)),
+        if (icon != null) ...[
+          Container(
+            width: 32, height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [iconColor, iconColor.withValues(alpha: 0.75)]),
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: iconColor.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3))],
+            ),
+            child: Icon(icon, size: 16, color: AppColors.white),
+          ),
+          const SizedBox(width: 12),
+        ],
+        Text(label, style: const TextStyle(fontSize: 12.5, color: AppColors.textHint)),
+        Expanded(
+          child: Text(value,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                  fontSize: large ? 15 : 13,
+                  fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
+                  color: valueColor)),
+        ),
       ],
     );
   }
@@ -336,9 +292,9 @@ class _DetailRow extends StatelessWidget {
 class _Divider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Divider(height: 1, color: Theme.of(context).dividerColor),
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 12),
+      child: Divider(height: 1, color: AppColors.border),
     );
   }
 }
@@ -351,17 +307,9 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
-      ),
-      child: Text(status,
-          style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: color)),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20)),
+      child: Text(status, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.white)),
     );
   }
 }
@@ -372,16 +320,14 @@ class _TagChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        boxShadow: [BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 3))],
       ),
-      child: Text(label,
-          style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+      child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
     );
   }
 }

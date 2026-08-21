@@ -58,12 +58,9 @@ class _CreateCustomerPageState extends ConsumerState<CreateCustomerPage> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _submitting = true);
-    await Future.delayed(const Duration(milliseconds: 300));
 
     final customer = Customer(
-      id: _isEditing
-          ? widget.editCustomer!.id
-          : DateTime.now().millisecondsSinceEpoch.toString(),
+      id: _isEditing ? widget.editCustomer!.id : '',
       name:      _nameCtrl.text.trim(),
       shopName:  _shopNameCtrl.text.trim().isEmpty ? null : _shopNameCtrl.text.trim(),
       phone:     _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
@@ -73,14 +70,22 @@ class _CreateCustomerPageState extends ConsumerState<CreateCustomerPage> {
       createdAt: _isEditing ? widget.editCustomer!.createdAt : DateTime.now(),
     );
 
-    if (_isEditing) {
-      ref.read(customersProvider.notifier).updateCustomer(customer);
-    } else {
-      ref.read(customersProvider.notifier).addCustomer(customer);
+    try {
+      if (_isEditing) {
+        await ref.read(customersProvider.notifier).updateCustomer(customer);
+      } else {
+        await ref.read(customersProvider.notifier).addCustomer(customer);
+      }
+      if (mounted) context.pop();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
-
-    if (!mounted) return;
-    context.pop();
   }
 
   @override
@@ -104,7 +109,7 @@ class _CreateCustomerPageState extends ConsumerState<CreateCustomerPage> {
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               gradient: isDark ? AppColors.silverGradient : null,
-              color: isDark ? null : AppColors.lightTextPrimary,
+              color: isDark ? null : AppColors.lightPrimary,
               borderRadius: BorderRadius.circular(10),
               boxShadow: [
                 BoxShadow(
@@ -240,7 +245,7 @@ class _CreateCustomerPageState extends ConsumerState<CreateCustomerPage> {
   }
 }
 
-// ── Address multiline field ────────────────────────────────────────────────
+// â”€â”€ Address multiline field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _AddressField extends StatefulWidget {
   final TextEditingController controller;
@@ -282,7 +287,7 @@ class _AddressFieldState extends State<_AddressField> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: _focused
-                  ? (isDark ? AppColors.silver : AppColors.lightTextPrimary)
+                  ? (isDark ? AppColors.silver : AppColors.lightPrimary)
                   : Theme.of(context).dividerColor,
               width: _focused ? 1.5 : 1,
             ),

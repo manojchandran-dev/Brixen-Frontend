@@ -3,8 +3,10 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
 import '../../features/auth/presentation/pages/sign_in_page.dart';
 import '../../features/auth/presentation/pages/sign_up_page.dart';
+import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/company_admin_home_page.dart';
 import '../../features/auth/presentation/pages/employee_home_page.dart';
+import '../../features/companies/domain/entities/company.dart';
 import '../../features/companies/presentation/pages/companies_page.dart';
 import '../../features/companies/presentation/pages/create_company_page.dart';
 import '../../features/sales/presentation/pages/sales_page.dart';
@@ -29,6 +31,7 @@ import '../../features/employees/presentation/pages/employee_detail_page.dart';
 import '../../features/employees/domain/entities/employee.dart';
 import '../../features/security/presentation/cubit/security_cubit.dart';
 import '../../features/security/presentation/pages/lock_screen_page.dart';
+import '../../features/security/presentation/pages/pin_setup_page.dart';
 import '../../features/security/presentation/pages/security_settings_page.dart';
 import '../../features/security/presentation/pages/set_pin_page.dart';
 
@@ -38,6 +41,7 @@ class AppRouter {
   static const String splash = '/';
   static const String signIn = '/sign-in';
   static const String signUp = '/sign-up';
+  static const String forgotPassword = '/forgot-password';
   static const String companies = '/companies';       // super admin home
   static const String companyAdminHome = '/admin';    // company admin home
   static const String employeeHome = '/home';         // employee home
@@ -60,6 +64,7 @@ class AppRouter {
   static const String lockScreen = '/lock';
   static const String security = '/security';
   static const String setPin = '/security/set-pin';
+  static const String pinSetup = '/security/pin-setup';
 
   static final GoRouter router = GoRouter(
     initialLocation: splash,
@@ -77,8 +82,12 @@ class AppRouter {
         builder: (context, state) => const SignUpPage(),
       ),
       GoRoute(
+        path: forgotPassword,
+        builder: (context, state) => const ForgotPasswordPage(),
+      ),
+      GoRoute(
         path: companies,
-        builder: (context, state) => const CompaniesPage(),
+        builder: (context, state) => CompaniesPage(initialSection: state.extra as String?),
       ),
       GoRoute(
         path: companyAdminHome,
@@ -90,8 +99,13 @@ class AppRouter {
       ),
       GoRoute(
         path: createCompany,
-        builder: (context, state) =>
-            CreateCompanyPage(fromMenu: state.extra == 'menu'),
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is Map) {
+            return CreateCompanyPage(editCompany: extra['edit'] as Company?);
+          }
+          return CreateCompanyPage(fromMenu: extra == 'menu');
+        },
       ),
       GoRoute(
         path: sales,
@@ -186,6 +200,10 @@ class AppRouter {
       GoRoute(
         path: employeeDetail,
         builder: (context, state) => EmployeeDetailPage(employee: state.extra as Employee),
+      ),
+      GoRoute(
+        path: pinSetup,
+        builder: (context, state) => const PinSetupPage(),
       ),
       GoRoute(
         path: lockScreen,

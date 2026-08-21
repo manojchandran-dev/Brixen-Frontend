@@ -228,12 +228,6 @@ class _SignUpViewState extends State<_SignUpView> {
                 ),
               ),
 
-              // Toggle last → on top → receives taps
-              Positioned(
-                top: 12,
-                right: 20,
-                child: _ThemeToggle(),
-              ),
             ],
           ),
         ),

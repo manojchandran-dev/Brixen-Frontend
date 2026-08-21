@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/app_bottom_nav.dart';
+import '../../../../shared/widgets/app_drawer.dart';
+import '../../../../shared/widgets/rich_card_shell.dart';
 import '../../domain/entities/customer.dart';
 import '../providers/customers_provider.dart';
 
@@ -32,6 +35,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
 
     return Scaffold(
       extendBody: true,
+      drawer: widget.fromMasters ? null : const AppDrawer(),
       bottomNavigationBar: const AppBottomNav(activeIndex: 3),
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -42,26 +46,43 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: Theme.of(context).dividerColor),
         ),
-        leading: GestureDetector(
-          onTap: () => widget.fromMasters ? context.pop() : context.go(AppRouter.companies),
-          child: Container(
-            margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              gradient: isDark ? AppColors.silverGradient : null,
-              color: isDark ? null : AppColors.lightTextPrimary,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.2),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
+        leading: widget.fromMasters
+            ? GestureDetector(
+                onTap: () => context.pop(),
+                child: Container(
+                  width: 40, height: 40,
+                  margin: const EdgeInsets.all(8),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: isDark ? cs.surfaceContainerHighest : AppColors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
+                      BoxShadow(color: AppColors.white.withValues(alpha: 0.8), blurRadius: 4, offset: const Offset(-2, -2)),
+                    ],
+                  ),
+                  child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
                 ),
-              ],
-            ),
-            child: Icon(Icons.arrow_back_ios_new_rounded, size: 16,
-                color: isDark ? AppColors.black : AppColors.white),
-          ),
-        ),
+              )
+            : Builder(
+                builder: (ctx) => GestureDetector(
+                  onTap: () => Scaffold.of(ctx).openDrawer(),
+                  child: Container(
+                    width: 40, height: 40,
+                    margin: const EdgeInsets.all(8),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isDark ? cs.surfaceContainerHighest : AppColors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
+                        BoxShadow(color: AppColors.white.withValues(alpha: 0.8), blurRadius: 4, offset: const Offset(-2, -2)),
+                      ],
+                    ),
+                    child: const Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
+                  ),
+                ),
+              ),
         title: widget.fromMasters
             ? SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -103,18 +124,16 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                 extra: widget.fromMasters ? 'masters' : null),
             child: Container(
               margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
-              width: 36,
-              height: 36,
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
-                gradient: isDark ? AppColors.silverGradient : null,
-                color: isDark ? null : AppColors.lightTextPrimary,
-                borderRadius: BorderRadius.circular(10),
+                gradient: isDark
+                    ? AppColors.silverGradient
+                    : const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.brand, AppColors.brandDeep]),
+                borderRadius: BorderRadius.circular(13),
                 boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.2),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
+                  BoxShadow(color: AppColors.brand.withValues(alpha: isDark ? 0.0 : 0.4), blurRadius: 10, offset: const Offset(0, 4)),
                 ],
               ),
               child: Icon(Icons.add_rounded, size: 20,
@@ -127,30 +146,28 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: TextField(
-              controller: _searchCtrl,
-              onChanged: (_) => setState(() {}),
-              style: TextStyle(color: cs.onSurface, fontSize: 14),
-              decoration: InputDecoration(
-                hintText: 'Search by name, phone or email…',
-                hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
-                prefixIcon: Icon(Icons.search_rounded, color: cs.onSurfaceVariant, size: 20),
-                filled: true,
-                fillColor: cs.surfaceContainerHighest,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Theme.of(context).dividerColor),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Theme.of(context).dividerColor),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                      color: isDark ? AppColors.silver : AppColors.lightTextPrimary,
-                      width: 1.5),
+            child: Container(
+              height: 48,
+              decoration: BoxDecoration(
+                color: isDark ? cs.surfaceContainerHighest : AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: isDark
+                    ? null
+                    : [
+                        BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
+                        BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+                      ],
+              ),
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (_) => setState(() {}),
+                style: TextStyle(color: cs.onSurface, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Search by name, phone or email…',
+                  hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
+                  prefixIcon: Icon(Icons.search_rounded, color: cs.onSurfaceVariant, size: 20),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 13),
                 ),
               ),
             ),
@@ -197,7 +214,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (_, i) => _CustomerCard(
                     customer: filtered[i],
-                    isDark: isDark,
+                    index: i,
                   ),
                 );
               },
@@ -211,139 +228,116 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
 
 class _CustomerCard extends ConsumerWidget {
   final Customer customer;
-  final bool isDark;
-  const _CustomerCard({required this.customer, required this.isDark});
+  final int index;
+  const _CustomerCard({required this.customer, this.index = 0});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs = Theme.of(context).colorScheme;
+    // Cycle each card's own background through pale tints of the same 5
+    // colours used elsewhere (drawer icons, Companies/Employees/Sales lists).
+    const accentColors = [AppColors.brand, AppColors.positive, AppColors.brandDeep, AppColors.brandLight, AppColors.ink];
+    final accent = accentColors[index % accentColors.length];
+    final bg = Color.lerp(AppColors.surface, accent, 0.32)!;
 
-    return GestureDetector(
+    const fg = AppColors.ink;
+    final fgMuted = AppColors.ink.withValues(alpha: 0.6);
+    final dividerColor = AppColors.ink.withValues(alpha: 0.12);
+
+    return SwipeActions(
       onTap: () => context.push(AppRouter.customerDetail, extra: customer),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? cs.surfaceContainerHighest : AppColors.lightSurface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Theme.of(context).dividerColor),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.18 : 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+      actions: [
+        SwipeAction(
+          icon: Icons.edit_outlined,
+          label: 'Edit',
+          color: AppColors.accentIndigo,
+          onTap: () => context.push(AppRouter.createCustomer, extra: customer),
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(13),
-          child: Row(
+        SwipeAction(
+          icon: Icons.delete_outline,
+          label: 'Delete',
+          color: AppColors.error,
+          onTap: () => _confirmDelete(context, ref),
+        ),
+      ],
+      child: RichCardShell(
+        accentColor: AppColors.brandLight,
+        backgroundColor: bg,
+        showAccentBar: false,
+        edgeColor: accent,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(width: 3, color: AppColors.accentGold),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
-                  child: Row(
-                    children: [
-                      // Avatar circle
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: AppColors.accentGold.withValues(alpha: 0.12),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.accentGold.withValues(alpha: 0.3)),
-                        ),
-                        child: Center(
-                          child: Text(
-                            customer.name.isNotEmpty ? customer.name[0].toUpperCase() : '?',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.accentGold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(customer.name,
-                                style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: cs.onSurface)),
-                            if (customer.shopName != null) ...[
-                              const SizedBox(height: 2),
-                              Row(children: [
-                                Icon(Icons.storefront_outlined, size: 11, color: cs.onSurfaceVariant),
-                                const SizedBox(width: 4),
-                                Text(customer.shopName!,
-                                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-                              ]),
-                            ],
-                            if (customer.phone != null) ...[
-                              const SizedBox(height: 3),
-                              Row(
-                                children: [
-                                  Icon(Icons.phone_outlined, size: 11, color: cs.onSurfaceVariant),
-                                  const SizedBox(width: 4),
-                                  Text(customer.phone!,
-                                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-                                ],
-                              ),
-                            ],
-                            if (customer.email != null) ...[
-                              const SizedBox(height: 2),
-                              Row(
-                                children: [
-                                  Icon(Icons.email_outlined, size: 11, color: cs.onSurfaceVariant),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(customer.email!,
-                                        style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-                                        overflow: TextOverflow.ellipsis),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      PopupMenuButton<String>(
-                        onSelected: (v) => _onAction(context, ref, v),
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        icon: Icon(Icons.more_vert_rounded, size: 18, color: cs.onSurfaceVariant),
-                        itemBuilder: (_) => [
-                          PopupMenuItem(
-                            value: 'view',
-                            child: Row(children: [
-                              Icon(Icons.visibility_outlined, size: 16, color: cs.onSurface),
-                              const SizedBox(width: 10),
-                              Text('View', style: TextStyle(fontSize: 13, color: cs.onSurface)),
-                            ]),
-                          ),
-                          PopupMenuItem(
-                            value: 'edit',
-                            child: Row(children: [
-                              Icon(Icons.edit_outlined, size: 16, color: AppColors.accentIndigo),
-                              const SizedBox(width: 10),
-                              Text('Edit', style: TextStyle(fontSize: 13, color: AppColors.accentIndigo)),
-                            ]),
-                          ),
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: Row(children: [
-                              Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.accentRose),
-                              const SizedBox(width: 10),
-                              Text('Delete', style: TextStyle(fontSize: 13, color: AppColors.accentRose)),
-                            ]),
-                          ),
-                        ],
-                      ),
-                    ],
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [accent, accent.withValues(alpha: 0.75)]),
+                      shape: BoxShape.circle,
+                      boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))],
+                    ),
+                    child: Text(
+                      customer.name.trim().isNotEmpty ? customer.name.trim()[0].toUpperCase() : '?',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.white),
+                    ),
                   ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(customer.name,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg),
+                            overflow: TextOverflow.ellipsis),
+                        if (customer.shopName != null) ...[
+                          const SizedBox(height: 2),
+                          Row(children: [
+                            Icon(Icons.storefront_rounded, size: 11, color: fgMuted),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(customer.shopName!,
+                                  style: TextStyle(fontSize: 12, color: fgMuted),
+                                  overflow: TextOverflow.ellipsis),
+                            ),
+                          ]),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Container(
+                    width: 26,
+                    height: 26,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: AppColors.ink.withValues(alpha: 0.08), shape: BoxShape.circle),
+                    child: Icon(Icons.chevron_right_rounded, size: 16, color: fgMuted),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              RichCardDivider(color: dividerColor),
+              const SizedBox(height: 12),
+              StatGrid(
+                labelColor: fgMuted,
+                valueColor: fg,
+                dividerColor: dividerColor,
+                items: [
+                  StatGridItem(label: 'Phone', value: customer.phone ?? '—'),
+                  StatGridItem(label: 'GST No', value: customer.gstNumber ?? '—'),
+                  StatGridItem(label: 'Email', value: customer.email ?? '—'),
+                ],
+              ),
+              const SizedBox(height: 12),
+              RichCardDivider(color: dividerColor),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'Added ${DateFormat('dd MMM yyyy').format(customer.createdAt)}',
+                  style: TextStyle(fontSize: 11, color: fgMuted),
                 ),
               ),
             ],
@@ -351,17 +345,6 @@ class _CustomerCard extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  void _onAction(BuildContext context, WidgetRef ref, String action) {
-    switch (action) {
-      case 'view':
-        context.push(AppRouter.customerDetail, extra: customer);
-      case 'edit':
-        context.push(AppRouter.createCustomer, extra: customer);
-      case 'delete':
-        _confirmDelete(context, ref);
-    }
   }
 
   void _confirmDelete(BuildContext context, WidgetRef ref) {
@@ -381,9 +364,17 @@ class _CustomerCard extends ConsumerWidget {
             child: Text('Cancel', style: TextStyle(color: cs.onSurfaceVariant)),
           ),
           TextButton(
-            onPressed: () {
-              ref.read(customersProvider.notifier).deleteCustomer(customer.id);
+            onPressed: () async {
               Navigator.pop(context);
+              try {
+                await ref.read(customersProvider.notifier).deleteCustomer(customer.id);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+                  );
+                }
+              }
             },
             child: Text('Delete',
                 style: TextStyle(color: AppColors.accentRose, fontWeight: FontWeight.w700)),

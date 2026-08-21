@@ -55,10 +55,10 @@ class AppTheme {
         brightness: Brightness.light,
         scaffoldBackgroundColor: AppColors.lightBackground,
         colorScheme: const ColorScheme.light(
-          primary: Color(0xFF2A2A2A),        // dark grey — elite CTA colour
+          primary: AppColors.lightPrimary,   // blue — elite CTA colour
           onPrimary: AppColors.white,
-          secondary: AppColors.silver,
-          onSecondary: AppColors.black,
+          secondary: AppColors.positive,
+          onSecondary: AppColors.ink,
           surface: AppColors.lightSurface,
           onSurface: AppColors.lightTextPrimary,
           onSurfaceVariant: AppColors.lightTextSecondary,
@@ -77,7 +77,7 @@ class AppTheme {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.silverDark, width: 1.5),
+            borderSide: const BorderSide(color: AppColors.lightPrimary, width: 1.5),
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),

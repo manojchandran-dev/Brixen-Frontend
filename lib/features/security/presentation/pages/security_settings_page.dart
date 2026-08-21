@@ -56,7 +56,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
                 title: 'PIN Lock',
                 subtitle: state.isPinEnabled
                     ? 'PIN lock is active'
-                    : 'Set a 4-digit PIN',
+                    : 'Set a 6-digit PIN',
                 trailing: Switch.adaptive(
                   value: state.isPinEnabled,
                   activeThumbColor: AppColors.silver,
@@ -73,7 +73,7 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
                 _SettingsTile(
                   icon: Icons.edit_outlined,
                   title: 'Change PIN',
-                  subtitle: 'Update your 4-digit PIN',
+                  subtitle: 'Update your 6-digit PIN',
                   trailing: Icon(Icons.chevron_right,
                       color: Theme.of(context).colorScheme.onSurfaceVariant),
                   onTap: () => context.push(AppRouter.setPin),

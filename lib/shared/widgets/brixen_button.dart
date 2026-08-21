@@ -34,18 +34,17 @@ class _FilledBtn extends StatelessWidget {
     this.onPressed,
   });
 
-  static const _darkBtn = Color(0xFF111111);
-
   @override
   Widget build(BuildContext context) {
     final bool disabled = onPressed == null || isLoading;
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final Color fillColor = disabled
-        ? Theme.of(context).colorScheme.surfaceContainerHighest
+    final Color fillColor = disabled ? Theme.of(context).colorScheme.surfaceContainerHighest : Colors.transparent;
+    final Gradient? gradient = disabled
+        ? null
         : isDark
-            ? Colors.transparent   // gradient handles fill in dark
-            : _darkBtn;            // near-black in light — elite contrast on silver bg
+            ? AppColors.silverGradient
+            : const LinearGradient(colors: [AppColors.brand, AppColors.positive], begin: Alignment.centerLeft, end: Alignment.centerRight);
 
     return GestureDetector(
       onTap: disabled ? null : onPressed,
@@ -54,9 +53,9 @@ class _FilledBtn extends StatelessWidget {
         width: double.infinity,
         height: 56,
         decoration: BoxDecoration(
-          gradient: (!disabled && isDark) ? AppColors.silverGradient : null,
-          color: (!disabled && isDark) ? null : fillColor,
-          borderRadius: BorderRadius.circular(12),
+          gradient: gradient,
+          color: gradient == null ? fillColor : null,
+          borderRadius: BorderRadius.circular(27),
           boxShadow: disabled
               ? null
               : isDark
@@ -68,17 +67,10 @@ class _FilledBtn extends StatelessWidget {
                       ),
                     ]
                   : [
-                      // deep shadow — makes near-black button "float" on silver bg
                       BoxShadow(
-                        color: AppColors.black.withValues(alpha: 0.30),
-                        blurRadius: 22,
+                        color: AppColors.ink.withValues(alpha: 0.25),
+                        blurRadius: 16,
                         offset: const Offset(0, 8),
-                        spreadRadius: -2,
-                      ),
-                      BoxShadow(
-                        color: AppColors.black.withValues(alpha: 0.10),
-                        blurRadius: 40,
-                        offset: const Offset(0, 14),
                       ),
                     ],
         ),
@@ -95,11 +87,11 @@ class _FilledBtn extends StatelessWidget {
               : Text(
                   label,
                   style: TextStyle(
-                    // dark mode: black text on silver | light mode: white text on near-black
+                    // dark mode: black text on silver | light mode: white text on the gradient
                     color: isDark ? AppColors.black : AppColors.white,
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
                   ),
                 ),
         ),

@@ -23,10 +23,11 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
   final _step1Key = GlobalKey<FormState>();
   final _step2Key = GlobalKey<FormState>();
   final _step3Key = GlobalKey<FormState>();
-  final _step4Key = GlobalKey<FormState>();
 
   int _currentStep = 0;
   bool _submitting = false;
+  String? _employeeId; // set once step 1 succeeds — used by steps 2/3/4
+  Employee? _reviewEmployee; // freshly fetched for the Review step
 
   static const _labels = ['Personal', 'Employment', 'Banking', 'Review'];
 
@@ -55,7 +56,7 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
   final _accountNumberCtrl = TextEditingController();
   final _ifscCtrl = TextEditingController();
 
-  // Step 4 — Emergency Contact
+  // Step 1 — Emergency Contact (part of Personal, per the wizard's field list)
   final _emergencyNameCtrl = TextEditingController();
   final _emergencyPhoneCtrl = TextEditingController();
 
@@ -70,6 +71,7 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
     super.initState();
     final e = widget.editEmployee;
     if (e != null) {
+      _employeeId = e.id;
       _firstNameCtrl.text = e.firstName;
       _lastNameCtrl.text = e.lastName ?? '';
       _emailCtrl.text = e.email ?? '';
@@ -109,47 +111,98 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
     super.dispose();
   }
 
-  GlobalKey<FormState> get _currentFormKey => [_step1Key, _step2Key, _step3Key, _step4Key][_currentStep];
+  // Only steps 0-2 have real forms to validate — step 3 (Review) is display-only.
+  GlobalKey<FormState>? get _currentFormKey {
+    final keys = [_step1Key, _step2Key, _step3Key];
+    return _currentStep < keys.length ? keys[_currentStep] : null;
+  }
 
-  void _next() { if (!_currentFormKey.currentState!.validate()) return; if (_currentStep < 3) setState(() => _currentStep++); }
   void _back() { if (_currentStep > 0) setState(() => _currentStep--); }
 
-  Future<void> _submit() async {
-    if (!_currentFormKey.currentState!.validate()) return;
+  Future<void> _handleNext() async {
+    if (_currentFormKey != null && !_currentFormKey!.currentState!.validate()) return;
     setState(() => _submitting = true);
-    await Future.delayed(const Duration(milliseconds: 400));
     final notifier = ref.read(employeesProvider.notifier);
-    final employee = Employee(
-      id: _isEditing ? widget.editEmployee!.id : DateTime.now().millisecondsSinceEpoch.toString(),
-      employeeCode: _isEditing ? widget.editEmployee!.employeeCode : notifier.nextEmployeeCode(),
-      firstName: _firstNameCtrl.text.trim(),
-      lastName: _lastNameCtrl.text.trim().isEmpty ? null : _lastNameCtrl.text.trim(),
-      gender: _gender,
-      dateOfBirth: _dateOfBirth,
-      email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
-      phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
-      address: _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
-      joiningDate: _joiningDate,
-      department: _departmentCtrl.text.trim().isEmpty ? null : _departmentCtrl.text.trim(),
-      designation: _designationCtrl.text.trim().isEmpty ? null : _designationCtrl.text.trim(),
-      managerId: _manager?.id,
-      managerName: _manager?.fullName,
-      employmentType: _employmentType,
-      salary: double.tryParse(_salaryCtrl.text.trim()),
-      panNumber: _panCtrl.text.trim().isEmpty ? null : _panCtrl.text.trim().toUpperCase(),
-      aadhaarNumber: _aadhaarCtrl.text.trim().isEmpty ? null : _aadhaarCtrl.text.trim(),
-      bankName: _bankNameCtrl.text.trim().isEmpty ? null : _bankNameCtrl.text.trim(),
-      accountNumber: _accountNumberCtrl.text.trim().isEmpty ? null : _accountNumberCtrl.text.trim(),
-      ifscCode: _ifscCtrl.text.trim().isEmpty ? null : _ifscCtrl.text.trim().toUpperCase(),
-      emergencyContactName: _emergencyNameCtrl.text.trim().isEmpty ? null : _emergencyNameCtrl.text.trim(),
-      emergencyContactPhone: _emergencyPhoneCtrl.text.trim().isEmpty ? null : _emergencyPhoneCtrl.text.trim(),
-      status: _status,
-      createdAt: _isEditing ? widget.editEmployee!.createdAt : DateTime.now(),
-    );
-    if (_isEditing) { await notifier.updateEmployee(employee); }
-    else            { await notifier.addEmployee(employee); }
-    if (!mounted) return;
-    if (widget.fromMasters) { context.pop(); } else { context.go(AppRouter.employees); }
+    try {
+      switch (_currentStep) {
+        case 0:
+          if (_isEditing) {
+            final merged = widget.editEmployee!.copyWith(
+              firstName: _firstNameCtrl.text.trim(),
+              lastName: _lastNameCtrl.text.trim().isEmpty ? null : _lastNameCtrl.text.trim(),
+              gender: _gender,
+              dateOfBirth: _dateOfBirth,
+              email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
+              phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+              address: _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
+              emergencyContactName: _emergencyNameCtrl.text.trim().isEmpty ? null : _emergencyNameCtrl.text.trim(),
+              emergencyContactPhone: _emergencyPhoneCtrl.text.trim().isEmpty ? null : _emergencyPhoneCtrl.text.trim(),
+            );
+            await notifier.updateEmployee(merged);
+            _employeeId = widget.editEmployee!.id;
+          } else {
+            final personal = Employee(
+              id: '',
+              employeeCode: '',
+              firstName: _firstNameCtrl.text.trim(),
+              lastName: _lastNameCtrl.text.trim().isEmpty ? null : _lastNameCtrl.text.trim(),
+              gender: _gender,
+              dateOfBirth: _dateOfBirth,
+              email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
+              phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+              address: _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
+              emergencyContactName: _emergencyNameCtrl.text.trim().isEmpty ? null : _emergencyNameCtrl.text.trim(),
+              emergencyContactPhone: _emergencyPhoneCtrl.text.trim().isEmpty ? null : _emergencyPhoneCtrl.text.trim(),
+              createdAt: DateTime.now(),
+            );
+            final created = await notifier.createStep1(personal);
+            _employeeId = created.id;
+          }
+          setState(() => _currentStep = 1);
+        case 1:
+          final employment = Employee(
+            id: _employeeId!,
+            employeeCode: '',
+            firstName: '',
+            department: _departmentCtrl.text.trim().isEmpty ? null : _departmentCtrl.text.trim(),
+            designation: _designationCtrl.text.trim().isEmpty ? null : _designationCtrl.text.trim(),
+            joiningDate: _joiningDate,
+            managerId: _manager?.id,
+            employmentType: _employmentType,
+            salary: double.tryParse(_salaryCtrl.text.trim()),
+            status: _status,
+            createdAt: DateTime.now(),
+          );
+          await notifier.updateStep2(_employeeId!, employment);
+          setState(() => _currentStep = 2);
+        case 2:
+          final banking = Employee(
+            id: _employeeId!,
+            employeeCode: '',
+            firstName: '',
+            panNumber: _panCtrl.text.trim().isEmpty ? null : _panCtrl.text.trim().toUpperCase(),
+            aadhaarNumber: _aadhaarCtrl.text.trim().isEmpty ? null : _aadhaarCtrl.text.trim(),
+            bankName: _bankNameCtrl.text.trim().isEmpty ? null : _bankNameCtrl.text.trim(),
+            accountNumber: _accountNumberCtrl.text.trim().isEmpty ? null : _accountNumberCtrl.text.trim(),
+            ifscCode: _ifscCtrl.text.trim().isEmpty ? null : _ifscCtrl.text.trim().toUpperCase(),
+            createdAt: DateTime.now(),
+          );
+          await notifier.updateStep3(_employeeId!, banking);
+          _reviewEmployee = await notifier.fetchEmployeeDetail(_employeeId!);
+          setState(() => _currentStep = 3);
+        case 3:
+          if (!mounted) return;
+          if (widget.fromMasters) { context.pop(); } else { context.go(AppRouter.employees); }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -170,7 +223,7 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               gradient: isDark ? AppColors.silverGradient : null,
-              color: isDark ? null : AppColors.lightTextPrimary,
+              color: isDark ? null : AppColors.lightPrimary,
               borderRadius: BorderRadius.circular(10),
               boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.2), blurRadius: 6, offset: const Offset(0, 2))],
             ),
@@ -206,7 +259,7 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
               child: KeyedSubtree(key: ValueKey(_currentStep), child: _buildStep(managerOptions)),
             ),
           ),
-          _NavBar(currentStep: _currentStep, totalSteps: 4, submitting: _submitting, isEditing: _isEditing, onBack: _back, onNext: _next, onSubmit: _submit),
+          _NavBar(currentStep: _currentStep, totalSteps: 4, submitting: _submitting, onBack: _back, onContinue: _handleNext),
         ],
       ),
     );
@@ -221,6 +274,7 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
           emailCtrl: _emailCtrl, phoneCtrl: _phoneCtrl, addressCtrl: _addressCtrl,
           gender: _gender, genders: _genders, onGenderChanged: (v) => setState(() => _gender = v),
           dateOfBirth: _dateOfBirth, onDobChanged: (d) => setState(() => _dateOfBirth = d),
+          emergencyNameCtrl: _emergencyNameCtrl, emergencyPhoneCtrl: _emergencyPhoneCtrl,
         );
       case 1:
         return _Step2(
@@ -238,19 +292,22 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
           bankNameCtrl: _bankNameCtrl, accountNumberCtrl: _accountNumberCtrl, ifscCtrl: _ifscCtrl,
         );
       default:
+        final r = _reviewEmployee;
         return _Step4(
-          formKey: _step4Key,
-          emergencyNameCtrl: _emergencyNameCtrl, emergencyPhoneCtrl: _emergencyPhoneCtrl,
+          onboardingStatus: r?.onboardingStatus,
           preview: {
-            'Name': [_firstNameCtrl.text.trim(), _lastNameCtrl.text.trim()].where((s) => s.isNotEmpty).join(' ').isEmpty ? '—' : [_firstNameCtrl.text.trim(), _lastNameCtrl.text.trim()].where((s) => s.isNotEmpty).join(' '),
-            'Gender': _gender ?? '—',
-            'Date of Birth': _dateOfBirth == null ? '—' : DateFormat('dd MMM yyyy').format(_dateOfBirth!),
-            'Department': _departmentCtrl.text.trim().isEmpty ? '—' : _departmentCtrl.text.trim(),
-            'Designation': _designationCtrl.text.trim().isEmpty ? '—' : _designationCtrl.text.trim(),
-            'Employment Type': _employmentType ?? '—',
-            'Manager': _manager?.fullName ?? '—',
-            'Salary': _salaryCtrl.text.trim().isEmpty ? '—' : '₹${_salaryCtrl.text.trim()}',
-            'Status': _status,
+            'Name': r?.fullName.isNotEmpty == true ? r!.fullName : '—',
+            'Employee Code': r?.employeeCode.isNotEmpty == true ? r!.employeeCode : '—',
+            'Gender': r?.gender ?? '—',
+            'Date of Birth': r?.dateOfBirth == null ? '—' : DateFormat('dd MMM yyyy').format(r!.dateOfBirth!),
+            'Department': r?.department ?? '—',
+            'Designation': r?.designation ?? '—',
+            'Employment Type': r?.employmentType ?? '—',
+            'Manager': r?.managerName ?? '—',
+            'Salary': r?.salary == null ? '—' : '₹${r!.salary!.toStringAsFixed(2)}',
+            'Status': r?.status ?? '—',
+            'Bank': r?.bankName ?? '—',
+            'Account No.': r?.accountNumber ?? '—',
           },
         );
     }
@@ -305,9 +362,9 @@ class _StepIndicator extends StatelessWidget {
 // ── Nav Bar ────────────────────────────────────────────────────────────────
 
 class _NavBar extends StatelessWidget {
-  final int currentStep, totalSteps; final bool submitting, isEditing;
-  final VoidCallback onBack, onNext, onSubmit;
-  const _NavBar({required this.currentStep, required this.totalSteps, required this.submitting, required this.isEditing, required this.onBack, required this.onNext, required this.onSubmit});
+  final int currentStep, totalSteps; final bool submitting;
+  final VoidCallback onBack, onContinue;
+  const _NavBar({required this.currentStep, required this.totalSteps, required this.submitting, required this.onBack, required this.onContinue});
 
   @override
   Widget build(BuildContext context) {
@@ -318,9 +375,9 @@ class _NavBar extends StatelessWidget {
       child: Row(children: [
         if (currentStep > 0) ...[Expanded(child: BrixenButton(label: 'Back', isOutlined: true, onPressed: onBack)), const SizedBox(width: 12)],
         Expanded(flex: 2, child: BrixenButton(
-          label: isLast ? (isEditing ? 'Save Changes' : 'Create Employee') : 'Continue',
+          label: isLast ? 'Done' : 'Continue',
           isLoading: submitting,
-          onPressed: submitting ? null : (isLast ? onSubmit : onNext),
+          onPressed: submitting ? null : onContinue,
         )),
       ]),
     );
@@ -332,6 +389,7 @@ class _NavBar extends StatelessWidget {
 class _Step1 extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController firstNameCtrl, lastNameCtrl, emailCtrl, phoneCtrl, addressCtrl;
+  final TextEditingController emergencyNameCtrl, emergencyPhoneCtrl;
   final String? gender;
   final List<String> genders;
   final void Function(String?) onGenderChanged;
@@ -341,6 +399,7 @@ class _Step1 extends StatelessWidget {
   const _Step1({
     required this.formKey, required this.firstNameCtrl, required this.lastNameCtrl,
     required this.emailCtrl, required this.phoneCtrl, required this.addressCtrl,
+    required this.emergencyNameCtrl, required this.emergencyPhoneCtrl,
     required this.gender, required this.genders, required this.onGenderChanged,
     required this.dateOfBirth, required this.onDobChanged,
   });
@@ -382,6 +441,18 @@ class _Step1 extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         _MultilineField(controller: addressCtrl, label: 'Address', hint: 'Enter residential address', icon: Icons.location_on_outlined),
+        const SizedBox(height: 22),
+        BrixenTextField(
+          label: 'Emergency Contact Name', hint: 'Enter contact name',
+          controller: emergencyNameCtrl, textInputAction: TextInputAction.next,
+          prefixIcon: const Icon(Icons.contact_emergency_outlined),
+        ),
+        const SizedBox(height: 22),
+        BrixenTextField(
+          label: 'Emergency Contact Phone', hint: 'Enter contact phone',
+          controller: emergencyPhoneCtrl, keyboardType: TextInputType.phone,
+          prefixIcon: const Icon(Icons.phone_in_talk_outlined),
+        ),
         const SizedBox(height: 22),
       ]),
     );
@@ -509,43 +580,54 @@ class _Step3 extends StatelessWidget {
   }
 }
 
-// ── Step 4: Emergency Contact & Review ─────────────────────────────────────
+// ── Step 4: Review ───────────────────────────────────────────────────────────
 
 class _Step4 extends StatelessWidget {
-  final GlobalKey<FormState> formKey;
-  final TextEditingController emergencyNameCtrl, emergencyPhoneCtrl;
+  final String? onboardingStatus;
   final Map<String, String> preview;
-  const _Step4({required this.formKey, required this.emergencyNameCtrl, required this.emergencyPhoneCtrl, required this.preview});
+  const _Step4({required this.onboardingStatus, required this.preview});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Form(
-      key: formKey,
-      child: ListView(padding: const EdgeInsets.fromLTRB(16, 28, 16, 16), children: [
-        BrixenTextField(label: 'Emergency Contact Name', hint: 'Enter contact name', controller: emergencyNameCtrl, textInputAction: TextInputAction.next, prefixIcon: const Icon(Icons.contact_emergency_outlined)),
-        const SizedBox(height: 22),
-        BrixenTextField(label: 'Emergency Contact Phone', hint: 'Enter contact phone', controller: emergencyPhoneCtrl, keyboardType: TextInputType.phone, prefixIcon: const Icon(Icons.phone_in_talk_outlined)),
-        const SizedBox(height: 28),
-        Text('Review', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface)),
-        const SizedBox(height: 12),
+    final isCompleted = onboardingStatus == 'completed';
+    return ListView(padding: const EdgeInsets.fromLTRB(16, 28, 16, 16), children: [
+      if (onboardingStatus != null) ...[
         Container(
-          decoration: BoxDecoration(color: isDark ? cs.surfaceContainerHighest : AppColors.lightSurface, borderRadius: BorderRadius.circular(14), border: Border.all(color: Theme.of(context).dividerColor)),
-          child: Column(children: preview.entries.map((e) {
-            final isLast = e.key == preview.keys.last;
-            return Column(children: [
-              Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text(e.key, style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
-                Flexible(child: Text(e.value, textAlign: TextAlign.end, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: e.key == 'Status' ? AppColors.accentEmerald : cs.onSurface))),
-              ])),
-              if (!isLast) Divider(height: 1, color: Theme.of(context).dividerColor),
-            ]);
-          }).toList()),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: (isCompleted ? AppColors.accentEmerald : AppColors.brandLight).withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: (isCompleted ? AppColors.accentEmerald : AppColors.brandLight).withValues(alpha: 0.4)),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(isCompleted ? Icons.check_circle_outline_rounded : Icons.hourglass_top_rounded,
+                size: 16, color: isCompleted ? AppColors.accentEmerald : AppColors.brandLight),
+            const SizedBox(width: 6),
+            Text(isCompleted ? 'Setup Completed' : 'Setup Pending',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isCompleted ? AppColors.accentEmerald : AppColors.brandLight)),
+          ]),
         ),
-        const SizedBox(height: 22),
-      ]),
-    );
+        const SizedBox(height: 20),
+      ],
+      Text('Review', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface)),
+      const SizedBox(height: 12),
+      Container(
+        decoration: BoxDecoration(color: isDark ? cs.surfaceContainerHighest : AppColors.lightSurface, borderRadius: BorderRadius.circular(14), border: Border.all(color: Theme.of(context).dividerColor)),
+        child: Column(children: preview.entries.map((e) {
+          final isLast = e.key == preview.keys.last;
+          return Column(children: [
+            Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Text(e.key, style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+              Flexible(child: Text(e.value, textAlign: TextAlign.end, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: e.key == 'Status' ? AppColors.accentEmerald : cs.onSurface))),
+            ])),
+            if (!isLast) Divider(height: 1, color: Theme.of(context).dividerColor),
+          ]);
+        }).toList()),
+      ),
+      const SizedBox(height: 22),
+    ]);
   }
 }
 

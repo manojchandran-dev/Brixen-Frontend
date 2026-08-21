@@ -1,8 +1,7 @@
 class Sale {
   final String id;
-  final String? companyId;
   final String? customerId;
-  final String billNo;
+  final String? customerName; // display name, resolved client-side from Customers
   final DateTime billDate;
   final String? invoiceType;
   final double subtotal;
@@ -16,9 +15,8 @@ class Sale {
 
   const Sale({
     required this.id,
-    this.companyId,
     this.customerId,
-    required this.billNo,
+    this.customerName,
     required this.billDate,
     this.invoiceType,
     required this.subtotal,
@@ -33,9 +31,8 @@ class Sale {
 
   Sale copyWith({
     String? id,
-    String? companyId,
     String? customerId,
-    String? billNo,
+    String? customerName,
     DateTime? billDate,
     String? invoiceType,
     double? subtotal,
@@ -49,9 +46,8 @@ class Sale {
   }) {
     return Sale(
       id: id ?? this.id,
-      companyId: companyId ?? this.companyId,
       customerId: customerId ?? this.customerId,
-      billNo: billNo ?? this.billNo,
+      customerName: customerName ?? this.customerName,
       billDate: billDate ?? this.billDate,
       invoiceType: invoiceType ?? this.invoiceType,
       subtotal: subtotal ?? this.subtotal,

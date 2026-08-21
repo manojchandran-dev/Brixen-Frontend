@@ -7,7 +7,18 @@
       "Bash(flutter pub *)",
       "Bash(pg_isready -U postgres)",
       "Bash(psql -U postgres -c \"\\\\l\")",
-      "PowerShell($pgData = \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\data\"; if \\(Test-Path \"$pgData\\\\pg_hba.conf\"\\) { Get-Content \"$pgData\\\\pg_hba.conf\" | Where-Object { $_ -notmatch \"^#\" -and $_.Trim\\(\\) -ne \"\" } })"
+      "PowerShell($pgData = \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\data\"; if \\(Test-Path \"$pgData\\\\pg_hba.conf\"\\) { Get-Content \"$pgData\\\\pg_hba.conf\" | Where-Object { $_ -notmatch \"^#\" -and $_.Trim\\(\\) -ne \"\" } })",
+      "Bash(flutter analyze *)",
+      "Bash(curl -s -X POST https://brixen-backend.onrender.com/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"admin@brixen.com\",\"password\":\"ChangeMe123!\"}')",
+      "Bash(curl -s -X POST https://brixen-backend.onrender.com/api/v1/auth/pin -H 'Content-Type: application/json' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsImVtYWlsIjoiYWRtaW5AYnJpeGVuLmNvbSIsInJvbGUiOiJzdXBlcl9hZG1pbiIsImlhdCI6MTc4NTQwNDAxMCwiZXhwIjoxNzg1NDA0OTEwfQ.BKRi-NVotFL9KXpEl99tkkabEVxp2Xfm6xGMR0vbbr4' -d '{\"pin\":\"111999\"}')",
+      "Bash(curl -s -X POST https://brixen-backend.onrender.com/api/v1/auth/pin/verify -H 'Content-Type: application/json' -d '{\"refreshToken\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsImlhdCI6MTc4NTQwNDAxMCwiZXhwIjoxNzg2MDA4ODEwfQ.hPuM3Iqh712Equ3tI5CoX8QqHyy6tgg-H9nQWqtqIW8\",\"pin\":\"111999\"}')",
+      "Bash(~/.fvm/default/bin/flutter analyze *)",
+      "Read(//d//**)",
+      "Bash(flutter devices *)",
+      "PowerShell(flutter devices 2>&1)",
+      "Bash(grep -v '\\\\.g\\\\.dart$')",
+      "Bash(grep -v '\\\\.freezed\\\\.dart$')",
+      "Read(//tmp/**)"
     ]
   }
 }
