@@ -51,10 +51,10 @@ class ComingSoonView extends StatelessWidget {
                       end: Alignment.bottomRight,
                       colors: [AppColors.brand, AppColors.brandDeep],
                     ),
-                    boxShadow: [
+                    boxShadow: AppColors.shadows([
                       BoxShadow(color: AppColors.brand.withValues(alpha: 0.35), blurRadius: 26, offset: const Offset(0, 14)),
-                      BoxShadow(color: AppColors.white.withValues(alpha: 0.7), blurRadius: 10, offset: const Offset(-4, -4)),
-                    ],
+                      BoxShadow(color: AppColors.highlightShadow(0.7), blurRadius: 10, offset: const Offset(-4, -4)),
+                    ]),
                   ),
                   child: Icon(icon, color: AppColors.white, size: 44),
                 ),
@@ -68,7 +68,7 @@ class ComingSoonView extends StatelessWidget {
                       shape: BoxShape.circle,
                       color: AppColors.positive,
                       border: Border.all(color: AppColors.background, width: 3),
-                      boxShadow: [BoxShadow(color: AppColors.positive.withValues(alpha: 0.4), blurRadius: 10, offset: const Offset(0, 4))],
+                      boxShadow: AppColors.shadows([BoxShadow(color: AppColors.positive.withValues(alpha: 0.4), blurRadius: 10, offset: const Offset(0, 4))]),
                     ),
                     child: const Icon(Icons.hourglass_top_rounded, color: AppColors.white, size: 16),
                   ),
@@ -76,12 +76,12 @@ class ComingSoonView extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 28),
-            Text(title, style: const TextStyle(color: AppColors.ink, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
+            Text(title, style: TextStyle(color: AppColors.ink, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
             const SizedBox(height: 10),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13.5, height: 1.5),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13.5, height: 1.5),
             ),
             const SizedBox(height: 22),
             Container(

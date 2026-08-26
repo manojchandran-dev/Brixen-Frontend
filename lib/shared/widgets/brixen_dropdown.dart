@@ -133,8 +133,8 @@ class _BrixenDropdownState<T> extends State<BrixenDropdown<T>>
             boxShadow: isDark
                 ? null
                 : [
-                    BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
-                    BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+                    BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
+                    BoxShadow(color: AppColors.highlightShadow(0.85), blurRadius: 6, offset: const Offset(-3, -3)),
                   ],
           ),
           child: Row(
@@ -152,9 +152,9 @@ class _BrixenDropdownState<T> extends State<BrixenDropdown<T>>
                           end: Alignment.bottomRight,
                           colors: [widget.iconColor, widget.iconColor.withValues(alpha: 0.75)],
                         ),
-                        boxShadow: [
+                        boxShadow: AppColors.shadows([
                           BoxShadow(color: widget.iconColor.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3)),
-                        ],
+                        ]),
                       ),
                       child: Icon(widget.icon, size: 17, color: AppColors.white),
                     ),
@@ -229,7 +229,7 @@ class _BrixenDropdownPanel<T> extends StatelessWidget {
     }
 
     return Material(
-      elevation: 10,
+      elevation: isDark ? 0 : 10,
       shadowColor: Colors.black.withValues(alpha: 0.15),
       borderRadius:
           const BorderRadius.vertical(bottom: Radius.circular(12)),

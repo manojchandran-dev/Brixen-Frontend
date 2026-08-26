@@ -44,7 +44,7 @@ class AppDrawer extends StatelessWidget {
       icon: Icons.receipt_outlined,
       label: 'Expenses',
       subtitle: 'Track spending',
-      color: AppColors.ink,
+      color: AppColors.brandBlack,
       onTap: (context) => context.go(AppRouter.expenses),
     ),
   ];
@@ -55,21 +55,24 @@ class AppDrawer extends StatelessWidget {
       label: 'Company Category',
       subtitle: 'Company types',
       color: AppColors.brand,
-      onTap: (context) => context.go(AppRouter.companies, extra: 'masters/companyCategory'),
+      onTap: (context) =>
+          context.go(AppRouter.companies, extra: 'masters/companyCategory'),
     ),
     _DrawerItem(
       icon: Icons.sell_rounded,
       label: 'Expense Category',
       subtitle: 'Spending types',
       color: AppColors.positive,
-      onTap: (context) => context.go(AppRouter.companies, extra: 'masters/expenseCategory'),
+      onTap: (context) =>
+          context.go(AppRouter.companies, extra: 'masters/expenseCategory'),
     ),
     _DrawerItem(
       icon: Icons.straighten_rounded,
       label: 'Units',
       subtitle: 'Measurement units',
       color: AppColors.brandDeep,
-      onTap: (context) => context.go(AppRouter.companies, extra: 'masters/unit'),
+      onTap: (context) =>
+          context.go(AppRouter.companies, extra: 'masters/unit'),
     ),
   ];
 
@@ -83,69 +86,140 @@ class AppDrawer extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(22, 20, 22, 8),
+              padding: const EdgeInsets.fromLTRB(22, 24, 22, 10),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(9),
-                    child: Image.asset('assets/images/icon.png', width: 32, height: 32, fit: BoxFit.cover),
+                  Container(
+                    width: 50,
+                    height: 50,
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          AppColors.brand.withValues(alpha: 0.14),
+                          AppColors.positive.withValues(alpha: 0.14),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: AppColors.shadows([
+                        BoxShadow(
+                          color: AppColors.shadowDark.withValues(alpha: 0.08),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                        BoxShadow(
+                          color: AppColors.highlightShadow(0.9),
+                          blurRadius: 6,
+                          offset: const Offset(-3, -3),
+                        ),
+                      ]),
+                    ),
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      fit: BoxFit.contain,
+                    ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 14),
                   Text.rich(
-                    TextSpan(children: [
-                      const TextSpan(text: 'Brix', style: TextStyle(color: AppColors.brand)),
-                      const TextSpan(text: 'en', style: TextStyle(color: AppColors.positive)),
-                    ]),
-                    style: GoogleFonts.spaceGrotesk(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+                    TextSpan(
+                      children: [
+                        const TextSpan(
+                          text: 'Brix',
+                          style: TextStyle(color: AppColors.brand),
+                        ),
+                        const TextSpan(
+                          text: 'en',
+                          style: TextStyle(color: AppColors.positive),
+                        ),
+                      ],
+                    ),
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                    ),
                   ),
                 ],
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(22, 0, 22, 18),
-              child: Text('Jump to a module', style: TextStyle(color: AppColors.textHint, fontSize: 12.5)),
+            Padding(
+              padding: EdgeInsets.fromLTRB(22, 0, 22, 14),
+              child: Text(
+                'Jump to a module',
+                style: TextStyle(
+                  color: AppColors.textHint,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 22),
+              child: Container(height: 1, color: AppColors.border),
             ),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
                 children: [
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _moduleItems.length,
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 14,
-                      crossAxisSpacing: 14,
-                      childAspectRatio: 0.98,
+                  ..._moduleItems.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _DrawerTile(item: item),
                     ),
-                    itemBuilder: (_, i) => _DrawerTile(item: _moduleItems[i]),
                   ),
-                  const SizedBox(height: 26),
-                  Row(children: [
-                    Container(
-                      width: 30, height: 30,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.brandDeep, AppColors.ink]),
-                        borderRadius: BorderRadius.circular(9),
-                        boxShadow: [BoxShadow(color: AppColors.brandDeep.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3))],
+                  const SizedBox(height: 28),
+                  Row(
+                    children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: AppColors.ink.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.dashboard_customize_rounded,
+                          size: 14,
+                          color: AppColors.ink,
+                        ),
                       ),
-                      child: const Icon(Icons.dashboard_customize_rounded, size: 15, color: AppColors.white),
-                    ),
-                    const SizedBox(width: 10),
-                    const Text('Masters', style: TextStyle(color: AppColors.ink, fontSize: 15, fontWeight: FontWeight.w800)),
-                  ]),
-                  const Padding(
-                    padding: EdgeInsets.only(left: 40, top: 2),
-                    child: Text('Categories & units', style: TextStyle(color: AppColors.textHint, fontSize: 11.5)),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Masters',
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.1,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(height: 1, color: AppColors.border),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  ..._masterItems.map((item) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _MasterRowTile(item: item),
-                      )),
+                  Padding(
+                    padding: EdgeInsets.only(left: 38, top: 3),
+                    child: Text(
+                      'Categories & units',
+                      style: TextStyle(
+                        color: AppColors.textHint,
+                        fontSize: 11.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  ..._masterItems.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 9),
+                      child: _MasterRowTile(item: item),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -162,11 +236,6 @@ class _DrawerTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Same pale opaque-tint + colored hard-edge treatment used on every
-    // list card app-wide, so each module reads as its own accent color
-    // instead of a flat white box.
-    final bg = Color.lerp(AppColors.surface, item.color, 0.32)!;
-
     return GestureDetector(
       onTap: () {
         Navigator.of(context).pop();
@@ -174,45 +243,110 @@ class _DrawerTile extends StatelessWidget {
       },
       behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(20),
-          border: Border(
-            right: BorderSide(color: item.color, width: 2.5),
-            bottom: BorderSide(color: item.color, width: 5),
-          ),
-          boxShadow: [
-            BoxShadow(color: item.color.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(2, 6)),
-            BoxShadow(color: AppColors.ink.withValues(alpha: 0.08), blurRadius: 18, offset: const Offset(0, 10)),
-            BoxShadow(color: AppColors.white.withValues(alpha: 0.9), blurRadius: 8, offset: const Offset(-4, -4)),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [item.color, item.color.withValues(alpha: 0.75)],
-                ),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(color: item.color.withValues(alpha: 0.4), blurRadius: 12, offset: const Offset(0, 6)),
-                ],
-              ),
-              child: Icon(item.icon, size: 22, color: AppColors.white),
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: AppColors.shadows([
+            BoxShadow(
+              color: AppColors.shadowDark.withValues(alpha: 0.07),
+              blurRadius: 16,
+              offset: const Offset(0, 7),
             ),
-            const Spacer(),
-            Text(item.label, style: const TextStyle(color: AppColors.ink, fontSize: 14.5, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 2),
-            Text(item.subtitle, style: TextStyle(color: AppColors.ink.withValues(alpha: 0.6), fontSize: 11)),
-          ],
+            BoxShadow(
+              color: AppColors.highlightShadow(0.9),
+              blurRadius: 8,
+              offset: const Offset(-4, -4),
+            ),
+          ]),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  width: 4,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: AppColors.accentGradient(item.color),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 13,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: AppColors.accentGradient(item.color),
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: AppColors.shadows([
+                              BoxShadow(
+                                color: item.color.withValues(alpha: 0.3),
+                                blurRadius: 10,
+                                offset: const Offset(0, 5),
+                              ),
+                            ]),
+                          ),
+                          child: Icon(
+                            item.icon,
+                            size: 20,
+                            color: AppColors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                item.label,
+                                style: TextStyle(
+                                  color: AppColors.ink,
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 1),
+                              Text(
+                                item.subtitle,
+                                style: TextStyle(
+                                  color: AppColors.textHint,
+                                  fontSize: 11.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 20,
+                          color: AppColors.textHint.withValues(alpha: 0.6),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -225,6 +359,9 @@ class _MasterRowTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Same white-card + left-accent language as the modules above, kept
+    // deliberately quieter (smaller icon, thinner accent, indented) so the
+    // hierarchy — nested under "Masters" — still reads at a glance.
     return GestureDetector(
       onTap: () {
         Navigator.of(context).pop();
@@ -232,53 +369,108 @@ class _MasterRowTile extends StatelessWidget {
       },
       behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        margin: const EdgeInsets.only(left: 12),
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
-            BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
-          ],
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: AppColors.shadows([
+            BoxShadow(
+              color: AppColors.shadowDark.withValues(alpha: 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 5),
+            ),
+            BoxShadow(
+              color: AppColors.highlightShadow(0.85),
+              blurRadius: 6,
+              offset: const Offset(-3, -3),
+            ),
+          ]),
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [item.color, item.color.withValues(alpha: 0.75)],
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(15),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  width: 3,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: AppColors.accentGradient(item.color),
+                    ),
+                  ),
                 ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(color: item.color.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4)),
-                ],
-              ),
-              child: Icon(item.icon, size: 18, color: AppColors.white),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 34,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: AppColors.accentGradient(item.color),
+                            ),
+                            shape: BoxShape.circle,
+                            boxShadow: AppColors.shadows([
+                              BoxShadow(
+                                color: item.color.withValues(alpha: 0.28),
+                                blurRadius: 7,
+                                offset: const Offset(0, 3),
+                              ),
+                            ]),
+                          ),
+                          child: Icon(
+                            item.icon,
+                            size: 15,
+                            color: AppColors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 11),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.label,
+                                style: TextStyle(
+                                  color: AppColors.ink,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 1),
+                              Text(
+                                item.subtitle,
+                                style: TextStyle(
+                                  color: AppColors.textHint,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 18,
+                          color: AppColors.textHint.withValues(alpha: 0.55),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(item.label, style: const TextStyle(color: AppColors.ink, fontSize: 14, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 1),
-                  Text(item.subtitle, style: const TextStyle(color: AppColors.textHint, fontSize: 11.5)),
-                ],
-              ),
-            ),
-            Container(
-              width: 26,
-              height: 26,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: AppColors.ink.withValues(alpha: 0.06), shape: BoxShape.circle),
-              child: const Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.textHint),
-            ),
-          ],
+          ),
         ),
       ),
     );

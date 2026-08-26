@@ -28,10 +28,10 @@ class SaleDetailPage extends ConsumerWidget {
       builder: (_) => AlertDialog(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Sale', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.ink)),
-        content: const Text('Delete this sale? This cannot be undone.', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+        title: Text('Delete Sale', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.ink)),
+        content: Text('Delete this sale? This cannot be undone.', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary))),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary))),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
@@ -41,12 +41,12 @@ class SaleDetailPage extends ConsumerWidget {
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+                    SnackBar(content: Text(e.toString()), backgroundColor: AppColors.dangerFill),
                   );
                 }
               }
             },
-            child: const Text('Delete', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700)),
+            child: Text('Delete', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -77,26 +77,26 @@ class SaleDetailPage extends ConsumerWidget {
             margin: const EdgeInsets.all(8),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: AppColors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
-                BoxShadow(color: AppColors.white.withValues(alpha: 0.8), blurRadius: 4, offset: const Offset(-2, -2)),
-              ],
+              boxShadow: AppColors.shadows([
+                BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
+                BoxShadow(color: AppColors.highlightShadow(0.8), blurRadius: 4, offset: const Offset(-2, -2)),
+              ]),
             ),
-            child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
+            child: Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
           ),
         ),
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           GestureDetector(
             onTap: () => context.pop(),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const Text('Sales', style: TextStyle(fontSize: 12, color: AppColors.textHint, fontWeight: FontWeight.w500)),
-              const Icon(Icons.chevron_right_rounded, size: 14, color: AppColors.textHint),
-              Flexible(child: Text(title, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.ink))),
+              Text('Sales', style: TextStyle(fontSize: 12, color: AppColors.textHint, fontWeight: FontWeight.w500)),
+              Icon(Icons.chevron_right_rounded, size: 14, color: AppColors.textHint),
+              Flexible(child: Text(title, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.ink))),
             ]),
           ),
-          Text(DateFormat('dd MMM yyyy').format(sale.billDate), style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
+          Text(DateFormat('dd MMM yyyy').format(sale.billDate), style: TextStyle(fontSize: 11, color: AppColors.textHint)),
         ]),
         actions: [
           GestureDetector(
@@ -111,7 +111,7 @@ class SaleDetailPage extends ConsumerWidget {
               decoration: BoxDecoration(
                 gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.brand, AppColors.brandDeep]),
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [BoxShadow(color: AppColors.brand.withValues(alpha: 0.4), blurRadius: 10, offset: const Offset(0, 4))],
+                boxShadow: AppColors.shadows([BoxShadow(color: AppColors.brand.withValues(alpha: 0.4), blurRadius: 10, offset: const Offset(0, 4))]),
               ),
               child: const Icon(Icons.edit_outlined, size: 18, color: AppColors.white),
             ),
@@ -123,11 +123,11 @@ class SaleDetailPage extends ConsumerWidget {
               width: 38, height: 38,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: AppColors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [BoxShadow(color: AppColors.ink.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 4))],
+                boxShadow: AppColors.shadows([BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 4))]),
               ),
-              child: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.ink),
+              child: Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.ink),
             ),
           ),
         ],
@@ -197,9 +197,9 @@ class SaleDetailPage extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Notes', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textHint, letterSpacing: 0.3)),
+                  Text('Notes', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textHint, letterSpacing: 0.3)),
                   const SizedBox(height: 8),
-                  Text(sale.notes!, style: const TextStyle(fontSize: 14, color: AppColors.ink)),
+                  Text(sale.notes!, style: TextStyle(fontSize: 14, color: AppColors.ink)),
                 ],
               ),
             ),
@@ -230,10 +230,10 @@ class _SectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 16, offset: const Offset(0, 6)),
-          BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
-        ],
+        boxShadow: AppColors.shadows([
+          BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.06), blurRadius: 16, offset: const Offset(0, 6)),
+          BoxShadow(color: AppColors.highlightShadow(0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+        ]),
       ),
       child: child,
     );
@@ -267,15 +267,15 @@ class _DetailRow extends StatelessWidget {
             width: 32, height: 32,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [iconColor, iconColor.withValues(alpha: 0.75)]),
+              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: AppColors.accentGradient(iconColor)),
               shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: iconColor.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3))],
+              boxShadow: AppColors.shadows([BoxShadow(color: iconColor.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3))]),
             ),
             child: Icon(icon, size: 16, color: AppColors.white),
           ),
           const SizedBox(width: 12),
         ],
-        Text(label, style: const TextStyle(fontSize: 12.5, color: AppColors.textHint)),
+        Text(label, style: TextStyle(fontSize: 12.5, color: AppColors.textHint)),
         Expanded(
           child: Text(value,
               textAlign: TextAlign.end,
@@ -292,7 +292,7 @@ class _DetailRow extends StatelessWidget {
 class _Divider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return const Padding(
+    return Padding(
       padding: EdgeInsets.symmetric(vertical: 12),
       child: Divider(height: 1, color: AppColors.border),
     );
@@ -325,9 +325,9 @@ class _TagChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 3))],
+        boxShadow: AppColors.shadows([BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 3))]),
       ),
-      child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+      child: Text(label, style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
     );
   }
 }

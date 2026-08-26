@@ -11,17 +11,20 @@ class StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = isActive ? AppColors.positive : AppColors.ink;
+    final statusColor = isActive ? AppColors.positive : AppColors.brandBlack;
     final bg = inverse ? AppColors.white : statusColor;
     final fg = inverse ? statusColor : AppColors.white;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(6, 4, 12, 4),
       decoration: BoxDecoration(
-        color: bg,
+        gradient: inverse
+            ? null
+            : LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: AppColors.accentGradient(bg)),
+        color: inverse ? bg : null,
         borderRadius: BorderRadius.circular(20),
         boxShadow: inverse
-            ? [BoxShadow(color: AppColors.ink.withValues(alpha: 0.12), blurRadius: 8, offset: const Offset(0, 3))]
+            ? AppColors.shadows([BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.12), blurRadius: 8, offset: const Offset(0, 3))])
             : null,
       ),
       child: Row(

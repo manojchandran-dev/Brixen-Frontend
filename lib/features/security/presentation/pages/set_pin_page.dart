@@ -225,13 +225,13 @@ class _SetPinPageState extends State<SetPinPage> {
                           gradient: isDark ? AppColors.silverGradient : null,
                           color: isDark ? null : AppColors.lightSurfaceElevated,
                           border: Border.all(color: AppColors.silver.withValues(alpha: 0.4), width: 1.5),
-                          boxShadow: [
+                          boxShadow: AppColors.shadows([
                             BoxShadow(
                               color: AppColors.silver.withValues(alpha: isDark ? 0.22 : 0.15),
                               blurRadius: 24,
                               offset: const Offset(0, 8),
                             ),
-                          ],
+                          ]),
                         ),
                         child: Icon(_stepIcon, size: 32, color: isDark ? AppColors.black : AppColors.silverDark),
                       ),

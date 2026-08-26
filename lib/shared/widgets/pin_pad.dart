@@ -36,26 +36,36 @@ class PinPad extends StatelessWidget {
   Widget _buildKey(String k, BuildContext context) {
     final isBack = k == '⌫';
     final isEmpty = k.isEmpty;
-    if (isEmpty) return const SizedBox(width: 76, height: 76);
-    return GestureDetector(
-      onTap: isBack ? _onBackspace : () => _onKey(k),
-      child: Container(
-        width: 76,
-        height: 76,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: AppColors.surfaceElevated,
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Center(
-          child: isBack
-              ? const Icon(Icons.backspace_outlined, color: AppColors.brand, size: 22)
-              : Text(k,
-                  style: const TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
-                  )),
+    if (isEmpty) return const SizedBox(width: 62, height: 62);
+    return Container(
+      width: 62,
+      height: 62,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.surface,
+        boxShadow: AppColors.shadows([
+          BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, 5)),
+          BoxShadow(color: AppColors.highlightShadow(0.9), blurRadius: 6, offset: const Offset(-3, -3)),
+        ]),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          onTap: isBack ? _onBackspace : () => _onKey(k),
+          customBorder: const CircleBorder(),
+          splashColor: AppColors.brand.withValues(alpha: 0.12),
+          highlightColor: AppColors.brand.withValues(alpha: 0.08),
+          child: Center(
+            child: isBack
+                ? const Icon(Icons.backspace_outlined, color: AppColors.brand, size: 20)
+                : Text(k,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    )),
+          ),
         ),
       ),
     );
@@ -92,12 +102,12 @@ class PinPad extends StatelessWidget {
                   width: 2,
                 ),
                 boxShadow: filled
-                    ? [
+                    ? AppColors.shadows([
                         BoxShadow(
                           color: AppColors.brand.withValues(alpha: 0.35),
                           blurRadius: 8,
                         )
-                      ]
+                      ])
                     : null,
               ),
             );
@@ -121,7 +131,7 @@ class PinPad extends StatelessWidget {
                       padding: const EdgeInsets.only(top: 12),
                       child: Text(
                         errorText!,
-                        style: const TextStyle(color: AppColors.ink, fontSize: 13, fontWeight: FontWeight.w600),
+                        style: TextStyle(color: AppColors.ink, fontSize: 13, fontWeight: FontWeight.w600),
                       ),
                     )
                   : const SizedBox(height: 12),
@@ -137,12 +147,12 @@ class PinPad extends StatelessWidget {
             child: Column(
               children: rows.map(
                 (row) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.only(bottom: 14),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: row
                         .map((k) => Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 9),
+                              padding: const EdgeInsets.symmetric(horizontal: 11),
                               child: _buildKey(k, context),
                             ))
                         .toList(),

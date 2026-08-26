@@ -20,6 +20,8 @@ class ApiEndpoints {
   static const String expenses       = '/api/v1/expenses';
   static const String customers      = '/api/v1/customers';
   static const String sales          = '/api/v1/sales';
+  static const String dashboardSummary = '/api/v1/dashboard/summary';
+  static const String reportsSummary   = '/api/v1/reports/summary';
 
   static String companyById(String id)     => '/api/v1/companies/$id';
   static String companyStatus(String id)   => '/api/v1/companies/$id/status';

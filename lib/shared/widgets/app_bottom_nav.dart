@@ -15,9 +15,11 @@ class AppBottomNav extends StatelessWidget {
       return;
     }
     switch (index) {
+      case 2:
+        context.go(AppRouter.companies, extra: 'reports');
+        return;
       case 0:
       case 1:
-      case 2:
       case 3:
         context.go(AppRouter.companies);
     }
@@ -25,7 +27,11 @@ class AppBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Reads AppColors' own dark-mode flag rather than Theme.of(context) —
+    // this widget is passed as `bottomNavigationBar: const AppBottomNav(...)`
+    // on every page, and as a const instance it doesn't reliably rebuild
+    // off Theme.of(context) when the app-wide theme toggles.
+    final isDark = AppColors.isDark;
     // NOTE: no transparent ColoredBox wrapper here — with `extendBody: true`
     // this widget is stretched to the full Scaffold height, and a
     // Container(color: ...) — even fully transparent — always intercepts
@@ -39,16 +45,15 @@ class AppBottomNav extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10),
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: isDark ? AppColors.surface : AppColors.black,
+            color: isDark ? AppColors.brand : AppColors.black,
             borderRadius: BorderRadius.circular(36),
-            border: isDark ? Border.all(color: Theme.of(context).dividerColor) : null,
-            boxShadow: [
+            boxShadow: AppColors.shadows([
               BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.3),
+                color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.3),
                 blurRadius: 20,
                 offset: const Offset(0, 6),
               ),
-            ],
+            ]),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -84,79 +89,29 @@ class _NavBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    if (!isDark) {
-      // Light mode: black pill bar, active icon shown inside a filled green circle.
-      final iconColor = isActive ? AppColors.white : Colors.white.withValues(alpha: 0.5);
-      return SizedBox(
-        width: 52,
-        child: GestureDetector(
-          onTap: onTap,
-          behavior: HitTestBehavior.opaque,
-          child: Center(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: isActive ? AppColors.positive : null,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                isActive ? activeIcon : icon,
-                size: 19,
-                color: iconColor,
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    // Dark mode: unchanged — full pill glow.
-    const inactiveColor = AppColors.textSecondary;
-    const activeContentColor = AppColors.black;
-
-    return Expanded(
+    // Same pill treatment in both themes — solid bar (black in light mode,
+    // brand blue in dark mode) with the active icon inside a filled green
+    // circle, so the highlight colour reads consistently either way.
+    final iconColor = isActive ? AppColors.white : Colors.white.withValues(alpha: 0.75);
+    return SizedBox(
+      width: 52,
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            gradient: isActive ? AppColors.silverGradient : null,
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: isActive
-                ? [
-                    BoxShadow(
-                      color: AppColors.silver.withValues(alpha: 0.22),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                isActive ? activeIcon : icon,
-                size: 20,
-                color: isActive ? activeContentColor : inactiveColor,
-              ),
-              const SizedBox(height: 3),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isActive ? activeContentColor : inactiveColor,
-                  fontSize: 10,
-                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-                  letterSpacing: isActive ? 0.2 : 0,
-                ),
-              ),
-            ],
+        child: Center(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: isActive ? AppColors.positive : null,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isActive ? activeIcon : icon,
+              size: 19,
+              color: iconColor,
+            ),
           ),
         ),
       ),

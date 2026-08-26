@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/theme_cubit.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
@@ -13,8 +15,10 @@ import '../providers/companies_provider.dart';
 import '../widgets/company_card.dart';
 import '../../../../shared/widgets/rich_card_shell.dart';
 import '../../../../shared/widgets/app_drawer.dart';
-import '../../../../shared/widgets/coming_soon_view.dart';
+import '../../../../shared/widgets/app_bottom_nav.dart';
 import '../../../../shared/widgets/welcome_dashboard_view.dart';
+import '../../../../shared/widgets/skeleton.dart';
+import '../../../reports/presentation/pages/reports_body.dart';
 import '../../../masters/domain/entities/master_item.dart';
 import '../../../masters/domain/entities/master_type.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
@@ -57,7 +61,9 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialSection != null) {
+    if (widget.initialSection == 'reports') {
+      _navIndex = 2;
+    } else if (widget.initialSection != null) {
       _navIndex = 3;
       _stack.addAll(widget.initialSection!.split('/'));
     }
@@ -69,13 +75,21 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
     // GoRouter reuses this State when navigating to the same `/companies`
     // route with new `extra` (e.g. re-tapping a drawer item while already
     // here) — initState() won't run again, so re-apply the section here.
-    if (widget.initialSection != null && widget.initialSection != oldWidget.initialSection) {
-      setState(() {
-        _navIndex = 3;
-        _stack
-          ..clear()
-          ..addAll(widget.initialSection!.split('/'));
-      });
+    if (widget.initialSection != null &&
+        widget.initialSection != oldWidget.initialSection) {
+      if (widget.initialSection == 'reports') {
+        setState(() {
+          _navIndex = 2;
+          _stack.clear();
+        });
+      } else {
+        setState(() {
+          _navIndex = 3;
+          _stack
+            ..clear()
+            ..addAll(widget.initialSection!.split('/'));
+        });
+      }
     }
   }
 
@@ -85,7 +99,10 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
     super.dispose();
   }
 
-  void _onNavTap(int i) => setState(() { _navIndex = i; _stack.clear(); });
+  void _onNavTap(int i) => setState(() {
+    _navIndex = i;
+    _stack.clear();
+  });
 
   bool get _hideNavBar {
     if (_stack.isEmpty) return false;
@@ -95,11 +112,20 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
 
   // For masterMenu drill-down: masters/masterMenu/cat:<catId>
   bool get _inCategoryDrillDown =>
-      _stack.length >= 3 && _stack[0] == 'masters' && _stack[1] == 'masterMenu' && _stack[2].startsWith('cat:');
+      _stack.length >= 3 &&
+      _stack[0] == 'masters' &&
+      _stack[1] == 'masterMenu' &&
+      _stack[2].startsWith('cat:');
   String get _drillCatId => _inCategoryDrillDown ? _stack[2].substring(4) : '';
   void _push(String page) => setState(() => _stack.add(page));
-  void _pop() => setState(() { if (_stack.isNotEmpty) _stack.removeLast(); });
-  void _popTo(int depth) => setState(() { while (_stack.length > depth) { _stack.removeLast(); } });
+  void _pop() => setState(() {
+    if (_stack.isNotEmpty) _stack.removeLast();
+  });
+  void _popTo(int depth) => setState(() {
+    while (_stack.length > depth) {
+      _stack.removeLast();
+    }
+  });
 
   // ── AppBar ──────────────────────────────────────────────────────────────────
 
@@ -109,7 +135,9 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return PopScope(
       canPop: !_inMenuSub,
-      onPopInvokedWithResult: (didPop, _) { if (!didPop && _inMenuSub) _pop(); },
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _inMenuSub) _pop();
+      },
       child: BlocProvider.value(
         value: masterCubit,
         child: Scaffold(
@@ -124,23 +152,30 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
             titleSpacing: 12,
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(1),
-              child: Container(height: 1, color: Theme.of(context).dividerColor),
+              child: Container(
+                height: 1,
+                color: Theme.of(context).dividerColor,
+              ),
             ),
             leading: Builder(
               builder: (ctx) => Center(
                 child: Material(
                   color: isDark ? AppColors.surface : AppColors.white,
                   borderRadius: BorderRadius.circular(12),
-                  elevation: 2,
-                  shadowColor: AppColors.ink.withValues(alpha: 0.3),
+                  elevation: isDark ? 0 : 2,
+                  shadowColor: AppColors.shadowDark.withValues(alpha: 0.3),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
-                    onTap: _inMenuSub ? _pop : () => Scaffold.of(ctx).openDrawer(),
+                    onTap: _inMenuSub
+                        ? _pop
+                        : () => Scaffold.of(ctx).openDrawer(),
                     child: SizedBox(
                       width: 40,
                       height: 40,
                       child: Icon(
-                        _inMenuSub ? Icons.arrow_back_ios_new_rounded : Icons.menu_rounded,
+                        _inMenuSub
+                            ? Icons.arrow_back_ios_new_rounded
+                            : Icons.menu_rounded,
                         size: _inMenuSub ? 16 : 18,
                         color: AppColors.ink,
                       ),
@@ -153,12 +188,19 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
                 ? _buildBreadcrumb(cs)
                 : Text(
                     _navLabel(_navIndex),
-                    style: const TextStyle(color: AppColors.ink, fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.4),
+                    style: TextStyle(
+                      color: AppColors.ink,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.4,
+                    ),
                   ),
             actions: [_buildAction(cs, isDark)],
           ),
           body: _buildBody(),
-          bottomNavigationBar: _hideNavBar ? null : _BottomNav(currentIndex: _navIndex, onTap: _onNavTap),
+          bottomNavigationBar: _hideNavBar
+              ? null
+              : AppBottomNav(activeIndex: _navIndex, onTap: _onNavTap),
         ),
       ),
     );
@@ -168,13 +210,16 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
     final crumbs = <_Crumb>[_Crumb('More', () => _popTo(0))];
     for (int i = 0; i < _stack.length; i++) {
       final seg = _stack[i];
+      // 'masters' has no standalone page of its own anymore and isn't
+      // shown in the breadcrumb either — every drawer link now goes
+      // straight to a specific master type (companyCategory/etc), so the
+      // trail reads "More > Company Category" instead of "More > Masters
+      // > Company Category".
+      if (seg == 'masters') continue;
       final depth = i + 1;
       final isLast = i == _stack.length - 1;
       final label = _segLabel(seg);
-      // 'masters' has no standalone page of its own anymore — it's just a
-      // breadcrumb label, not a tappable stop, since every drawer link now
-      // goes straight to a specific master type (companyCategory/etc).
-      final tappable = !isLast && seg != 'masters';
+      final tappable = !isLast;
       crumbs.add(_Crumb(label, tappable ? () => _popTo(depth) : null));
     }
     return SingleChildScrollView(
@@ -185,20 +230,26 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
           if (crumbs.indexOf(c) > 0) {
             yield Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Icon(Icons.chevron_right_rounded, size: 14,
-                  color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
+              child: Icon(
+                Icons.chevron_right_rounded,
+                size: 14,
+                color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+              ),
             );
           }
           yield GestureDetector(
             onTap: c.onTap,
-            child: Text(c.label, style: TextStyle(
-              color: c.onTap != null
-                  ? cs.onSurfaceVariant.withValues(alpha: 0.6)
-                  : cs.onSurface,
-              fontSize: c.onTap != null ? 12 : 15,
-              fontWeight: c.onTap != null ? FontWeight.w400 : FontWeight.w700,
-              letterSpacing: c.onTap == null ? 0.1 : 0,
-            )),
+            child: Text(
+              c.label,
+              style: TextStyle(
+                color: c.onTap != null
+                    ? cs.onSurfaceVariant.withValues(alpha: 0.6)
+                    : cs.onSurface,
+                fontSize: c.onTap != null ? 12 : 15,
+                fontWeight: c.onTap != null ? FontWeight.w400 : FontWeight.w700,
+                letterSpacing: c.onTap == null ? 0.1 : 0,
+              ),
+            ),
           );
         }).toList(),
       ),
@@ -216,7 +267,10 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
       final s = masterCubit.state;
       if (s is MasterLoaded) {
         try {
-          return s.items.firstWhere((x) => x.assignedCategoryId == catId).assignedCategoryName ?? catId;
+          return s.items
+                  .firstWhere((x) => x.assignedCategoryId == catId)
+                  .assignedCategoryName ??
+              catId;
         } catch (_) {}
       }
       return catId;
@@ -227,27 +281,46 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
   Widget _buildAction(ColorScheme cs, bool isDark) {
     final last = _stack.isEmpty ? '' : _stack.last;
     VoidCallback? onTap;
-    if (last == 'companies') onTap = () => context.push(AppRouter.createCompany, extra: 'menu');
+    if (last == 'companies')
+      onTap = () => context.push(AppRouter.createCompany, extra: 'menu');
     // masterMenu top-level category view or drilled-into category: + opens create
     if (last == 'masterMenu') onTap = () => _push('create');
     if (last.startsWith('cat:')) onTap = () => _push('create');
     // Other non-assignable master types: + opens create
-    if (masterTypeFor(last) != null && !(masterTypeFor(last)?.hasParentAssignment ?? false)) {
+    if (masterTypeFor(last) != null &&
+        !(masterTypeFor(last)?.hasParentAssignment ?? false)) {
       onTap = () => _push('create');
     }
     if (onTap == null) return const SizedBox.shrink();
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 38, height: 38,
+        width: 38,
+        height: 38,
         margin: const EdgeInsets.only(right: 12),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          gradient: isDark ? AppColors.silverGradient : const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.brand, AppColors.brandDeep]),
+          gradient: isDark
+              ? AppColors.silverGradient
+              : const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppColors.brand, AppColors.brandDeep],
+                ),
           borderRadius: BorderRadius.circular(13),
-          boxShadow: [BoxShadow(color: AppColors.brand.withValues(alpha: isDark ? 0.0 : 0.4), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: AppColors.shadows([
+            BoxShadow(
+              color: AppColors.brand.withValues(alpha: isDark ? 0.0 : 0.4),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ]),
         ),
-        child: Icon(Icons.add_rounded, size: 20, color: isDark ? AppColors.black : AppColors.white),
+        child: Icon(
+          Icons.add_rounded,
+          size: 20,
+          color: isDark ? AppColors.black : AppColors.white,
+        ),
       ),
     );
   }
@@ -257,11 +330,14 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
   Widget _buildBody() {
     if (_navIndex == 3 && _stack.isNotEmpty) {
       final path = _stack.join('/');
-      if (path == 'companies') return _CompaniesListBody(searchCtrl: _searchCtrl);
+      if (path == 'companies')
+        return _CompaniesListBody(searchCtrl: _searchCtrl);
 
       // ── masterMenu: 2-level drill-down ──────────────────────────────────────
       if (path == 'masters/masterMenu') {
-        return _MasterMenuCategoryView(onCategoryTap: (catId) => _push('cat:$catId'));
+        return _MasterMenuCategoryView(
+          onCategoryTap: (catId) => _push('cat:$catId'),
+        );
       }
       // masters/masterMenu/cat:<catId> → items for that category
       if (_inCategoryDrillDown && _stack.length == 3) {
@@ -272,23 +348,46 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
         );
       }
       // masters/masterMenu/cat:<catId>/create
-      if (_inCategoryDrillDown && _stack.length == 4 && _stack.last == 'create') {
-        return _MasterFormBody(typeKey: 'masterMenu', defaultCategoryId: _drillCatId, onSaved: _pop);
+      if (_inCategoryDrillDown &&
+          _stack.length == 4 &&
+          _stack.last == 'create') {
+        return _MasterFormBody(
+          typeKey: 'masterMenu',
+          defaultCategoryId: _drillCatId,
+          onSaved: _pop,
+        );
       }
       // masters/masterMenu/cat:<catId>/edit:<id>
-      if (_inCategoryDrillDown && _stack.length == 4 && _stack.last.startsWith('edit:')) {
-        return _MasterFormBody(typeKey: 'masterMenu', editId: _stack.last.substring(5), onSaved: _pop);
+      if (_inCategoryDrillDown &&
+          _stack.length == 4 &&
+          _stack.last.startsWith('edit:')) {
+        return _MasterFormBody(
+          typeKey: 'masterMenu',
+          editId: _stack.last.substring(5),
+          onSaved: _pop,
+        );
       }
 
       // ── Generic master types ─────────────────────────────────────────────────
       if (_stack.length == 2 && _stack[0] == 'masters') {
-        return _MasterItemsBody(typeKey: _stack[1], onEdit: (id) => _push('edit:$id'));
+        return _MasterItemsBody(
+          typeKey: _stack[1],
+          onEdit: (id) => _push('edit:$id'),
+        );
       }
-      if (_stack.length == 3 && _stack[0] == 'masters' && _stack[2] == 'create') {
+      if (_stack.length == 3 &&
+          _stack[0] == 'masters' &&
+          _stack[2] == 'create') {
         return _MasterFormBody(typeKey: _stack[1], onSaved: _pop);
       }
-      if (_stack.length == 3 && _stack[0] == 'masters' && _stack[2].startsWith('edit:')) {
-        return _MasterFormBody(typeKey: _stack[1], editId: _stack[2].substring(5), onSaved: _pop);
+      if (_stack.length == 3 &&
+          _stack[0] == 'masters' &&
+          _stack[2].startsWith('edit:')) {
+        return _MasterFormBody(
+          typeKey: _stack[1],
+          editId: _stack[2].substring(5),
+          onSaved: _pop,
+        );
       }
     }
     switch (_navIndex) {
@@ -297,13 +396,11 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
       // Attendance module disabled for now — uncomment to re-enable.
       // case 1: return const AttendanceBody();
       case 2:
-        return const ComingSoonView(
-          icon: Icons.bar_chart_rounded,
-          title: 'Reports',
-          subtitle: 'Company-wide reports are on the way.',
-        );
-      case 3: return const _MenuBody();
-      default: return const SizedBox.shrink();
+        return const ReportsBody();
+      case 3:
+        return const _MenuBody();
+      default:
+        return const SizedBox.shrink();
     }
   }
 
@@ -326,8 +423,16 @@ class _CompaniesListBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final companiesAsync = ref.watch(companiesProvider);
     return companiesAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.silver)),
-      error: (e, _) => Center(child: Text(e.toString(), style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))),
+      loading: () =>
+          const SkeletonListView(padding: EdgeInsets.fromLTRB(14, 70, 14, 100)),
+      error: (e, _) => Center(
+        child: Text(
+          e.toString(),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
       data: (companies) {
         return Column(
           children: [
@@ -341,38 +446,69 @@ class _CompaniesListBody extends ConsumerWidget {
                       decoration: BoxDecoration(
                         color: AppColors.surface,
                         borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
-                          BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
-                        ],
+                        boxShadow: AppColors.shadows([
+                          BoxShadow(
+                            color: AppColors.shadowDark.withValues(alpha: 0.06),
+                            blurRadius: 14,
+                            offset: const Offset(0, 6),
+                          ),
+                          BoxShadow(
+                            color: AppColors.highlightShadow(0.85),
+                            blurRadius: 6,
+                            offset: const Offset(-3, -3),
+                          ),
+                        ]),
                       ),
                       child: TextField(
                         controller: searchCtrl,
-                        style: const TextStyle(color: AppColors.ink, fontSize: 13),
+                        style: TextStyle(color: AppColors.ink, fontSize: 13),
                         decoration: InputDecoration(
                           hintText: 'Search companies...',
-                          hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 13),
-                          prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textHint, size: 20),
+                          hintStyle: TextStyle(
+                            color: AppColors.textHint,
+                            fontSize: 13,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search_rounded,
+                            color: AppColors.textHint,
+                            size: 20,
+                          ),
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 11,
+                          ),
                         ),
-                        onChanged: (v) => ref.read(companiesProvider.notifier).search(v),
+                        onChanged: (v) =>
+                            ref.read(companiesProvider.notifier).search(v),
                       ),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Container(
-                    width: 46, height: 46,
+                    width: 46,
+                    height: 46,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: AppColors.surface,
                       borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
-                        BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
-                      ],
+                      boxShadow: AppColors.shadows([
+                        BoxShadow(
+                          color: AppColors.shadowDark.withValues(alpha: 0.06),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                        BoxShadow(
+                          color: AppColors.highlightShadow(0.85),
+                          blurRadius: 6,
+                          offset: const Offset(-3, -3),
+                        ),
+                      ]),
                     ),
-                    child: const Icon(Icons.tune_rounded, color: AppColors.brand, size: 19),
+                    child: const Icon(
+                      Icons.tune_rounded,
+                      color: AppColors.brand,
+                      size: 19,
+                    ),
                   ),
                 ],
               ),
@@ -382,19 +518,41 @@ class _CompaniesListBody extends ConsumerWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Total Companies', style: TextStyle(color: AppColors.textHint, fontSize: 12.5)),
+                  Text(
+                    'Total Companies',
+                    style: TextStyle(color: AppColors.textHint, fontSize: 12.5),
+                  ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                    decoration: BoxDecoration(color: AppColors.brand.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
-                    child: Text(companies.length.toString(),
-                        style: const TextStyle(color: AppColors.brand, fontWeight: FontWeight.w800, fontSize: 12)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.brand.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      companies.length.toString(),
+                      style: const TextStyle(
+                        color: AppColors.brand,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
             Expanded(
               child: companies.isEmpty
-                  ? Center(child: Text('No companies found', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)))
+                  ? Center(
+                      child: Text(
+                        'No companies found',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    )
                   : ListView.builder(
                       padding: const EdgeInsets.fromLTRB(14, 0, 14, 100),
                       itemCount: companies.length,
@@ -404,17 +562,28 @@ class _CompaniesListBody extends ConsumerWidget {
                           company: c,
                           index: i,
                           onToggleStatus: () {
-                            ref.read(companiesProvider.notifier).toggleStatus(c.id).then((err) {
-                              if (err != null && context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(err), backgroundColor: AppColors.ink),
-                                );
-                              }
-                            });
+                            ref
+                                .read(companiesProvider.notifier)
+                                .toggleStatus(c.id)
+                                .then((err) {
+                                  if (err != null && context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(err),
+                                        backgroundColor: AppColors.dangerFill,
+                                      ),
+                                    );
+                                  }
+                                });
                           },
-                          onDelete: () => ref.read(companiesProvider.notifier).deleteCompany(c.id),
+                          onDelete: () => ref
+                              .read(companiesProvider.notifier)
+                              .deleteCompany(c.id),
                           onView: () => _viewCompanyDetail(context, ref, c.id),
-                          onEdit: () => context.push(AppRouter.createCompany, extra: {'edit': c}),
+                          onEdit: () => context.push(
+                            AppRouter.createCompany,
+                            extra: {'edit': c},
+                          ),
                         );
                       },
                     ),
@@ -428,14 +597,21 @@ class _CompaniesListBody extends ConsumerWidget {
 
 // ── Company detail sheet ──────────────────────────────────────────────────────
 
-Future<void> _viewCompanyDetail(BuildContext context, WidgetRef ref, String id) async {
+Future<void> _viewCompanyDetail(
+  BuildContext context,
+  WidgetRef ref,
+  String id,
+) async {
   showDialog(
     context: context,
     barrierDismissible: false,
-    builder: (_) => const Center(child: CircularProgressIndicator(color: AppColors.silver)),
+    builder: (_) =>
+        const Center(child: CircularProgressIndicator(color: AppColors.silver)),
   );
   try {
-    final company = await ref.read(companiesProvider.notifier).fetchCompanyDetail(id);
+    final company = await ref
+        .read(companiesProvider.notifier)
+        .fetchCompanyDetail(id);
     if (!context.mounted) return;
     Navigator.of(context, rootNavigator: true).pop();
     _showCompanyDetail(context, ref, company);
@@ -443,7 +619,10 @@ Future<void> _viewCompanyDetail(BuildContext context, WidgetRef ref, String id) 
     if (!context.mounted) return;
     Navigator.of(context, rootNavigator: true).pop();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+      SnackBar(
+        content: Text(e.toString()),
+        backgroundColor: AppColors.dangerFill,
+      ),
     );
   }
 }
@@ -469,27 +648,47 @@ void _showCompanyDetail(BuildContext context, WidgetRef ref, Company company) {
             context: ctx,
             builder: (dCtx) => AlertDialog(
               title: const Text('Delete company?'),
-              content: Text('This will permanently remove "${company.name}". This can\'t be undone.'),
+              content: Text(
+                'This will permanently remove "${company.name}". This can\'t be undone.',
+              ),
               actions: [
-                TextButton(onPressed: () => Navigator.of(dCtx).pop(false), child: const Text('Cancel')),
+                TextButton(
+                  onPressed: () => Navigator.of(dCtx).pop(false),
+                  child: const Text('Cancel'),
+                ),
                 TextButton(
                   onPressed: () => Navigator.of(dCtx).pop(true),
-                  child: const Text('Delete', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700)),
+                  child: Text(
+                    'Delete',
+                    style: TextStyle(
+                      color: AppColors.ink,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
               ],
             ),
           );
           if (confirmed == true) {
-            await ref.read(companiesProvider.notifier).deleteCompany(company.id);
+            await ref
+                .read(companiesProvider.notifier)
+                .deleteCompany(company.id);
             if (ctx.mounted) Navigator.of(ctx).pop();
           }
         },
         onToggleStatus: () async {
-          final err = await ref.read(companiesProvider.notifier).toggleStatus(company.id);
+          final err = await ref
+              .read(companiesProvider.notifier)
+              .toggleStatus(company.id);
           if (ctx.mounted) {
             Navigator.of(ctx).pop();
             if (err != null) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err), backgroundColor: AppColors.ink));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(err),
+                  backgroundColor: AppColors.dangerFill,
+                ),
+              );
             }
           }
         },
@@ -513,15 +712,17 @@ class _CompanyDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = company; // Company — all fields are typed with null safety
-    final isPending = c.onboardingStatus != null && c.onboardingStatus != 'completed';
+    final isPending =
+        c.onboardingStatus != null && c.onboardingStatus != 'completed';
     return DraggableScrollableSheet(
       initialChildSize: 0.8,
       minChildSize: 0.4,
       maxChildSize: 0.95,
       builder: (_, controller) => GestureDetector(
-        onTap: () {}, // absorb taps so the outer dismiss handler ignores sheet touches
+        onTap:
+            () {}, // absorb taps so the outer dismiss handler ignores sheet touches
         child: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppColors.background,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
@@ -530,8 +731,12 @@ class _CompanyDetailSheet extends StatelessWidget {
               // Handle
               Container(
                 margin: const EdgeInsets.only(top: 12, bottom: 8),
-                width: 36, height: 4,
-                decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
               // Header
               Padding(
@@ -539,7 +744,8 @@ class _CompanyDetailSheet extends StatelessWidget {
                 child: Row(
                   children: [
                     Container(
-                      width: 52, height: 52,
+                      width: 52,
+                      height: 52,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
@@ -548,25 +754,60 @@ class _CompanyDetailSheet extends StatelessWidget {
                           colors: [AppColors.brand, AppColors.brandDeep],
                         ),
                         borderRadius: BorderRadius.circular(16),
-                        boxShadow: [BoxShadow(color: AppColors.brand.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 5))],
+                        boxShadow: AppColors.shadows([
+                          BoxShadow(
+                            color: AppColors.brand.withValues(alpha: 0.35),
+                            blurRadius: 12,
+                            offset: const Offset(0, 5),
+                          ),
+                        ]),
                       ),
-                      child: Text(c.initials, style: const TextStyle(color: AppColors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                      child: Text(
+                        c.initials,
+                        style: const TextStyle(
+                          color: AppColors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(c.name, style: const TextStyle(color: AppColors.ink, fontSize: 17, fontWeight: FontWeight.w800), overflow: TextOverflow.ellipsis),
+                          Text(
+                            c.name,
+                            style: TextStyle(
+                              color: AppColors.ink,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                           if (c.industryType != null)
-                            Text(c.industryType!, style: const TextStyle(color: AppColors.textHint, fontSize: 12.5)),
+                            Text(
+                              c.industryType!,
+                              style: TextStyle(
+                                color: AppColors.textHint,
+                                fontSize: 12.5,
+                              ),
+                            ),
                         ],
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _SheetIconButton(icon: Icons.edit_outlined, color: AppColors.brand, onTap: onEdit),
+                    _SheetIconButton(
+                      icon: Icons.edit_outlined,
+                      color: AppColors.brand,
+                      onTap: onEdit,
+                    ),
                     const SizedBox(width: 8),
-                    _SheetIconButton(icon: Icons.delete_outline_rounded, color: AppColors.ink, onTap: onDelete),
+                    _SheetIconButton(
+                      icon: Icons.delete_outline_rounded,
+                      color: AppColors.ink,
+                      onTap: onDelete,
+                    ),
                   ],
                 ),
               ),
@@ -579,22 +820,55 @@ class _CompanyDetailSheet extends StatelessWidget {
                       child: GestureDetector(
                         onTap: onToggleStatus,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 11,
+                          ),
                           decoration: BoxDecoration(
-                            color: c.isActive ? AppColors.positive : AppColors.ink,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: c.isActive
+                                  ? [AppColors.positive, AppColors.positive]
+                                  : AppColors.accentGradient(
+                                      AppColors.brandBlack,
+                                    ),
+                            ),
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: Row(
                             children: [
-                              Icon(c.isActive ? Icons.check_circle_rounded : Icons.pause_circle_filled_rounded, color: AppColors.white, size: 18),
+                              Icon(
+                                c.isActive
+                                    ? Icons.check_circle_rounded
+                                    : Icons.pause_circle_filled_rounded,
+                                color: AppColors.white,
+                                size: 18,
+                              ),
                               const SizedBox(width: 8),
-                              Text(c.isActive ? 'Active' : 'Inactive',
-                                  style: const TextStyle(color: AppColors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+                              Text(
+                                c.isActive ? 'Active' : 'Inactive',
+                                style: const TextStyle(
+                                  color: AppColors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                               const Spacer(),
-                              Text('Tap to ${c.isActive ? 'deactivate' : 'activate'}',
-                                  style: const TextStyle(color: AppColors.white, fontSize: 11.5, fontWeight: FontWeight.w500)),
+                              Text(
+                                'Tap to ${c.isActive ? 'deactivate' : 'activate'}',
+                                style: const TextStyle(
+                                  color: AppColors.white,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                               const SizedBox(width: 4),
-                              const Icon(Icons.sync_alt_rounded, color: AppColors.white, size: 15),
+                              const Icon(
+                                Icons.sync_alt_rounded,
+                                color: AppColors.white,
+                                size: 15,
+                              ),
                             ],
                           ),
                         ),
@@ -603,9 +877,22 @@ class _CompanyDetailSheet extends StatelessWidget {
                     if (isPending) ...[
                       const SizedBox(width: 10),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                        decoration: BoxDecoration(color: AppColors.brandLight, borderRadius: BorderRadius.circular(16)),
-                        child: const Text('Setup Pending', style: TextStyle(color: AppColors.white, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 11,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.brandLight,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Text(
+                          'Setup Pending',
+                          style: TextStyle(
+                            color: AppColors.white,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                     ],
                   ],
@@ -617,28 +904,94 @@ class _CompanyDetailSheet extends StatelessWidget {
                   controller: controller,
                   padding: const EdgeInsets.fromLTRB(18, 0, 18, 32),
                   children: [
-                    _DetailSection(title: 'Contact Information', items: [
-                      if (c.ownerName.isNotEmpty)
-                        _DetailRow(icon: Icons.person_outline, label: 'Owner', value: c.ownerName),
-                      if (c.email != null && c.email!.isNotEmpty)
-                        _DetailRow(icon: Icons.mail_outline_rounded, label: 'Email', value: c.email!, iconColor: AppColors.positive),
-                      if (c.phone != null && c.phone!.isNotEmpty)
-                        _DetailRow(icon: Icons.phone_outlined, label: 'Phone', value: c.phone!),
-                    ]),
+                    _DetailSection(
+                      title: 'Contact Information',
+                      items: [
+                        if (c.ownerName.isNotEmpty)
+                          _DetailRow(
+                            icon: Icons.person_outline,
+                            label: 'Owner',
+                            value: c.ownerName,
+                          ),
+                        if (c.email != null && c.email!.isNotEmpty)
+                          _DetailRow(
+                            icon: Icons.mail_outline_rounded,
+                            label: 'Email',
+                            value: c.email!,
+                            iconColor: AppColors.positive,
+                          ),
+                        if (c.phone != null && c.phone!.isNotEmpty)
+                          _DetailRow(
+                            icon: Icons.phone_outlined,
+                            label: 'Phone',
+                            value: c.phone!,
+                          ),
+                      ],
+                    ),
                     const SizedBox(height: 18),
-                    _DetailSection(title: 'Location', items: [
-                      if (c.address != null)  _DetailRow(icon: Icons.location_on_outlined,   label: 'Address', value: c.address!, iconColor: AppColors.positive),
-                      if (c.city != null)     _DetailRow(icon: Icons.location_city_outlined, label: 'City',    value: c.city!),
-                      if (c.state != null)    _DetailRow(icon: Icons.map_outlined,           label: 'State',   value: c.state!, iconColor: AppColors.positive),
-                      if (c.country != null)  _DetailRow(icon: Icons.language_outlined,      label: 'Country', value: c.country!),
-                      if (c.pincode != null)  _DetailRow(icon: Icons.pin_outlined,           label: 'Pincode', value: c.pincode!, iconColor: AppColors.positive),
-                    ]),
+                    _DetailSection(
+                      title: 'Location',
+                      items: [
+                        if (c.address != null)
+                          _DetailRow(
+                            icon: Icons.location_on_outlined,
+                            label: 'Address',
+                            value: c.address!,
+                            iconColor: AppColors.positive,
+                          ),
+                        if (c.city != null)
+                          _DetailRow(
+                            icon: Icons.location_city_outlined,
+                            label: 'City',
+                            value: c.city!,
+                          ),
+                        if (c.state != null)
+                          _DetailRow(
+                            icon: Icons.map_outlined,
+                            label: 'State',
+                            value: c.state!,
+                            iconColor: AppColors.positive,
+                          ),
+                        if (c.country != null)
+                          _DetailRow(
+                            icon: Icons.language_outlined,
+                            label: 'Country',
+                            value: c.country!,
+                          ),
+                        if (c.pincode != null)
+                          _DetailRow(
+                            icon: Icons.pin_outlined,
+                            label: 'Pincode',
+                            value: c.pincode!,
+                            iconColor: AppColors.positive,
+                          ),
+                      ],
+                    ),
                     const SizedBox(height: 18),
-                    _DetailSection(title: 'Business', items: [
-                      if (c.industryType != null)     _DetailRow(icon: Icons.work_outline,             label: 'Industry',     value: c.industryType!),
-                      if (c.subscriptionPlan != null) _DetailRow(icon: Icons.card_membership_outlined, label: 'Plan',         value: c.subscriptionPlan!, iconColor: AppColors.positive),
-                      _DetailRow(icon: Icons.calendar_today_outlined, label: 'Created', value: '${c.createdAt.day}/${c.createdAt.month}/${c.createdAt.year}'),
-                    ]),
+                    _DetailSection(
+                      title: 'Business',
+                      items: [
+                        if (c.industryType != null)
+                          _DetailRow(
+                            icon: Icons.work_outline,
+                            label: 'Industry',
+                            value: c.industryType!,
+                          ),
+                        if (c.subscriptionPlan != null)
+                          _DetailRow(
+                            icon: Icons.card_membership_outlined,
+                            label: 'Plan',
+                            value: c.subscriptionPlan!,
+                            iconColor: AppColors.positive,
+                          ),
+                        _DetailRow(
+                          icon: Icons.calendar_today_outlined,
+                          label: 'Created',
+                          value:
+                              '${c.createdAt.day}/${c.createdAt.month}/${c.createdAt.year}',
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -654,21 +1007,30 @@ class _SheetIconButton extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  const _SheetIconButton({required this.icon, required this.color, required this.onTap});
+  const _SheetIconButton({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 38, height: 38,
+        width: 38,
+        height: 38,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: AppColors.surface,
           shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(color: AppColors.ink.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 4)),
-          ],
+          boxShadow: AppColors.shadows([
+            BoxShadow(
+              color: AppColors.shadowDark.withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ]),
         ),
         child: Icon(icon, size: 18, color: color),
       ),
@@ -687,24 +1049,47 @@ class _DetailSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(color: AppColors.textHint, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
+        Text(
+          title,
+          style: TextStyle(
+            color: AppColors.textHint,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+          ),
+        ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 16, offset: const Offset(0, 6)),
-              BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-2, -2)),
-            ],
+            boxShadow: AppColors.shadows([
+              BoxShadow(
+                color: AppColors.shadowDark.withValues(alpha: 0.06),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+              BoxShadow(
+                color: AppColors.highlightShadow(0.85),
+                blurRadius: 6,
+                offset: const Offset(-2, -2),
+              ),
+            ]),
           ),
           child: Column(
-            children: items.asMap().entries.map((e) => Column(
-              children: [
-                e.value,
-                if (e.key < items.length - 1) const Divider(height: 1, color: AppColors.border, indent: 60),
-              ],
-            )).toList(),
+            children: items
+                .asMap()
+                .entries
+                .map(
+                  (e) => Column(
+                    children: [
+                      e.value,
+                      if (e.key < items.length - 1)
+                        Divider(height: 1, color: AppColors.border, indent: 60),
+                    ],
+                  ),
+                )
+                .toList(),
           ),
         ),
       ],
@@ -716,7 +1101,12 @@ class _DetailRow extends StatelessWidget {
   final IconData icon;
   final String label, value;
   final Color iconColor;
-  const _DetailRow({required this.icon, required this.label, required this.value, this.iconColor = AppColors.brand});
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.iconColor = AppColors.brand,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -725,34 +1115,74 @@ class _DetailRow extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 32, height: 32,
+            width: 32,
+            height: 32,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [iconColor, iconColor.withValues(alpha: 0.75)],
+                colors: AppColors.accentGradient(iconColor),
               ),
               shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: iconColor.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3))],
+              boxShadow: AppColors.shadows([
+                BoxShadow(
+                  color: iconColor.withValues(alpha: 0.35),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ]),
             ),
             child: Icon(icon, size: 16, color: AppColors.white),
           ),
           const SizedBox(width: 12),
-          Text(label, style: const TextStyle(color: AppColors.textHint, fontSize: 12)),
+          Text(
+            label,
+            style: TextStyle(color: AppColors.textHint, fontSize: 12),
+          ),
           const SizedBox(width: 8),
-          Expanded(child: Text(value, textAlign: TextAlign.end, style: const TextStyle(color: AppColors.ink, fontSize: 13, fontWeight: FontWeight.w600))),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                color: AppColors.ink,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-
 // ── Menu full page ────────────────────────────────────────────────────────────
 
-class _MenuBody extends StatelessWidget {
+class _MenuBody extends StatefulWidget {
   const _MenuBody();
+
+  @override
+  State<_MenuBody> createState() => _MenuBodyState();
+}
+
+class _MenuBodyState extends State<_MenuBody> {
+  late final StreamSubscription<ThemeMode> _themeSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _themeSub = themeCubit.stream.listen((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _themeSub.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -769,21 +1199,36 @@ class _MenuBody extends StatelessWidget {
               colors: [AppColors.brand, AppColors.positive],
             ),
             borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(color: AppColors.ink.withValues(alpha: 0.25), blurRadius: 20, offset: const Offset(0, 10)),
-            ],
+            boxShadow: AppColors.shadows([
+              BoxShadow(
+                color: AppColors.shadowDark.withValues(alpha: 0.25),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ]),
           ),
           child: Row(
             children: [
               Container(
-                width: 56, height: 56,
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.16),
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.5),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.35),
+                    width: 1.5,
+                  ),
                 ),
                 child: const Center(
-                  child: Text('AD', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: AppColors.white)),
+                  child: Text(
+                    'AD',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 17,
+                      color: AppColors.white,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -791,17 +1236,32 @@ class _MenuBody extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Admin', style: TextStyle(color: AppColors.white, fontWeight: FontWeight.w800, fontSize: 17)),
+                    Text(
+                      'Admin',
+                      style: TextStyle(
+                        color: AppColors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                      ),
+                    ),
                     SizedBox(height: 6),
                     _RoleBadge(),
                   ],
                 ),
               ),
               Container(
-                width: 34, height: 34,
+                width: 34,
+                height: 34,
                 alignment: Alignment.center,
-                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.16), shape: BoxShape.circle),
-                child: const Icon(Icons.chevron_right_rounded, color: AppColors.white, size: 18),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.16),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.white,
+                  size: 18,
+                ),
               ),
             ],
           ),
@@ -811,10 +1271,28 @@ class _MenuBody extends StatelessWidget {
         // ── Preferences ───────────────────────────────────────────
         _MenuSectionLabel('Preferences'),
         const SizedBox(height: 10),
-        _MenuSection(items: [
-          _MenuItem(icon: Icons.settings_rounded, label: 'Settings', color: AppColors.brand,    onTap: () => context.push(AppRouter.security)),
-          _MenuItem(icon: Icons.help_rounded,     label: 'Support',  color: AppColors.positive, onTap: () {}),
-        ]),
+        _MenuSection(
+          items: [
+            _MenuItem(
+              icon: Icons.lock_outline_rounded,
+              label: 'App Lock',
+              color: AppColors.brand,
+              onTap: () => context.push(AppRouter.security),
+            ),
+            _MenuItem(
+              icon: Icons.help_rounded,
+              label: 'Support',
+              color: AppColors.positive,
+              onTap: () {},
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _DarkModeToggleCard(
+          isDark: themeCubit.isDark,
+          onChanged: (v) =>
+              themeCubit.setMode(v ? ThemeMode.dark : ThemeMode.light),
+        ),
         const SizedBox(height: 24),
 
         // ── Logout ────────────────────────────────────────────────
@@ -828,23 +1306,50 @@ class _MenuBody extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(color: AppColors.ink.withValues(alpha: 0.08), blurRadius: 20, offset: const Offset(0, 10)),
-                BoxShadow(color: AppColors.white.withValues(alpha: 0.9), blurRadius: 10, offset: const Offset(-4, -4)),
-              ],
+              boxShadow: AppColors.shadows([
+                BoxShadow(
+                  color: AppColors.shadowDark.withValues(alpha: 0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+                BoxShadow(
+                  color: AppColors.highlightShadow(0.9),
+                  blurRadius: 10,
+                  offset: const Offset(-4, -4),
+                ),
+              ]),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 36, height: 36,
+                  width: 36,
+                  height: 36,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(color: AppColors.ink.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(11)),
-                  child: const Icon(Icons.logout_rounded, size: 18, color: AppColors.ink),
+                  decoration: BoxDecoration(
+                    color: AppColors.ink.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(
+                    Icons.logout_rounded,
+                    size: 18,
+                    color: AppColors.ink,
+                  ),
                 ),
                 const SizedBox(width: 14),
-                const Text('Logout', style: TextStyle(color: AppColors.ink, fontSize: 14, fontWeight: FontWeight.w700)),
+                Text(
+                  'Logout',
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const Spacer(),
-                Icon(Icons.chevron_right_rounded, color: AppColors.ink.withValues(alpha: 0.35), size: 20),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.ink.withValues(alpha: 0.35),
+                  size: 20,
+                ),
               ],
             ),
           ),
@@ -856,14 +1361,29 @@ class _MenuBody extends StatelessWidget {
           child: Column(
             children: [
               Text.rich(
-                TextSpan(children: [
-                  const TextSpan(text: 'Brix', style: TextStyle(color: AppColors.brand)),
-                  const TextSpan(text: 'en', style: TextStyle(color: AppColors.positive)),
-                ]),
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: -0.4),
+                TextSpan(
+                  children: [
+                    const TextSpan(
+                      text: 'Brix',
+                      style: TextStyle(color: AppColors.brand),
+                    ),
+                    const TextSpan(
+                      text: 'en',
+                      style: TextStyle(color: AppColors.positive),
+                    ),
+                  ],
+                ),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.4,
+                ),
               ),
               const SizedBox(height: 4),
-              const Text('Version 1.0.0', style: TextStyle(color: AppColors.textHint, fontSize: 11.5)),
+              Text(
+                'Version 1.0.0',
+                style: TextStyle(color: AppColors.textHint, fontSize: 11.5),
+              ),
             ],
           ),
         ),
@@ -879,12 +1399,25 @@ class _RoleBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(20)),
-      child: const Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.verified_rounded, size: 12, color: AppColors.white),
-        SizedBox(width: 4),
-        Text('Super Admin', style: TextStyle(color: AppColors.white, fontSize: 11, fontWeight: FontWeight.w700)),
-      ]),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.verified_rounded, size: 12, color: AppColors.white),
+          SizedBox(width: 4),
+          Text(
+            'Super Admin',
+            style: TextStyle(
+              color: AppColors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -897,14 +1430,24 @@ class _MenuSectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(width: 3, height: 13, decoration: BoxDecoration(color: AppColors.brand, borderRadius: BorderRadius.circular(2))),
+        Container(
+          width: 3,
+          height: 13,
+          decoration: BoxDecoration(
+            color: AppColors.brand,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
         const SizedBox(width: 8),
-        Text(label.toUpperCase(),
-            style: const TextStyle(
-                color: AppColors.textHint,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.2)),
+        Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            color: AppColors.textHint,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+          ),
+        ),
       ],
     );
   }
@@ -920,10 +1463,18 @@ class _MenuSection extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(color: AppColors.ink.withValues(alpha: 0.08), blurRadius: 20, offset: const Offset(0, 10)),
-          BoxShadow(color: AppColors.white.withValues(alpha: 0.9), blurRadius: 10, offset: const Offset(-4, -4)),
-        ],
+        boxShadow: AppColors.shadows([
+          BoxShadow(
+            color: AppColors.shadowDark.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+          BoxShadow(
+            color: AppColors.highlightShadow(0.9),
+            blurRadius: 10,
+            offset: const Offset(-4, -4),
+          ),
+        ]),
       ),
       child: Column(
         children: items.asMap().entries.map((entry) {
@@ -935,11 +1486,15 @@ class _MenuSection extends StatelessWidget {
                 onTap: item.onTap,
                 behavior: HitTestBehavior.opaque,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
                   child: Row(
                     children: [
                       Container(
-                        width: 36, height: 36,
+                        width: 36,
+                        height: 36,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
                           color: item.color.withValues(alpha: 0.13),
@@ -948,21 +1503,26 @@ class _MenuSection extends StatelessWidget {
                         child: Icon(item.icon, size: 18, color: item.color),
                       ),
                       const SizedBox(width: 14),
-                      Text(item.label,
-                          style: const TextStyle(
-                              color: AppColors.ink,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600)),
+                      Text(
+                        item.label,
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       const Spacer(),
-                      Icon(Icons.chevron_right_rounded,
-                          size: 18,
-                          color: AppColors.ink.withValues(alpha: 0.3)),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 18,
+                        color: AppColors.ink.withValues(alpha: 0.3),
+                      ),
                     ],
                   ),
                 ),
               ),
               if (i < items.length - 1)
-                const Divider(height: 1, color: AppColors.border, indent: 66),
+                Divider(height: 1, color: AppColors.border, indent: 66),
             ],
           );
         }).toList(),
@@ -976,100 +1536,93 @@ class _MenuItem {
   final String label;
   final Color color;
   final VoidCallback onTap;
-  const _MenuItem({required this.icon, required this.label, required this.color, required this.onTap});
+  const _MenuItem({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+}
+
+class _DarkModeToggleCard extends StatelessWidget {
+  final bool isDark;
+  final ValueChanged<bool> onChanged;
+  const _DarkModeToggleCard({required this.isDark, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: AppColors.shadows([
+          BoxShadow(
+            color: AppColors.shadowDark.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+          BoxShadow(
+            color: AppColors.shadowLight.withValues(alpha: 0.9),
+            blurRadius: 10,
+            offset: const Offset(-4, -4),
+          ),
+        ]),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.brandDeep.withValues(alpha: 0.13),
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Icon(
+                isDark ? Icons.dark_mode_rounded : Icons.dark_mode_outlined,
+                size: 18,
+                color: AppColors.brandDeep,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                'Dark mode',
+                style: TextStyle(
+                  color: AppColors.ink,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Switch.adaptive(
+              value: isDark,
+              activeThumbColor: AppColors.brand,
+              onChanged: onChanged,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ── Floating pill bottom nav ──────────────────────────────────────────────────
-
-class _BottomNav extends StatelessWidget {
-  final int currentIndex;
-  final void Function(int) onTap;
-  const _BottomNav({required this.currentIndex, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    // NOTE: no transparent ColoredBox wrapper here — with `extendBody: true`
-    // this widget is stretched to the full Scaffold height, and a
-    // Container(color: ...) — even fully transparent — always intercepts
-    // hit-testing across its whole bounds, silently swallowing every tap
-    // (including the AppBar's hamburger) outside the actual nav pill.
-    return SafeArea(
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: Container(
-          height: 60,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: AppColors.ink,
-            borderRadius: BorderRadius.circular(32),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _NavBtn(icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard_rounded, isActive: currentIndex == 0, onTap: () => onTap(0)),
-              // Attendance module disabled for now — uncomment to re-enable.
-              // _NavBtn(icon: Icons.access_time_outlined, activeIcon: Icons.access_time_filled_rounded, isActive: currentIndex == 1, onTap: () => onTap(1)),
-              _NavBtn(icon: Icons.bar_chart_outlined, activeIcon: Icons.bar_chart_rounded, isActive: currentIndex == 2, onTap: () => onTap(2)),
-              _NavBtn(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, isActive: currentIndex == 3, onTap: () => onTap(3)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavBtn extends StatelessWidget {
-  final IconData icon;
-  final IconData activeIcon;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  const _NavBtn({required this.icon, required this.activeIcon, required this.isActive, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    // Black pill bar, active icon shown inside a filled green circle.
-    final iconColor = isActive ? AppColors.white : Colors.white.withValues(alpha: 0.5);
-
-    return SizedBox(
-      width: 50,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Center(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: isActive ? AppColors.positive : null,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(isActive ? activeIcon : icon, size: 18, color: iconColor),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-
 
 // ── Masters List ─────────────────────────────────────────────────────────────
 
 // Individual item cards within a master list cycle through the full 5-color
 // brand palette by index (same pattern as the Companies list) instead of all
 // sharing one flat color per master type.
-const _masterCardAccentColors = [AppColors.brand, AppColors.positive, AppColors.brandDeep, AppColors.brandLight, AppColors.ink];
+List<Color> get _masterCardAccentColors => [
+  AppColors.brand,
+  AppColors.positive,
+  AppColors.brandDeep,
+  AppColors.brandLight,
+  AppColors.brandBlack,
+];
 
 // ── Generic Master Items List ─────────────────────────────────────────────────
 
@@ -1077,7 +1630,11 @@ class _MasterItemsBody extends StatefulWidget {
   final String typeKey;
   final void Function(String id) onEdit;
   final String? filterCategoryId; // null = show all
-  const _MasterItemsBody({required this.typeKey, required this.onEdit, this.filterCategoryId});
+  const _MasterItemsBody({
+    required this.typeKey,
+    required this.onEdit,
+    this.filterCategoryId,
+  });
   @override
   State<_MasterItemsBody> createState() => _MasterItemsBodyState();
 }
@@ -1086,7 +1643,8 @@ class _MasterItemsBodyState extends State<_MasterItemsBody> {
   final _searchCtrl = TextEditingController();
   String? _selectedCategory; // null = All
 
-  bool get _hasCategories => masterTypeFor(widget.typeKey)?.hasParentAssignment ?? false;
+  bool get _hasCategories =>
+      masterTypeFor(widget.typeKey)?.hasParentAssignment ?? false;
 
   @override
   void initState() {
@@ -1100,7 +1658,8 @@ class _MasterItemsBodyState extends State<_MasterItemsBody> {
     // No Key on this widget, so Flutter reuses this State when navigating
     // between different master types in the same slot — initState won't
     // re-run, so reload explicitly when the type actually changes.
-    if (oldWidget.typeKey != widget.typeKey || oldWidget.filterCategoryId != widget.filterCategoryId) {
+    if (oldWidget.typeKey != widget.typeKey ||
+        oldWidget.filterCategoryId != widget.filterCategoryId) {
       masterCubit.load(widget.typeKey);
     }
   }
@@ -1119,17 +1678,25 @@ class _MasterItemsBodyState extends State<_MasterItemsBody> {
       bloc: masterCubit,
       builder: (context, state) {
         if (state is MasterError) {
-          return Center(child: Text(state.message, style: TextStyle(color: cs.onSurfaceVariant)));
+          return Center(
+            child: Text(
+              state.message,
+              style: TextStyle(color: cs.onSurfaceVariant),
+            ),
+          );
         }
         if (state is! MasterLoaded) {
-          return const Center(child: CircularProgressIndicator(color: AppColors.silver));
+          return const SkeletonListView(
+            padding: EdgeInsets.fromLTRB(14, 70, 14, 100),
+          );
         }
 
         // Build unique category list from all items (not just filtered)
         final allItems = state.items;
         final categoryMap = <String, String>{}; // id → name
         for (final item in allItems) {
-          if (item.assignedCategoryId != null && item.assignedCategoryName != null) {
+          if (item.assignedCategoryId != null &&
+              item.assignedCategoryName != null) {
             categoryMap[item.assignedCategoryId!] = item.assignedCategoryName!;
           }
         }
@@ -1145,7 +1712,8 @@ class _MasterItemsBodyState extends State<_MasterItemsBody> {
         final countMap = <String, int>{};
         for (final item in state.items) {
           if (item.assignedCategoryId != null) {
-            countMap[item.assignedCategoryId!] = (countMap[item.assignedCategoryId!] ?? 0) + 1;
+            countMap[item.assignedCategoryId!] =
+                (countMap[item.assignedCategoryId!] ?? 0) + 1;
           }
         }
 
@@ -1159,18 +1727,33 @@ class _MasterItemsBodyState extends State<_MasterItemsBody> {
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
-                    BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
-                  ],
+                  boxShadow: AppColors.shadows([
+                    BoxShadow(
+                      color: AppColors.shadowDark.withValues(alpha: 0.06),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                    BoxShadow(
+                      color: AppColors.highlightShadow(0.85),
+                      blurRadius: 6,
+                      offset: const Offset(-3, -3),
+                    ),
+                  ]),
                 ),
                 child: TextField(
                   controller: _searchCtrl,
-                  style: const TextStyle(color: AppColors.ink, fontSize: 14),
+                  style: TextStyle(color: AppColors.ink, fontSize: 14),
                   decoration: InputDecoration(
                     hintText: 'Search ${typeCfg?.name ?? 'items'}...',
-                    hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 14),
-                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textHint, size: 20),
+                    hintStyle: TextStyle(
+                      color: AppColors.textHint,
+                      fontSize: 14,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.search_rounded,
+                      color: AppColors.textHint,
+                      size: 20,
+                    ),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(vertical: 13),
                   ),
@@ -1193,12 +1776,14 @@ class _MasterItemsBodyState extends State<_MasterItemsBody> {
                       selected: _selectedCategory == null,
                       onTap: () => setState(() => _selectedCategory = null),
                     ),
-                    ...categoryMap.entries.map((e) => _FilterChip(
-                      label: e.value,
-                      count: countMap[e.key] ?? 0,
-                      selected: _selectedCategory == e.key,
-                      onTap: () => setState(() => _selectedCategory = e.key),
-                    )),
+                    ...categoryMap.entries.map(
+                      (e) => _FilterChip(
+                        label: e.value,
+                        count: countMap[e.key] ?? 0,
+                        selected: _selectedCategory == e.key,
+                        onTap: () => setState(() => _selectedCategory = e.key),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1209,55 +1794,87 @@ class _MasterItemsBodyState extends State<_MasterItemsBody> {
             // List
             Expanded(
               child: items.isEmpty
-                  ? Center(child: Text('No items found', style: TextStyle(color: cs.onSurfaceVariant)))
+                  ? Center(
+                      child: Text(
+                        'No items found',
+                        style: TextStyle(color: cs.onSurfaceVariant),
+                      ),
+                    )
                   : ListView.builder(
                       padding: const EdgeInsets.fromLTRB(14, 4, 14, 100),
                       itemCount: items.length,
                       itemBuilder: (_, i) {
-                        final itemColor = _masterCardAccentColors[i % _masterCardAccentColors.length];
+                        final itemColor =
+                            _masterCardAccentColors[i %
+                                _masterCardAccentColors.length];
                         return _MasterCard(
-                        item: items[i],
-                        icon: typeCfg?.icon ?? Icons.list_alt_outlined,
-                        color: itemColor,
-                        onView: () => _showMasterDetail(
-                          context,
-                          items[i],
-                          typeCfg?.icon ?? Icons.list_alt_outlined,
-                          itemColor,
-                        ),
-                        onEdit: () => widget.onEdit(items[i].id),
-                        onDelete: () async {
-                          final confirmed = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              backgroundColor: Theme.of(ctx).colorScheme.surfaceContainerHighest,
-                              title: Text('Delete ${typeCfg?.name ?? 'item'}?',
-                                  style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface)),
-                              content: Text(
-                                'This will permanently delete "${items[i].name}". This action cannot be undone.',
-                                style: TextStyle(color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+                          item: items[i],
+                          icon: typeCfg?.icon ?? Icons.list_alt_outlined,
+                          color: itemColor,
+                          onView: () => _showMasterDetail(
+                            context,
+                            items[i],
+                            typeCfg?.icon ?? Icons.list_alt_outlined,
+                            itemColor,
+                          ),
+                          onEdit: () => widget.onEdit(items[i].id),
+                          onDelete: () async {
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                backgroundColor: Theme.of(
+                                  ctx,
+                                ).colorScheme.surfaceContainerHighest,
+                                title: Text(
+                                  'Delete ${typeCfg?.name ?? 'item'}?',
+                                  style: TextStyle(
+                                    color: Theme.of(ctx).colorScheme.onSurface,
+                                  ),
+                                ),
+                                content: Text(
+                                  'This will permanently delete "${items[i].name}". This action cannot be undone.',
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      ctx,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(ctx).pop(false),
+                                    child: Text(
+                                      'Cancel',
+                                      style: TextStyle(
+                                        color: Theme.of(
+                                          ctx,
+                                        ).colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(ctx).pop(true),
+                                    child: Text(
+                                      'Delete',
+                                      style: TextStyle(color: AppColors.error),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.of(ctx).pop(false),
-                                  child: Text('Cancel', style: TextStyle(color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
-                                ),
-                                TextButton(
-                                  onPressed: () => Navigator.of(ctx).pop(true),
-                                  child: const Text('Delete', style: TextStyle(color: AppColors.error)),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (confirmed != true || !context.mounted) return;
-                          masterCubit.delete(items[i].id).then((err) {
-                            if (err != null && context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(err), backgroundColor: AppColors.ink),
-                              );
-                            }
-                          });
-                        },
+                            );
+                            if (confirmed != true || !context.mounted) return;
+                            masterCubit.delete(items[i].id).then((err) {
+                              if (err != null && context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(err),
+                                    backgroundColor: AppColors.dangerFill,
+                                  ),
+                                );
+                              }
+                            });
+                          },
                         );
                       },
                     ),
@@ -1274,7 +1891,12 @@ class _FilterChip extends StatelessWidget {
   final int count;
   final bool selected;
   final VoidCallback onTap;
-  const _FilterChip({required this.label, required this.count, required this.selected, required this.onTap});
+  const _FilterChip({
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1286,30 +1908,43 @@ class _FilterChip extends StatelessWidget {
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? AppColors.silver.withValues(alpha: 0.18) : cs.surfaceContainerHighest,
+          color: selected
+              ? AppColors.silver.withValues(alpha: 0.18)
+              : cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? AppColors.silver : Theme.of(context).dividerColor, width: selected ? 1.5 : 1),
+          border: Border.all(
+            color: selected ? AppColors.silver : Theme.of(context).dividerColor,
+            width: selected ? 1.5 : 1,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label, style: TextStyle(
-              color: selected ? AppColors.silver : cs.onSurfaceVariant,
-              fontSize: 12,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-            )),
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? AppColors.silver : cs.onSurfaceVariant,
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
             const SizedBox(width: 5),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
               decoration: BoxDecoration(
-                color: selected ? AppColors.silver.withValues(alpha: 0.25) : Theme.of(context).dividerColor,
+                color: selected
+                    ? AppColors.silver.withValues(alpha: 0.25)
+                    : Theme.of(context).dividerColor,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Text('$count', style: TextStyle(
-                color: selected ? AppColors.silver : cs.onSurfaceVariant,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-              )),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  color: selected ? AppColors.silver : cs.onSurfaceVariant,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
         ),
@@ -1320,7 +1955,12 @@ class _FilterChip extends StatelessWidget {
 
 // ── Master item detail sheet ────────────────────────────────────────────────
 
-void _showMasterDetail(BuildContext context, MasterItem item, IconData icon, Color color) {
+void _showMasterDetail(
+  BuildContext context,
+  MasterItem item,
+  IconData icon,
+  Color color,
+) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -1339,15 +1979,22 @@ class _MasterDetailSheet extends StatelessWidget {
   final MasterItem item;
   final IconData icon;
   final Color color;
-  const _MasterDetailSheet({required this.item, required this.icon, required this.color});
+  const _MasterDetailSheet({
+    required this.item,
+    required this.icon,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final details = <MapEntry<String, String>>[
-      if (item.fullForm != null && item.fullForm!.isNotEmpty) MapEntry('Full Form', item.fullForm!),
-      if (item.assignedCategoryName != null) MapEntry('Category', item.assignedCategoryName!),
-      if (item.description != null && item.description!.isNotEmpty) MapEntry('Description', item.description!),
+      if (item.fullForm != null && item.fullForm!.isNotEmpty)
+        MapEntry('Full Form', item.fullForm!),
+      if (item.assignedCategoryName != null)
+        MapEntry('Category', item.assignedCategoryName!),
+      if (item.description != null && item.description!.isNotEmpty)
+        MapEntry('Description', item.description!),
     ];
 
     return DraggableScrollableSheet(
@@ -1355,7 +2002,8 @@ class _MasterDetailSheet extends StatelessWidget {
       minChildSize: 0.3,
       maxChildSize: 0.9,
       builder: (_, controller) => GestureDetector(
-        onTap: () {}, // absorb taps so the outer dismiss handler ignores sheet touches
+        onTap:
+            () {}, // absorb taps so the outer dismiss handler ignores sheet touches
         child: Container(
           decoration: BoxDecoration(
             color: Theme.of(context).scaffoldBackgroundColor,
@@ -1365,15 +2013,20 @@ class _MasterDetailSheet extends StatelessWidget {
             children: [
               Container(
                 margin: const EdgeInsets.only(top: 12, bottom: 8),
-                width: 36, height: 4,
-                decoration: BoxDecoration(color: Theme.of(context).dividerColor, borderRadius: BorderRadius.circular(2)),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).dividerColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                 child: Row(
                   children: [
                     Container(
-                      width: 48, height: 48,
+                      width: 48,
+                      height: 48,
                       decoration: BoxDecoration(
                         color: color.withValues(alpha: 0.13),
                         borderRadius: BorderRadius.circular(12),
@@ -1383,7 +2036,14 @@ class _MasterDetailSheet extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text(item.name, style: TextStyle(color: cs.onSurface, fontSize: 18, fontWeight: FontWeight.w700)),
+                      child: Text(
+                        item.name,
+                        style: TextStyle(
+                          color: cs.onSurface,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -1391,21 +2051,45 @@ class _MasterDetailSheet extends StatelessWidget {
               Divider(height: 1, color: Theme.of(context).dividerColor),
               Expanded(
                 child: details.isEmpty
-                    ? Center(child: Text('No additional details', style: TextStyle(color: cs.onSurfaceVariant)))
+                    ? Center(
+                        child: Text(
+                          'No additional details',
+                          style: TextStyle(color: cs.onSurfaceVariant),
+                        ),
+                      )
                     : ListView(
                         controller: controller,
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                        children: details.map((e) => Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(e.key.toUpperCase(), style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.6)),
-                              const SizedBox(height: 4),
-                              Text(e.value, style: TextStyle(color: cs.onSurface, fontSize: 14, height: 1.4)),
-                            ],
-                          ),
-                        )).toList(),
+                        children: details
+                            .map(
+                              (e) => Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      e.key.toUpperCase(),
+                                      style: TextStyle(
+                                        color: cs.onSurfaceVariant,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0.6,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      e.value,
+                                      style: TextStyle(
+                                        color: cs.onSurface,
+                                        fontSize: 14,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                            .toList(),
                       ),
               ),
             ],
@@ -1421,21 +2105,41 @@ class _MasterCard extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onView, onEdit, onDelete;
-  const _MasterCard({required this.item, required this.icon, required this.color, required this.onView, required this.onEdit, required this.onDelete});
+  const _MasterCard({
+    required this.item,
+    required this.icon,
+    required this.color,
+    required this.onView,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final bg = Color.lerp(AppColors.surface, color, 0.32)!;
+    final bg = Color.lerp(
+      AppColors.surface,
+      color,
+      AppColors.cardTintBlend(color),
+    )!;
     final fgMuted = AppColors.ink.withValues(alpha: 0.6);
-    final statusColor = item.isActive ? AppColors.positive : AppColors.ink.withValues(alpha: 0.35);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: SwipeActions(
         onTap: onView,
         actions: [
-          SwipeAction(icon: Icons.edit_outlined, label: 'Edit', color: AppColors.brand, onTap: onEdit),
-          SwipeAction(icon: Icons.delete_outline, label: 'Delete', color: AppColors.error, onTap: onDelete),
+          SwipeAction(
+            icon: Icons.edit_outlined,
+            label: 'Edit',
+            color: AppColors.brand,
+            onTap: onEdit,
+          ),
+          SwipeAction(
+            icon: Icons.delete_outline,
+            label: 'Delete',
+            color: AppColors.brandBlack,
+            onTap: onDelete,
+          ),
         ],
         child: RichCardShell(
           accentColor: color,
@@ -1447,12 +2151,23 @@ class _MasterCard extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 46, height: 46,
+                  width: 46,
+                  height: 46,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [color, color.withValues(alpha: 0.75)]),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: AppColors.accentGradient(color),
+                    ),
                     shape: BoxShape.circle,
-                    boxShadow: [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))],
+                    boxShadow: AppColors.shadows([
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.35),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]),
                   ),
                   child: Icon(icon, size: 20, color: AppColors.white),
                 ),
@@ -1461,34 +2176,67 @@ class _MasterCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(children: [
-                        Expanded(
-                          child: Text(item.name,
-                              style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, fontSize: 15),
-                              overflow: TextOverflow.ellipsis),
+                      Text(
+                        item.name,
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
                         ),
-                        const SizedBox(width: 6),
-                        Container(width: 7, height: 7, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
-                      ]),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       if (item.fullForm != null && item.fullForm!.isNotEmpty)
-                        Text(item.fullForm!, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600)),
+                        Text(
+                          item.fullForm!,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       if (item.assignedCategoryName != null)
-                        Row(children: [
-                          Icon(Icons.category_rounded, size: 11, color: color),
-                          const SizedBox(width: 3),
-                          Text(item.assignedCategoryName!, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600)),
-                        ]),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.category_rounded,
+                              size: 11,
+                              color: color,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              item.assignedCategoryName!,
+                              style: TextStyle(
+                                color: color,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       if (item.description != null)
-                        Text(item.description!, style: TextStyle(color: fgMuted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text(
+                          item.description!,
+                          style: TextStyle(color: fgMuted, fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 6),
                 Container(
-                  width: 26, height: 26,
+                  width: 26,
+                  height: 26,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(color: AppColors.ink.withValues(alpha: 0.08), shape: BoxShape.circle),
-                  child: Icon(Icons.chevron_right_rounded, size: 16, color: fgMuted),
+                  decoration: BoxDecoration(
+                    color: AppColors.ink.withValues(alpha: 0.08),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: fgMuted,
+                  ),
                 ),
               ],
             ),
@@ -1504,9 +2252,15 @@ class _MasterCard extends StatelessWidget {
 class _MasterFormBody extends StatefulWidget {
   final String typeKey;
   final String? editId;
-  final String? defaultCategoryId; // pre-fill category when creating from drill-down
+  final String?
+  defaultCategoryId; // pre-fill category when creating from drill-down
   final VoidCallback onSaved;
-  const _MasterFormBody({required this.typeKey, this.editId, this.defaultCategoryId, required this.onSaved});
+  const _MasterFormBody({
+    required this.typeKey,
+    this.editId,
+    this.defaultCategoryId,
+    required this.onSaved,
+  });
   @override
   State<_MasterFormBody> createState() => _MasterFormBodyState();
 }
@@ -1524,7 +2278,8 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
   String? _selectedCategoryName;
 
   bool get _isEdit => widget.editId != null;
-  bool get _needsCategory => masterTypeFor(widget.typeKey)?.hasParentAssignment ?? false;
+  bool get _needsCategory =>
+      masterTypeFor(widget.typeKey)?.hasParentAssignment ?? false;
   bool get _isRemote => masterCubit.remoteDatasourceFor(widget.typeKey) != null;
   bool get _isUnit => widget.typeKey == 'unit';
 
@@ -1548,7 +2303,9 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
       _selectedCategoryId = widget.defaultCategoryId;
       final cats = masterCubit.itemsOfType('companyCategory');
       try {
-        _selectedCategoryName = cats.firstWhere((c) => c.id == widget.defaultCategoryId).name;
+        _selectedCategoryName = cats
+            .firstWhere((c) => c.id == widget.defaultCategoryId)
+            .name;
       } catch (_) {}
     }
   }
@@ -1565,7 +2322,9 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
   Future<void> _loadItemFromApi() async {
     setState(() => _loadingItem = true);
     try {
-      final item = await masterCubit.remoteDatasourceFor(widget.typeKey)!.getById(widget.editId!);
+      final item = await masterCubit
+          .remoteDatasourceFor(widget.typeKey)!
+          .getById(widget.editId!);
       if (!mounted) return;
       setState(() => _fillFrom(item));
     } catch (e) {
@@ -1596,32 +2355,47 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
       if (_isEdit) {
         final state = masterCubit.state as MasterLoaded;
         final existing = state.items.firstWhere((c) => c.id == widget.editId!);
-        await masterCubit.update(existing.copyWith(
-          name: _nameCtrl.text.trim(),
-          description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-          isActive: _isActive,
-          assignedCategoryId: _selectedCategoryId,
-          assignedCategoryName: _selectedCategoryName,
-          fullForm: _isUnit && _fullFormCtrl.text.trim().isNotEmpty ? _fullFormCtrl.text.trim() : null,
-        ));
+        await masterCubit.update(
+          existing.copyWith(
+            name: _nameCtrl.text.trim(),
+            description: _descCtrl.text.trim().isEmpty
+                ? null
+                : _descCtrl.text.trim(),
+            isActive: _isActive,
+            assignedCategoryId: _selectedCategoryId,
+            assignedCategoryName: _selectedCategoryName,
+            fullForm: _isUnit && _fullFormCtrl.text.trim().isNotEmpty
+                ? _fullFormCtrl.text.trim()
+                : null,
+          ),
+        );
       } else {
-        await masterCubit.add(MasterItem(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          typeKey: widget.typeKey,
-          name: _nameCtrl.text.trim(),
-          description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-          isActive: _isActive,
-          createdAt: DateTime.now(),
-          fullForm: _isUnit && _fullFormCtrl.text.trim().isNotEmpty ? _fullFormCtrl.text.trim() : null,
-          assignedCategoryId: _selectedCategoryId,
-          assignedCategoryName: _selectedCategoryName,
-        ));
+        await masterCubit.add(
+          MasterItem(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            typeKey: widget.typeKey,
+            name: _nameCtrl.text.trim(),
+            description: _descCtrl.text.trim().isEmpty
+                ? null
+                : _descCtrl.text.trim(),
+            isActive: _isActive,
+            createdAt: DateTime.now(),
+            fullForm: _isUnit && _fullFormCtrl.text.trim().isNotEmpty
+                ? _fullFormCtrl.text.trim()
+                : null,
+            assignedCategoryId: _selectedCategoryId,
+            assignedCategoryName: _selectedCategoryName,
+          ),
+        );
       }
       if (mounted) widget.onSaved();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: AppColors.dangerFill,
+          ),
         );
       }
     } finally {
@@ -1636,10 +2410,14 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
     final categories = masterCubit.itemsOfType('companyCategory');
 
     if (_loadingItem) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.silver));
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.silver),
+      );
     }
     if (_loadError != null) {
-      return Center(child: Text(_loadError!, style: TextStyle(color: cs.onSurfaceVariant)));
+      return Center(
+        child: Text(_loadError!, style: TextStyle(color: cs.onSurfaceVariant)),
+      );
     }
 
     return Column(
@@ -1656,7 +2434,8 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
                     hint: 'e.g. pcs',
                     controller: _nameCtrl,
                     prefixIcon: const Icon(Icons.straighten_rounded),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
                   const SizedBox(height: 18),
                   BrixenTextField(
@@ -1679,7 +2458,8 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
                     hint: 'Enter name',
                     controller: _nameCtrl,
                     prefixIcon: Icon(typeCfg?.icon ?? Icons.list_alt_rounded),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
                   const SizedBox(height: 18),
                   if (_needsCategory) ...[
@@ -1706,13 +2486,20 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
           ),
         ),
         Container(
-          padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 24),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            12,
+            16,
+            MediaQuery.of(context).padding.bottom + 24,
+          ),
           decoration: BoxDecoration(
             color: AppColors.background,
-            border: const Border(top: BorderSide(color: AppColors.border)),
+            border: Border(top: BorderSide(color: AppColors.border)),
           ),
           child: BrixenButton(
-            label: _isEdit ? 'Save Changes' : 'Create ${typeCfg?.name ?? 'Item'}',
+            label: _isEdit
+                ? 'Save Changes'
+                : 'Create ${typeCfg?.name ?? 'Item'}',
             onPressed: _saving ? null : _save,
             isLoading: _saving,
           ),
@@ -1721,7 +2508,6 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
     );
   }
 }
-
 
 // ── Company Category Dropdown ─────────────────────────────────────────────────
 
@@ -1765,7 +2551,8 @@ class _MasterMenuCategoryView extends StatefulWidget {
   const _MasterMenuCategoryView({required this.onCategoryTap});
 
   @override
-  State<_MasterMenuCategoryView> createState() => _MasterMenuCategoryViewState();
+  State<_MasterMenuCategoryView> createState() =>
+      _MasterMenuCategoryViewState();
 }
 
 class _MasterMenuCategoryViewState extends State<_MasterMenuCategoryView> {
@@ -1782,7 +2569,9 @@ class _MasterMenuCategoryViewState extends State<_MasterMenuCategoryView> {
       bloc: masterCubit,
       builder: (_, state) {
         if (state is! MasterLoaded) {
-          return const Center(child: CircularProgressIndicator(color: AppColors.silver));
+          return const SkeletonListView(
+            padding: EdgeInsets.fromLTRB(14, 70, 14, 100),
+          );
         }
 
         // Group items by category
@@ -1797,11 +2586,21 @@ class _MasterMenuCategoryViewState extends State<_MasterMenuCategoryView> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.add_to_queue_outlined, size: 48, color: cs.onSurfaceVariant),
+                Icon(
+                  Icons.add_to_queue_outlined,
+                  size: 48,
+                  color: cs.onSurfaceVariant,
+                ),
                 const SizedBox(height: 12),
-                Text('No master menus yet', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 15)),
+                Text(
+                  'No master menus yet',
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 15),
+                ),
                 const SizedBox(height: 6),
-                Text('Tap + to create one', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
+                Text(
+                  'Tap + to create one',
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                ),
               ],
             ),
           );
@@ -1810,8 +2609,10 @@ class _MasterMenuCategoryViewState extends State<_MasterMenuCategoryView> {
         return ListView(
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 100),
           children: [
-            Text('${grouped.length} ${grouped.length == 1 ? 'category' : 'categories'} · ${state.items.length} total menus',
-                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11)),
+            Text(
+              '${grouped.length} ${grouped.length == 1 ? 'category' : 'categories'} · ${state.items.length} total menus',
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
+            ),
             const SizedBox(height: 10),
             ...grouped.entries.map((e) {
               final catId = e.key;
@@ -1841,8 +2642,12 @@ class _CategorySummaryCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const _CategorySummaryCard({
-    required this.catId, required this.catName, required this.totalCount,
-    required this.activeCount, required this.inactiveCount, required this.onTap,
+    required this.catId,
+    required this.catName,
+    required this.totalCount,
+    required this.activeCount,
+    required this.inactiveCount,
+    required this.onTap,
   });
 
   @override
@@ -1861,27 +2666,51 @@ class _CategorySummaryCard extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 44, height: 44,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: AppColors.silver.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.silver.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: AppColors.silver.withValues(alpha: 0.3),
+                ),
               ),
-              child: const Center(child: Icon(Icons.category_outlined, size: 20, color: AppColors.silver)),
+              child: const Center(
+                child: Icon(
+                  Icons.category_outlined,
+                  size: 20,
+                  color: AppColors.silver,
+                ),
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(catName, style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w700, fontSize: 14)),
+                  Text(
+                    catName,
+                    style: TextStyle(
+                      color: cs.onSurface,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      _CountBadge(count: activeCount, label: 'Active', color: AppColors.accentEmerald),
+                      _CountBadge(
+                        count: activeCount,
+                        label: 'Active',
+                        color: AppColors.accentEmerald,
+                      ),
                       const SizedBox(width: 8),
                       if (inactiveCount > 0)
-                        _CountBadge(count: inactiveCount, label: 'Inactive', color: AppColors.accentRose),
+                        _CountBadge(
+                          count: inactiveCount,
+                          label: 'Inactive',
+                          color: AppColors.accentRose,
+                        ),
                     ],
                   ),
                 ],
@@ -1890,8 +2719,18 @@ class _CategorySummaryCard extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text('$totalCount', style: TextStyle(color: cs.onSurface, fontSize: 20, fontWeight: FontWeight.w700)),
-                Text('menus', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 10)),
+                Text(
+                  '$totalCount',
+                  style: TextStyle(
+                    color: cs.onSurface,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  'menus',
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 10),
+                ),
               ],
             ),
             const SizedBox(width: 8),
@@ -1907,7 +2746,11 @@ class _CountBadge extends StatelessWidget {
   final int count;
   final String label;
   final Color color;
-  const _CountBadge({required this.count, required this.label, required this.color});
+  const _CountBadge({
+    required this.count,
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1918,15 +2761,25 @@ class _CountBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
-      child: Text('$count $label', style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600)),
+      child: Text(
+        '$count $label',
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
-String _inr(int v) =>
-    NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0).format(v);
+String _inr(int v) => NumberFormat.currency(
+  locale: 'en_IN',
+  symbol: '₹',
+  decimalDigits: 0,
+).format(v);
 
 const _planPrices = <String, int>{
   'Basic': 10000,
@@ -1935,10 +2788,10 @@ const _planPrices = <String, int>{
 };
 
 const _planAccents = <String, Color>{
-  'Basic':        AppColors.accentSlate,
-  'Standard':     AppColors.accentTeal,
+  'Basic': AppColors.accentSlate,
+  'Standard': AppColors.accentTeal,
   'Professional': AppColors.accentIndigo,
-  'Enterprise':   AppColors.accentViolet,
+  'Enterprise': AppColors.accentViolet,
 };
 
 class _DashboardBody extends ConsumerWidget {
@@ -1953,7 +2806,20 @@ class _DashboardBody extends ConsumerWidget {
 
   static String _dateStr() {
     final n = DateTime.now();
-    const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const m = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return '${n.day} ${m[n.month - 1]} ${n.year}';
   }
 
@@ -1961,8 +2827,17 @@ class _DashboardBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final companiesAsync = ref.watch(companiesProvider);
     return companiesAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.silver)),
-      error: (e, _) => Center(child: Text(e.toString(), style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))),
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: AppColors.silver),
+      ),
+      error: (e, _) => Center(
+        child: Text(
+          e.toString(),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
       data: (all) {
         final active = all.where((c) => c.isActive).length;
 
@@ -1970,7 +2845,8 @@ class _DashboardBody extends ConsumerWidget {
         final planCount = <String, int>{};
         for (final c in all) {
           if (c.subscriptionPlan != null) {
-            planCount[c.subscriptionPlan!] = (planCount[c.subscriptionPlan!] ?? 0) + 1;
+            planCount[c.subscriptionPlan!] =
+                (planCount[c.subscriptionPlan!] ?? 0) + 1;
           }
         }
         final planRev = <String, int>{};
@@ -1981,16 +2857,32 @@ class _DashboardBody extends ConsumerWidget {
           totalRev += r;
         }
 
-        final recent = ([...all]..sort((a, b) => b.createdAt.compareTo(a.createdAt))).take(4).toList();
+        final recent = ([
+          ...all,
+        ]..sort((a, b) => b.createdAt.compareTo(a.createdAt))).take(4).toList();
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final cs = Theme.of(context).colorScheme;
 
         // Month-over-month new-company growth (only shown when computable).
         final now = DateTime.now();
-        final thisMonth = all.where((c) => c.createdAt.year == now.year && c.createdAt.month == now.month).length;
+        final thisMonth = all
+            .where(
+              (c) =>
+                  c.createdAt.year == now.year &&
+                  c.createdAt.month == now.month,
+            )
+            .length;
         final lastMonthDate = DateTime(now.year, now.month - 1);
-        final lastMonth = all.where((c) => c.createdAt.year == lastMonthDate.year && c.createdAt.month == lastMonthDate.month).length;
-        final growthPct = lastMonth > 0 ? (((thisMonth - lastMonth) / lastMonth) * 100).round() : null;
+        final lastMonth = all
+            .where(
+              (c) =>
+                  c.createdAt.year == lastMonthDate.year &&
+                  c.createdAt.month == lastMonthDate.month,
+            )
+            .length;
+        final growthPct = lastMonth > 0
+            ? (((thisMonth - lastMonth) / lastMonth) * 100).round()
+            : null;
 
         // 11 weekly buckets (oldest → newest) of how many companies signed up —
         // drives the hero card's dot-column chart bar heights (1–3 dots each).
@@ -1998,10 +2890,16 @@ class _DashboardBody extends ConsumerWidget {
           final weeksAgo = 10 - i;
           final start = now.subtract(Duration(days: (weeksAgo + 1) * 7));
           final end = now.subtract(Duration(days: weeksAgo * 7));
-          return all.where((c) => c.createdAt.isAfter(start) && c.createdAt.isBefore(end)).length;
+          return all
+              .where(
+                (c) => c.createdAt.isAfter(start) && c.createdAt.isBefore(end),
+              )
+              .length;
         });
 
-        final activePct = all.isNotEmpty ? (active / all.length * 100).round() : 0;
+        final activePct = all.isNotEmpty
+            ? (active / all.length * 100).round()
+            : 0;
         final inactivePct = all.isNotEmpty ? 100 - activePct : 0;
 
         return ListView(
@@ -2015,27 +2913,51 @@ class _DashboardBody extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(_greet(), style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
+                      Text(
+                        _greet(),
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text('Admin', style: TextStyle(color: cs.onSurface, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+                      Text(
+                        'Admin',
+                        style: TextStyle(
+                          color: cs.onSurface,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: isDark ? AppColors.surface : AppColors.lightSurface,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: Theme.of(context).dividerColor),
                   ),
-                  child: Text(_dateStr(), style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11)),
+                  child: Text(
+                    _dateStr(),
+                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 14),
 
             // ── Hero stat card ───────────────────────────────────────
-            _HeroStatCard(total: all.length, weekly: weekly, growthPct: growthPct),
+            _HeroStatCard(
+              total: all.length,
+              weekly: weekly,
+              growthPct: growthPct,
+            ),
             const SizedBox(height: 14),
 
             // ── Active / Inactive split card ──────────────────────────
@@ -2051,7 +2973,12 @@ class _DashboardBody extends ConsumerWidget {
             // ── Subscription by Plan ─────────────────────────────────
             _DashSectionLabel('Subscriptions by Plan'),
             const SizedBox(height: 6),
-            _PlanBreakdown(planCount: planCount, planRev: planRev, total: all.length, isDark: isDark),
+            _PlanBreakdown(
+              planCount: planCount,
+              planRev: planRev,
+              total: all.length,
+              isDark: isDark,
+            ),
             const SizedBox(height: 16),
 
             // ── Recent Companies ─────────────────────────────────────
@@ -2114,40 +3041,88 @@ class _HeroStatCard extends StatelessWidget {
             children: [
               Text(
                 total.toString(),
-                style: const TextStyle(color: AppColors.ink, fontSize: 42, fontWeight: FontWeight.w800, letterSpacing: -1, height: 1),
+                style: TextStyle(
+                  color: AppColors.ink,
+                  fontSize: 42,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -1,
+                  height: 1,
+                ),
               ),
               if (growthPct != null) ...[
                 const SizedBox(width: 10),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
-                    color: up ? AppColors.positive : AppColors.ink,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: up
+                          ? [AppColors.positive, AppColors.positive]
+                          : AppColors.accentGradient(AppColors.brandBlack),
+                    ),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Text('${growthPct!.abs()}%', style: const TextStyle(color: AppColors.white, fontSize: 12, fontWeight: FontWeight.w700)),
-                    const SizedBox(width: 4),
-                    Container(
-                      width: 16, height: 16,
-                      decoration: const BoxDecoration(color: AppColors.white, shape: BoxShape.circle),
-                      child: Icon(up ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-                          size: 11, color: up ? AppColors.positive : AppColors.ink),
-                    ),
-                  ]),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${growthPct!.abs()}%',
+                        style: const TextStyle(
+                          color: AppColors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Container(
+                        width: 16,
+                        height: 16,
+                        decoration: const BoxDecoration(
+                          color: AppColors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          up
+                              ? Icons.arrow_upward_rounded
+                              : Icons.arrow_downward_rounded,
+                          size: 11,
+                          color: up ? AppColors.positive : AppColors.brandBlack,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
               const Spacer(),
               Container(
-                width: 44, height: 44,
-                decoration: const BoxDecoration(color: AppColors.brand, shape: BoxShape.circle),
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: AppColors.brand,
+                  shape: BoxShape.circle,
+                ),
                 child: const Center(
-                  child: Text('B', style: TextStyle(color: AppColors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                  child: Text(
+                    'B',
+                    style: TextStyle(
+                      color: AppColors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          const Text('Total companies · vs previous 3 months', style: TextStyle(color: AppColors.textHint, fontSize: 12.5)),
+          Text(
+            'Total companies · vs previous 3 months',
+            style: TextStyle(color: AppColors.textHint, fontSize: 12.5),
+          ),
           if (weekly.isNotEmpty) ...[
             const SizedBox(height: 22),
             _DotColumnChart(weekly: weekly),
@@ -2174,7 +3149,9 @@ class _DotColumnChart extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: List.generate(weekly.length, (i) {
-          final height = weekly[i].clamp(0, rows) == 0 ? 1 : weekly[i].clamp(1, rows);
+          final height = weekly[i].clamp(0, rows) == 0
+              ? 1
+              : weekly[i].clamp(1, rows);
           final light = height <= 1 || (i.isEven && height < rows);
           return Column(
             mainAxisSize: MainAxisSize.min,
@@ -2182,8 +3159,12 @@ class _DotColumnChart extends StatelessWidget {
               return Padding(
                 padding: EdgeInsets.only(top: r == 0 ? 0 : gap),
                 child: Container(
-                  width: dot, height: dot,
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: light ? AppColors.brandLight : AppColors.brand),
+                  width: dot,
+                  height: dot,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: light ? AppColors.brandLight : AppColors.brand,
+                  ),
                 ),
               );
             }),
@@ -2211,9 +3192,23 @@ class _SplitStatCard extends StatelessWidget {
       child: IntrinsicHeight(
         child: Row(
           children: [
-            Expanded(child: _SplitHalf(filled: true, icon: Icons.groups_rounded, pct: activePct, label: 'Active')),
+            Expanded(
+              child: _SplitHalf(
+                filled: true,
+                icon: Icons.groups_rounded,
+                pct: activePct,
+                label: 'Active',
+              ),
+            ),
             const SizedBox(width: 8),
-            Expanded(child: _SplitHalf(filled: false, icon: Icons.person_off_rounded, pct: inactivePct, label: 'Inactive')),
+            Expanded(
+              child: _SplitHalf(
+                filled: false,
+                icon: Icons.person_off_rounded,
+                pct: inactivePct,
+                label: 'Inactive',
+              ),
+            ),
           ],
         ),
       ),
@@ -2227,12 +3222,19 @@ class _SplitHalf extends StatelessWidget {
   final int pct;
   final String label;
 
-  const _SplitHalf({required this.filled, required this.icon, required this.pct, required this.label});
+  const _SplitHalf({
+    required this.filled,
+    required this.icon,
+    required this.pct,
+    required this.label,
+  });
 
   @override
   Widget build(BuildContext context) {
     final fg = filled ? AppColors.white : AppColors.ink;
-    final iconBg = filled ? Colors.white.withValues(alpha: 0.16) : AppColors.brand.withValues(alpha: 0.1);
+    final iconBg = filled
+        ? Colors.white.withValues(alpha: 0.16)
+        : AppColors.brand.withValues(alpha: 0.1);
     final iconFg = filled ? AppColors.white : AppColors.brand;
 
     return Container(
@@ -2245,14 +3247,26 @@ class _SplitHalf extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 30, height: 30,
+            width: 30,
+            height: 30,
             decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
             child: Icon(icon, size: 15, color: iconFg),
           ),
           const SizedBox(height: 14),
-          Text('$pct%', style: TextStyle(color: fg, fontSize: 27, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+          Text(
+            '$pct%',
+            style: TextStyle(
+              color: fg,
+              fontSize: 27,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(label, style: TextStyle(color: fg.withValues(alpha: 0.8), fontSize: 12)),
+          Text(
+            label,
+            style: TextStyle(color: fg.withValues(alpha: 0.8), fontSize: 12),
+          ),
         ],
       ),
     );
@@ -2264,7 +3278,11 @@ class _RevenueCard extends StatelessWidget {
   final Map<String, int> planRev;
   final bool isDark;
 
-  const _RevenueCard({required this.totalRev, required this.planRev, required this.isDark});
+  const _RevenueCard({
+    required this.totalRev,
+    required this.planRev,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2285,7 +3303,13 @@ class _RevenueCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Total Received', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
+                    Text(
+                      'Total Received',
+                      style: TextStyle(
+                        color: cs.onSurfaceVariant,
+                        fontSize: 12,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Text(
                       _inr(totalRev),
@@ -2300,12 +3324,17 @@ class _RevenueCard extends StatelessWidget {
                 ),
               ),
               Container(
-                width: 44, height: 44,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
                   color: AppColors.silver.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.account_balance_wallet_outlined, color: AppColors.silver, size: 22),
+                child: const Icon(
+                  Icons.account_balance_wallet_outlined,
+                  color: AppColors.silver,
+                  size: 22,
+                ),
               ),
             ],
           ),
@@ -2321,7 +3350,9 @@ class _RevenueCard extends StatelessWidget {
                   children: planRev.entries.map((e) {
                     return Flexible(
                       flex: ((e.value / totalRev) * 1000).round(),
-                      child: Container(color: _planAccents[e.key] ?? AppColors.silver),
+                      child: Container(
+                        color: _planAccents[e.key] ?? AppColors.silver,
+                      ),
                     );
                   }).toList(),
                 ),
@@ -2337,11 +3368,21 @@ class _RevenueCard extends StatelessWidget {
                 return Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       '${e.key}  ${_inr(e.value)}',
-                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
+                      style: TextStyle(
+                        color: cs.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 );
@@ -2370,7 +3411,14 @@ class _PlanBreakdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (planCount.isEmpty) {
-      return Center(child: Text('No subscriptions yet', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)));
+      return Center(
+        child: Text(
+          'No subscriptions yet',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      );
     }
 
     final entries = planCount.entries.toList();
@@ -2392,30 +3440,64 @@ class _PlanBreakdown extends StatelessWidget {
           return Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 11,
+                ),
                 child: Row(
                   children: [
                     Container(
-                      width: 3, height: 40,
-                      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
+                      width: 3,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(plan, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 14)),
+                          Text(
+                            plan,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
                           const SizedBox(height: 5),
                           Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(color: color.withValues(alpha: 0.13), borderRadius: BorderRadius.circular(10)),
-                                child: Text('$count ${count == 1 ? 'co.' : 'cos.'}',
-                                    style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w700)),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: 0.13),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '$count ${count == 1 ? 'co.' : 'cos.'}',
+                                  style: TextStyle(
+                                    color: color,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
                               ),
                               const SizedBox(width: 7),
-                              Text('$pct% of total', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 10)),
+                              Text(
+                                '$pct% of total',
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                  fontSize: 10,
+                                ),
+                              ),
                             ],
                           ),
                         ],
@@ -2423,13 +3505,21 @@ class _PlanBreakdown extends StatelessWidget {
                     ),
                     Text(
                       _inr(rev),
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w800, fontSize: 15),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
                     ),
                   ],
                 ),
               ),
               if (i < entries.length - 1)
-                Divider(height: 1, color: Theme.of(context).dividerColor, indent: 33),
+                Divider(
+                  height: 1,
+                  color: Theme.of(context).dividerColor,
+                  indent: 33,
+                ),
             ],
           );
         }).toList(),
@@ -2448,7 +3538,9 @@ class _RecentRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final plan = company.subscriptionPlan;
-    final planColor = plan != null ? (_planAccents[plan] ?? AppColors.silver) : AppColors.silverDark;
+    final planColor = plan != null
+        ? (_planAccents[plan] ?? AppColors.silver)
+        : AppColors.silverDark;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
@@ -2461,22 +3553,46 @@ class _RecentRow extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 42, height: 42,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
               color: planColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(11),
               border: Border.all(color: planColor.withValues(alpha: 0.3)),
             ),
-            child: Center(child: Text(company.initials, style: TextStyle(color: planColor, fontWeight: FontWeight.w800, fontSize: 12))),
+            child: Center(
+              child: Text(
+                company.initials,
+                style: TextStyle(
+                  color: planColor,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(company.name, style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w600, fontSize: 14)),
+                Text(
+                  company.name,
+                  style: TextStyle(
+                    color: cs.onSurface,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
                 if (plan != null)
-                  Text(plan, style: TextStyle(color: planColor, fontSize: 11, fontWeight: FontWeight.w500)),
+                  Text(
+                    plan,
+                    style: TextStyle(
+                      color: planColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -2497,7 +3613,9 @@ class _RecentRow extends StatelessWidget {
             child: Text(
               company.isActive ? 'Active' : 'Inactive',
               style: TextStyle(
-                color: company.isActive ? AppColors.accentEmerald : AppColors.accentRose,
+                color: company.isActive
+                    ? AppColors.accentEmerald
+                    : AppColors.accentRose,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),
@@ -2508,4 +3626,3 @@ class _RecentRow extends StatelessWidget {
     );
   }
 }
-

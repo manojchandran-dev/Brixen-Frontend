@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/app_bottom_nav.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/rich_card_shell.dart';
+import '../../../../shared/widgets/skeleton.dart';
+import '../../../../shared/widgets/detail_sheet.dart';
+import 'package:intl/intl.dart';
 import '../../domain/entities/customer.dart';
 import '../providers/customers_provider.dart';
 
@@ -56,12 +58,12 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                   decoration: BoxDecoration(
                     color: isDark ? cs.surfaceContainerHighest : AppColors.white,
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
-                      BoxShadow(color: AppColors.white.withValues(alpha: 0.8), blurRadius: 4, offset: const Offset(-2, -2)),
-                    ],
+                    boxShadow: AppColors.shadows([
+                      BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
+                      BoxShadow(color: AppColors.highlightShadow(0.8), blurRadius: 4, offset: const Offset(-2, -2)),
+                    ]),
                   ),
-                  child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
+                  child: Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
                 ),
               )
             : Builder(
@@ -74,12 +76,12 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                     decoration: BoxDecoration(
                       color: isDark ? cs.surfaceContainerHighest : AppColors.white,
                       borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
-                        BoxShadow(color: AppColors.white.withValues(alpha: 0.8), blurRadius: 4, offset: const Offset(-2, -2)),
-                      ],
+                      boxShadow: AppColors.shadows([
+                        BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
+                        BoxShadow(color: AppColors.highlightShadow(0.8), blurRadius: 4, offset: const Offset(-2, -2)),
+                      ]),
                     ),
-                    child: const Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
+                    child: Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
                   ),
                 ),
               ),
@@ -132,9 +134,9 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                     ? AppColors.silverGradient
                     : const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.brand, AppColors.brandDeep]),
                 borderRadius: BorderRadius.circular(13),
-                boxShadow: [
+                boxShadow: AppColors.shadows([
                   BoxShadow(color: AppColors.brand.withValues(alpha: isDark ? 0.0 : 0.4), blurRadius: 10, offset: const Offset(0, 4)),
-                ],
+                ]),
               ),
               child: Icon(Icons.add_rounded, size: 20,
                   color: isDark ? AppColors.black : AppColors.white),
@@ -154,8 +156,8 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                 boxShadow: isDark
                     ? null
                     : [
-                        BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
-                        BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+                        BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
+                        BoxShadow(color: AppColors.highlightShadow(0.85), blurRadius: 6, offset: const Offset(-3, -3)),
                       ],
               ),
               child: TextField(
@@ -174,7 +176,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
           ),
           Expanded(
             child: customersAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const SkeletonListView(),
               error: (e, _) => Center(
                   child: Text(e.toString(), style: TextStyle(color: cs.error, fontSize: 13))),
               data: (list) {
@@ -208,14 +210,32 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                   );
                 }
 
-                return ListView.separated(
+                // A single rounded card holding every row (dividers between,
+                // no per-row shadow) — same flat list style as Employees.
+                return ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) => _CustomerCard(
-                    customer: filtered[i],
-                    index: i,
-                  ),
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: AppColors.shadows([
+                          BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.06), blurRadius: 16, offset: const Offset(0, 8)),
+                          BoxShadow(color: AppColors.highlightShadow(0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+                        ]),
+                      ),
+                      child: Column(
+                        children: filtered.asMap().entries.map((entry) {
+                          final i = entry.key;
+                          return Column(children: [
+                            _CustomerCard(customer: entry.value, index: i),
+                            if (i != filtered.length - 1) Divider(height: 1, color: AppColors.border, indent: 59),
+                          ]);
+                        }).toList(),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -233,18 +253,17 @@ class _CustomerCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Cycle each card's own background through pale tints of the same 5
-    // colours used elsewhere (drawer icons, Companies/Employees/Sales lists).
-    const accentColors = [AppColors.brand, AppColors.positive, AppColors.brandDeep, AppColors.brandLight, AppColors.ink];
+    final accentColors = [AppColors.brand, AppColors.positive, AppColors.brandDeep, AppColors.brandLight, AppColors.brandBlack];
     final accent = accentColors[index % accentColors.length];
-    final bg = Color.lerp(AppColors.surface, accent, 0.32)!;
 
-    const fg = AppColors.ink;
-    final fgMuted = AppColors.ink.withValues(alpha: 0.6);
-    final dividerColor = AppColors.ink.withValues(alpha: 0.12);
+    final fg = AppColors.ink;
+    final fgMuted = AppColors.ink.withValues(alpha: 0.55);
+    final fgFaint = AppColors.ink.withValues(alpha: 0.4);
 
+    // Flat list row — avatar, name, shop name and GST only — matching the
+    // Employees list style, instead of an individually shadowed card.
     return SwipeActions(
-      onTap: () => context.push(AppRouter.customerDetail, extra: customer),
+      onTap: () => _showCustomerDetail(context, ref, customer, accent),
       actions: [
         SwipeAction(
           icon: Icons.edit_outlined,
@@ -255,93 +274,53 @@ class _CustomerCard extends ConsumerWidget {
         SwipeAction(
           icon: Icons.delete_outline,
           label: 'Delete',
-          color: AppColors.error,
+          color: AppColors.brandBlack,
           onTap: () => _confirmDelete(context, ref),
         ),
       ],
-      child: RichCardShell(
-        accentColor: AppColors.brandLight,
-        backgroundColor: bg,
-        showAccentBar: false,
-        edgeColor: accent,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [accent, accent.withValues(alpha: 0.75)]),
-                      shape: BoxShape.circle,
-                      boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))],
-                    ),
-                    child: Text(
-                      customer.name.trim().isNotEmpty ? customer.name.trim()[0].toUpperCase() : '?',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.white),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(customer.name,
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg),
-                            overflow: TextOverflow.ellipsis),
-                        if (customer.shopName != null) ...[
-                          const SizedBox(height: 2),
-                          Row(children: [
-                            Icon(Icons.storefront_rounded, size: 11, color: fgMuted),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(customer.shopName!,
-                                  style: TextStyle(fontSize: 12, color: fgMuted),
-                                  overflow: TextOverflow.ellipsis),
-                            ),
-                          ]),
-                        ],
-                      ],
-                    ),
-                  ),
-                  Container(
-                    width: 26,
-                    height: 26,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(color: AppColors.ink.withValues(alpha: 0.08), shape: BoxShape.circle),
-                    child: Icon(Icons.chevron_right_rounded, size: 16, color: fgMuted),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              RichCardDivider(color: dividerColor),
-              const SizedBox(height: 12),
-              StatGrid(
-                labelColor: fgMuted,
-                valueColor: fg,
-                dividerColor: dividerColor,
-                items: [
-                  StatGridItem(label: 'Phone', value: customer.phone ?? '—'),
-                  StatGridItem(label: 'GST No', value: customer.gstNumber ?? '—'),
-                  StatGridItem(label: 'Email', value: customer.email ?? '—'),
-                ],
-              ),
-              const SizedBox(height: 12),
-              RichCardDivider(color: dividerColor),
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  'Added ${DateFormat('dd MMM yyyy').format(customer.createdAt)}',
-                  style: TextStyle(fontSize: 11, color: fgMuted),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        color: AppColors.surface,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: AppColors.accentGradient(accent),
                 ),
+                shape: BoxShape.circle,
               ),
-            ],
-          ),
+              child: Text(
+                customer.name.trim().isNotEmpty ? customer.name.trim()[0].toUpperCase() : '?',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.white),
+              ),
+            ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(customer.name,
+                      style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: fg),
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 2),
+                  Text(customer.shopName ?? '—',
+                      style: TextStyle(fontSize: 12, color: fgMuted), overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 2),
+                  Text(customer.gstNumber ?? 'No GST',
+                      style: TextStyle(fontSize: 11, color: fgFaint), overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textHint),
+          ],
         ),
       ),
     );
@@ -371,7 +350,7 @@ class _CustomerCard extends ConsumerWidget {
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+                    SnackBar(content: Text(e.toString()), backgroundColor: AppColors.dangerFill),
                   );
                 }
               }
@@ -383,4 +362,53 @@ class _CustomerCard extends ConsumerWidget {
       ),
     );
   }
+}
+
+void _showCustomerDetail(BuildContext context, WidgetRef ref, Customer customer, Color accent) {
+  showDetailSheet(context, (ctx) => DetailSheetScaffold(
+    avatarText: customer.name.trim().isNotEmpty ? customer.name.trim()[0].toUpperCase() : '?',
+    avatarGradient: AppColors.accentGradient(accent),
+    title: customer.name,
+    subtitle: customer.shopName,
+    onEdit: () {
+      Navigator.of(ctx).pop();
+      ctx.push(AppRouter.createCustomer, extra: customer);
+    },
+    onDelete: () async {
+      final confirmed = await showDialog<bool>(
+        context: ctx,
+        builder: (dCtx) => AlertDialog(
+          backgroundColor: Theme.of(dCtx).scaffoldBackgroundColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Delete Customer', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.ink)),
+          content: Text('Delete "${customer.name}"? This cannot be undone.', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(dCtx).pop(false), child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary))),
+            TextButton(onPressed: () => Navigator.of(dCtx).pop(true), child: Text('Delete', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700))),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      try {
+        await ref.read(customersProvider.notifier).deleteCustomer(customer.id);
+        if (ctx.mounted) Navigator.of(ctx).pop();
+      } catch (e) {
+        if (ctx.mounted) {
+          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: AppColors.dangerFill));
+        }
+      }
+    },
+    sections: [
+      DetailSection(title: 'Contact', items: [
+        if (customer.phone != null) DetailRow(icon: Icons.phone_rounded, label: 'Phone', value: customer.phone!),
+        if (customer.email != null) DetailRow(icon: Icons.mail_rounded, label: 'Email', value: customer.email!, iconColor: AppColors.positive),
+        if (customer.address != null && customer.address!.isNotEmpty) DetailRow(icon: Icons.location_on_rounded, label: 'Address', value: customer.address!),
+      ]),
+      DetailSection(title: 'Business', items: [
+        if (customer.shopName != null) DetailRow(icon: Icons.storefront_rounded, label: 'Shop Name', value: customer.shopName!),
+        DetailRow(icon: Icons.receipt_long_rounded, label: 'GST No', value: customer.gstNumber ?? 'No GST', iconColor: AppColors.positive),
+        DetailRow(icon: Icons.calendar_today_rounded, label: 'Added', value: DateFormat('dd MMM yyyy').format(customer.createdAt)),
+      ]),
+    ],
+  ));
 }

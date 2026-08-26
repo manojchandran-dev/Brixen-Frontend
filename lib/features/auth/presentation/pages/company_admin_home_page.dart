@@ -6,6 +6,7 @@ import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/coming_soon_view.dart';
 import '../../../employees/domain/entities/employee.dart';
 import '../../../employees/presentation/providers/employees_provider.dart';
+import '../../../../shared/widgets/skeleton.dart';
 
 class CompanyAdminHomePage extends ConsumerStatefulWidget {
   const CompanyAdminHomePage({super.key});
@@ -33,7 +34,7 @@ class _CompanyAdminHomePageState extends ConsumerState<CompanyAdminHomePage> {
 
   void _comingSoon(BuildContext context, String label) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$label — coming soon'), backgroundColor: AppColors.ink),
+      SnackBar(content: Text('$label — coming soon'), backgroundColor: AppColors.dangerFill),
     );
   }
 
@@ -51,8 +52,8 @@ class _CompanyAdminHomePageState extends ConsumerState<CompanyAdminHomePage> {
           2 => const ComingSoonView(icon: Icons.bar_chart_rounded, title: 'Reports', subtitle: 'Company-wide reports are on the way.'),
           3 => const ComingSoonView(icon: Icons.person_rounded, title: 'More', subtitle: 'Profile, settings and more will live here soon.'),
           _ => employeesAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator(color: AppColors.brand)),
-          error: (e, _) => Center(child: Text(e.toString(), style: const TextStyle(color: AppColors.textSecondary))),
+          loading: () => const SkeletonListView(padding: EdgeInsets.fromLTRB(16, 80, 16, 100)),
+          error: (e, _) => Center(child: Text(e.toString(), style: TextStyle(color: AppColors.textSecondary))),
           data: (all) => _AdminDashboardBody(
             employees: all,
             greeting: _greeting(),
@@ -112,32 +113,32 @@ class _AdminDashboardBody extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(color: AppColors.ink.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 4)),
-                  ],
+                  boxShadow: AppColors.shadows([
+                    BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 4)),
+                  ]),
                 ),
-                child: const Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
+                child: Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
               ),
             ),
             const SizedBox(width: 12),
-            Expanded(child: Text(dateStr, style: const TextStyle(color: AppColors.textHint, fontSize: 13))),
-            GestureDetector(onTap: () => onIconTap('Search'), child: const Icon(Icons.search_rounded, color: AppColors.ink, size: 24)),
+            Expanded(child: Text(dateStr, style: TextStyle(color: AppColors.textHint, fontSize: 13))),
+            GestureDetector(onTap: () => onIconTap('Search'), child: Icon(Icons.search_rounded, color: AppColors.ink, size: 24)),
             const SizedBox(width: 18),
             GestureDetector(
               onTap: () => onIconTap('Notifications'),
               child: Stack(clipBehavior: Clip.none, children: [
-                const Icon(Icons.notifications_none_rounded, color: AppColors.ink, size: 24),
+                Icon(Icons.notifications_none_rounded, color: AppColors.ink, size: 24),
                 Positioned(
                   top: -1,
                   right: -1,
-                  child: Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.ink, shape: BoxShape.circle)),
+                  child: Container(width: 8, height: 8, decoration: BoxDecoration(color: AppColors.brandBlack, shape: BoxShape.circle)),
                 ),
               ]),
             ),
           ],
         ),
         const SizedBox(height: 10),
-        Text('$greeting Admin', style: const TextStyle(color: AppColors.ink, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+        Text('$greeting Admin', style: TextStyle(color: AppColors.ink, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
         const SizedBox(height: 20),
 
         // ── Hero stat card ───────────────────────────────────────
@@ -180,7 +181,7 @@ class _HeroStatCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(total.toString(), style: const TextStyle(color: AppColors.ink, fontSize: 42, fontWeight: FontWeight.w800, letterSpacing: -1, height: 1)),
+              Text(total.toString(), style: TextStyle(color: AppColors.ink, fontSize: 42, fontWeight: FontWeight.w800, letterSpacing: -1, height: 1)),
               const SizedBox(width: 10),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -206,7 +207,7 @@ class _HeroStatCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          const Text('vs previous 3 months', style: TextStyle(color: AppColors.textHint, fontSize: 13)),
+          Text('vs previous 3 months', style: TextStyle(color: AppColors.textHint, fontSize: 13)),
           const SizedBox(height: 22),
           _DotColumnChart(weekly: weekly),
         ],
@@ -292,7 +293,7 @@ class _SplitHalf extends StatelessWidget {
     final badgeBg = filled ? AppColors.white : AppColors.brand;
     final badgeFg = filled ? AppColors.brand : AppColors.white;
     final arrowBg = filled ? AppColors.white : AppColors.positive;
-    final arrowFg = filled ? AppColors.ink : AppColors.white;
+    final arrowFg = filled ? AppColors.brandBlack : AppColors.white;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -357,7 +358,7 @@ class _HiringStatusCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -394,9 +395,9 @@ class _HiringStatusCard extends StatelessWidget {
           const SizedBox(height: 24),
           Row(
             children: [
-              Text('$onboarded Onboarded', style: const TextStyle(color: AppColors.ink, fontSize: 14, fontWeight: FontWeight.w700)),
+              Text('$onboarded Onboarded', style: TextStyle(color: AppColors.ink, fontSize: 14, fontWeight: FontWeight.w700)),
               const Spacer(),
-              Text('$pending Pending', style: const TextStyle(color: AppColors.ink, fontSize: 14, fontWeight: FontWeight.w700)),
+              Text('$pending Pending', style: TextStyle(color: AppColors.ink, fontSize: 14, fontWeight: FontWeight.w700)),
             ],
           ),
           const SizedBox(height: 14),
@@ -420,7 +421,7 @@ class _HiringStatusCard extends StatelessWidget {
           Row(children: [
             const _Legend(color: AppColors.positive, label: 'Onboarded'),
             const SizedBox(width: 20),
-            const _Legend(color: AppColors.surfaceElevated, label: 'Pending', bordered: true),
+            _Legend(color: AppColors.surfaceElevated, label: 'Pending', bordered: true),
           ]),
         ],
       ),
@@ -447,7 +448,7 @@ class _Legend extends StatelessWidget {
         ),
       ),
       const SizedBox(width: 6),
-      Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+      Text(label, style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
     ]);
   }
 }

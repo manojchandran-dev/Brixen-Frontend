@@ -70,9 +70,9 @@ class _BrixenTextFieldState extends State<BrixenTextField> {
                       end: Alignment.bottomRight,
                       colors: [widget.iconColor, widget.iconColor.withValues(alpha: 0.75)],
                     ),
-                    boxShadow: [
+                    boxShadow: AppColors.shadows([
                       BoxShadow(color: widget.iconColor.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3)),
-                    ],
+                    ]),
                   ),
                   child: IconTheme(
                     data: const IconThemeData(color: AppColors.white, size: 17),

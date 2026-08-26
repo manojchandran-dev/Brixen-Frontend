@@ -242,7 +242,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppColors.border),
                   ),
-                  child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
+                  child: Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
                 ),
               ),
               const SizedBox(height: 20),
@@ -262,7 +262,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                 Center(
                   child: Text.rich(
                     TextSpan(children: [
-                      const TextSpan(text: 'Work smart. ', style: TextStyle(color: AppColors.ink)),
+                      TextSpan(text: 'Work smart. ', style: TextStyle(color: AppColors.ink)),
                       TextSpan(text: 'Grow together.', style: TextStyle(color: AppColors.positive.withValues(alpha: 0.9))),
                     ]),
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
@@ -276,10 +276,10 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 30, offset: const Offset(0, 16)),
-                    BoxShadow(color: AppColors.white.withValues(alpha: 0.9), blurRadius: 14, offset: const Offset(-8, -8)),
-                  ],
+                  boxShadow: AppColors.shadows([
+                    BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.10), blurRadius: 30, offset: const Offset(0, 16)),
+                    BoxShadow(color: AppColors.highlightShadow(0.9), blurRadius: 14, offset: const Offset(-8, -8)),
+                  ]),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,7 +288,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       Flexible(
                         child: Text.rich(
                           TextSpan(children: [
-                            TextSpan(text: '$_titleLead ', style: const TextStyle(color: AppColors.ink)),
+                            TextSpan(text: '$_titleLead ', style: TextStyle(color: AppColors.ink)),
                             TextSpan(text: _titleAccent, style: const TextStyle(color: AppColors.positive)),
                           ]),
                           style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
@@ -298,7 +298,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       Container(width: 6, height: 6, margin: const EdgeInsets.only(top: 6), decoration: const BoxDecoration(color: AppColors.brand, shape: BoxShape.circle)),
                     ]),
                     const SizedBox(height: 8),
-                    Text(_subtitle, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.5)),
+                    Text(_subtitle, style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.5)),
                     const SizedBox(height: 14),
                     Container(
                       width: 44,
@@ -314,7 +314,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       child: _error != null
                           ? Padding(
                               padding: const EdgeInsets.only(top: 12),
-                              child: Text(_error!, style: const TextStyle(color: AppColors.error, fontSize: 13)),
+                              child: Text(_error!, style: TextStyle(color: AppColors.error, fontSize: 13)),
                             )
                           : const SizedBox.shrink(),
                     ),
@@ -496,7 +496,7 @@ class _AuthStyleField extends StatelessWidget {
         textInputAction: textInputAction,
         onFieldSubmitted: onFieldSubmitted,
         validator: validator,
-        style: const TextStyle(color: AppColors.ink, fontSize: 14),
+        style: TextStyle(color: AppColors.ink, fontSize: 14),
         decoration: InputDecoration(
           isDense: false,
           hintText: hint,
@@ -514,9 +514,9 @@ class _AuthStyleField extends StatelessWidget {
                   end: Alignment.bottomRight,
                   colors: [iconColor, iconColor.withValues(alpha: 0.75)],
                 ),
-                boxShadow: [
+                boxShadow: AppColors.shadows([
                   BoxShadow(color: iconColor.withValues(alpha: 0.45), blurRadius: 8, offset: const Offset(0, 3)),
-                ],
+                ]),
               ),
               child: Icon(icon, color: AppColors.white, size: 17),
             ),
@@ -553,7 +553,7 @@ class _GradientButton extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(27),
           gradient: const LinearGradient(colors: [AppColors.brand, AppColors.positive], begin: Alignment.centerLeft, end: Alignment.centerRight),
-          boxShadow: [BoxShadow(color: AppColors.ink.withValues(alpha: 0.25), blurRadius: 16, offset: const Offset(0, 8))],
+          boxShadow: AppColors.shadows([BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.25), blurRadius: 16, offset: const Offset(0, 8))]),
         ),
         child: Center(
           child: isLoading
@@ -617,7 +617,7 @@ class _OtpInput extends StatelessWidget {
               textAlign: TextAlign.center,
               keyboardType: TextInputType.number,
               maxLength: 1,
-              style: const TextStyle(color: AppColors.ink, fontSize: 20, fontWeight: FontWeight.w700),
+              style: TextStyle(color: AppColors.ink, fontSize: 20, fontWeight: FontWeight.w700),
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               decoration: InputDecoration(
                 counterText: '',

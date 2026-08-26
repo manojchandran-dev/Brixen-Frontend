@@ -1,5 +1,74 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
+
+/// A thin bottom-and-right accent stroke with a soft glow — starting
+/// slightly inset from the top-right corner and ending slightly inset from
+/// the bottom-left corner. The top and left sides stay clean and borderless.
+/// A plain `Border`/`BorderSide` can't hold a gradient, so this traces the
+/// path directly and paints it twice: a wide blurred pass for the glow,
+/// then a sharp pass on top.
+class GradientEdgePainter extends CustomPainter {
+  final double radius;
+  final double strokeWidth;
+  final double inset;
+  final List<Color> colors;
+  const GradientEdgePainter({
+    required this.radius,
+    required this.strokeWidth,
+    this.inset = 0,
+    required this.colors,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    final r = radius;
+    final shader = LinearGradient(
+      begin: Alignment.topRight,
+      end: Alignment.bottomLeft,
+      colors: colors,
+    ).createShader(Rect.fromLTWH(0, 0, w, h));
+    final centerBottomRight = Offset(w - r, h - r);
+    final pathRadius = r - strokeWidth / 2;
+
+    // One continuous path — straight right edge, the full bottom-right
+    // arc, straight bottom edge — pulled back from the top-right and
+    // bottom-left corners by `inset` instead of running into them.
+    final path = Path()
+      ..moveTo(w - strokeWidth / 2, r + inset)
+      ..lineTo(w - strokeWidth / 2, h - r)
+      ..arcTo(
+        Rect.fromCircle(center: centerBottomRight, radius: pathRadius),
+        0,
+        math.pi / 2,
+        false,
+      )
+      ..lineTo(r + inset, h - strokeWidth / 2);
+
+    final glowPaint = Paint()
+      ..shader = shader
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth * 2.5
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+    canvas.drawPath(path, glowPaint);
+
+    final sharpPaint = Paint()
+      ..shader = shader
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(path, sharpPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant GradientEdgePainter oldDelegate) =>
+      oldDelegate.radius != radius ||
+      oldDelegate.strokeWidth != strokeWidth ||
+      oldDelegate.inset != inset ||
+      oldDelegate.colors != colors;
+}
 
 /// Outer shell used by every module's list card: a colored left accent
 /// strip + rounded elevated container + tap handler. Keeps the visual
@@ -30,54 +99,100 @@ class RichCardShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = backgroundColor ?? (isDark ? Theme.of(context).colorScheme.surfaceContainerHighest : AppColors.surface);
+    final bg =
+        backgroundColor ??
+        (isDark
+            ? Theme.of(context).colorScheme.surfaceContainerHighest
+            : AppColors.surface);
     // On a strongly saturated card (e.g. a fully solid brand/positive fill),
     // tint both shadow layers with the card's own hue instead of neutral
     // ink/white. A pale tint (close to white, like the Companies list
     // cards) still wants the neutral pairing — the heavier tinted shadow
     // reads too dark against something that light.
-    final isPale = backgroundColor != null && HSLColor.fromColor(backgroundColor!).lightness > 0.8;
-    final tinted = backgroundColor != null && backgroundColor != AppColors.surface && !isPale;
-    final shadowDark = tinted ? Colors.black.withValues(alpha: 0.24) : AppColors.ink.withValues(alpha: 0.11);
-    final shadowLight = tinted ? Colors.white.withValues(alpha: 0.2) : AppColors.white.withValues(alpha: 0.9);
+    final isPale =
+        backgroundColor != null &&
+        HSLColor.fromColor(backgroundColor!).lightness > 0.8;
+    final tinted =
+        backgroundColor != null &&
+        backgroundColor != AppColors.surface &&
+        !isPale;
+    final shadowDark = tinted
+        ? Colors.black.withValues(alpha: 0.24)
+        : AppColors.shadowDark.withValues(alpha: 0.11);
+    final shadowLight = isDark
+        ? Colors.transparent
+        : (tinted
+              ? Colors.white.withValues(alpha: 0.2)
+              : Colors.white.withValues(alpha: 0.9));
+
+    // The right/bottom "hard edge" used to be a solid-colour Border, but a
+    // plain Border can't hold a gradient — GradientEdgePainter below traces
+    // the same rounded-rect edge instead, so it still picks up the
+    // blue→green swap in dark mode without losing the rounded corner.
+    final edgeGradient = edgeColor == null
+        ? null
+        : AppColors.accentGradient(edgeColor!);
 
     final card = Container(
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(18),
-        border: edgeColor == null
-            ? null
-            : Border(
-                right: BorderSide(color: edgeColor!, width: 2.5),
-                bottom: BorderSide(color: edgeColor!, width: 5),
-              ),
-        boxShadow: isDark
-            ? [BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 10, offset: const Offset(0, 3))]
-            : [
-                if (edgeColor != null) BoxShadow(color: edgeColor!.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(2, 6)),
-                BoxShadow(color: shadowDark, blurRadius: 22, offset: const Offset(0, 10)),
-                BoxShadow(color: shadowLight, blurRadius: 10, offset: const Offset(-4, -4)),
-              ],
+        boxShadow: AppColors.shadows([
+          if (edgeColor != null)
+            BoxShadow(
+              color: edgeColor!.withValues(alpha: 0.3),
+              blurRadius: 10,
+              offset: const Offset(2, 6),
+            ),
+          BoxShadow(
+            color: shadowDark,
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+          BoxShadow(
+            color: shadowLight,
+            blurRadius: 10,
+            offset: const Offset(-4, -4),
+          ),
+        ]),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(18),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (showAccentBar)
-                Container(
-                  width: 5,
-                  decoration: BoxDecoration(
-                    color: accentGradient == null ? accentColor : null,
-                    gradient: accentGradient == null
-                        ? null
-                        : LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: accentGradient!),
+        child: Stack(
+          children: [
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (showAccentBar)
+                    Container(
+                      width: 5,
+                      decoration: BoxDecoration(
+                        color: accentGradient == null ? accentColor : null,
+                        gradient: accentGradient == null
+                            ? null
+                            : LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: accentGradient!,
+                              ),
+                      ),
+                    ),
+                  Expanded(child: child),
+                ],
+              ),
+            ),
+            if (edgeGradient != null)
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: GradientEdgePainter(
+                    radius: 18,
+                    strokeWidth: 3,
+                    colors: edgeGradient,
                   ),
                 ),
-              Expanded(child: child),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );
@@ -158,9 +273,16 @@ class _SwipeActionsState extends State<SwipeActions> {
         GestureDetector(
           onTap: () => _dragExtent != 0 ? _close() : widget.onTap(),
           onHorizontalDragUpdate: (d) => setState(
-              () => _dragExtent = (_dragExtent + d.delta.dx).clamp(-_actionsWidth, 0)),
+            () => _dragExtent = (_dragExtent + d.delta.dx).clamp(
+              -_actionsWidth,
+              0,
+            ),
+          ),
           onHorizontalDragEnd: (d) => setState(
-              () => _dragExtent = _dragExtent < -_actionsWidth / 2 ? -_actionsWidth : 0),
+            () => _dragExtent = _dragExtent < -_actionsWidth / 2
+                ? -_actionsWidth
+                : 0,
+          ),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             curve: Curves.easeOut,
@@ -193,14 +315,27 @@ class _SwipeActionButton extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: width,
-        color: color,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: AppColors.accentGradient(color),
+          ),
+        ),
         alignment: Alignment.center,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, color: Colors.white, size: 20),
             const SizedBox(height: 3),
-            Text(label, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
@@ -215,7 +350,11 @@ class RichCardDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Divider(height: 1, thickness: 1, color: color ?? Theme.of(context).dividerColor);
+    return Divider(
+      height: 1,
+      thickness: 1,
+      color: color ?? Theme.of(context).dividerColor,
+    );
   }
 }
 
@@ -240,7 +379,13 @@ class StatGrid extends StatelessWidget {
   final Color? labelColor;
   final Color? valueColor;
   final Color? dividerColor;
-  const StatGrid({super.key, required this.items, this.labelColor, this.valueColor, this.dividerColor});
+  const StatGrid({
+    super.key,
+    required this.items,
+    this.labelColor,
+    this.valueColor,
+    this.dividerColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -254,7 +399,11 @@ class StatGrid extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: SizedBox(
                 height: 28,
-                child: VerticalDivider(width: 1, thickness: 1, color: dividerColor ?? Theme.of(context).dividerColor),
+                child: VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: dividerColor ?? Theme.of(context).dividerColor,
+                ),
               ),
             ),
           Expanded(
@@ -263,7 +412,11 @@ class StatGrid extends StatelessWidget {
               children: [
                 Text(
                   items[i].label,
-                  style: TextStyle(fontSize: 10, color: labelColor ?? cs.onSurfaceVariant, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: labelColor ?? cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 3),
@@ -271,7 +424,9 @@ class StatGrid extends StatelessWidget {
                   items[i].value,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: items[i].bold ? FontWeight.w700 : FontWeight.w600,
+                    fontWeight: items[i].bold
+                        ? FontWeight.w700
+                        : FontWeight.w600,
                     color: items[i].color ?? valueColor ?? cs.onSurface,
                   ),
                   overflow: TextOverflow.ellipsis,

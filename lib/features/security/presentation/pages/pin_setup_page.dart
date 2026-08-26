@@ -215,7 +215,7 @@ class _PinStep extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text.rich(
                         TextSpan(children: [
-                          const TextSpan(text: 'Work smart. ', style: TextStyle(color: AppColors.ink)),
+                          TextSpan(text: 'Work smart. ', style: TextStyle(color: AppColors.ink)),
                           TextSpan(text: 'Grow together.', style: TextStyle(color: AppColors.positive.withValues(alpha: 0.9))),
                         ]),
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
@@ -248,10 +248,10 @@ class _PinStep extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: AppColors.surface,
                           borderRadius: BorderRadius.circular(28),
-                          boxShadow: [
-                            BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 30, offset: const Offset(0, 16)),
-                            BoxShadow(color: AppColors.white.withValues(alpha: 0.9), blurRadius: 14, offset: const Offset(-8, -8)),
-                          ],
+                          boxShadow: AppColors.shadows([
+                            BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.10), blurRadius: 30, offset: const Offset(0, 16)),
+                            BoxShadow(color: AppColors.highlightShadow(0.9), blurRadius: 14, offset: const Offset(-8, -8)),
+                          ]),
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,

@@ -159,7 +159,7 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
               gradient: isDark ? AppColors.silverGradient : null,
               color: isDark ? null : AppColors.lightPrimary,
               borderRadius: BorderRadius.circular(10),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.2), blurRadius: 6, offset: const Offset(0, 2))],
+              boxShadow: AppColors.shadows([BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.2), blurRadius: 6, offset: const Offset(0, 2))]),
             ),
             child: Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: isDark ? AppColors.black : AppColors.white),
           ),

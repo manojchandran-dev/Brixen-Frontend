@@ -7,6 +7,8 @@ import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/app_bottom_nav.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/rich_card_shell.dart';
+import '../../../../shared/widgets/skeleton.dart';
+import '../../../../shared/widgets/detail_sheet.dart';
 import '../../domain/entities/purchase.dart';
 import '../providers/purchases_provider.dart';
 
@@ -56,12 +58,12 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
                   decoration: BoxDecoration(
                     color: isDark ? cs.surfaceContainerHighest : AppColors.white,
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
-                      BoxShadow(color: AppColors.white.withValues(alpha: 0.8), blurRadius: 4, offset: const Offset(-2, -2)),
-                    ],
+                    boxShadow: AppColors.shadows([
+                      BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
+                      BoxShadow(color: AppColors.highlightShadow(0.8), blurRadius: 4, offset: const Offset(-2, -2)),
+                    ]),
                   ),
-                  child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
+                  child: Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
                 ),
               )
             : Builder(
@@ -74,12 +76,12 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
                     decoration: BoxDecoration(
                       color: isDark ? cs.surfaceContainerHighest : AppColors.white,
                       borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
-                        BoxShadow(color: AppColors.white.withValues(alpha: 0.8), blurRadius: 4, offset: const Offset(-2, -2)),
-                      ],
+                      boxShadow: AppColors.shadows([
+                        BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
+                        BoxShadow(color: AppColors.highlightShadow(0.8), blurRadius: 4, offset: const Offset(-2, -2)),
+                      ]),
                     ),
-                    child: const Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
+                    child: Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
                   ),
                 ),
               ),
@@ -113,7 +115,7 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
                     ? AppColors.silverGradient
                     : const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.brand, AppColors.brandDeep]),
                 borderRadius: BorderRadius.circular(13),
-                boxShadow: [BoxShadow(color: AppColors.brand.withValues(alpha: isDark ? 0.0 : 0.4), blurRadius: 10, offset: const Offset(0, 4))],
+                boxShadow: AppColors.shadows([BoxShadow(color: AppColors.brand.withValues(alpha: isDark ? 0.0 : 0.4), blurRadius: 10, offset: const Offset(0, 4))]),
               ),
               child: Icon(Icons.add_rounded, size: 20, color: isDark ? AppColors.black : AppColors.white),
             ),
@@ -132,8 +134,8 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
                 boxShadow: isDark
                     ? null
                     : [
-                        BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
-                        BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+                        BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
+                        BoxShadow(color: AppColors.highlightShadow(0.85), blurRadius: 6, offset: const Offset(-3, -3)),
                       ],
               ),
               child: TextField(
@@ -152,7 +154,7 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
           ),
           Expanded(
             child: purchasesAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const SkeletonListView(),
               error: (e, _) => Center(child: Text(e.toString(), style: TextStyle(color: cs.error, fontSize: 13))),
               data: (list) {
                 final q = _searchCtrl.text.trim().toLowerCase();
@@ -196,16 +198,16 @@ class _PurchaseCard extends ConsumerWidget {
 
     // Cycle each card's own background through pale tints of the same 5
     // colours used elsewhere (drawer icons, Companies/Employees/Sales/Customers lists).
-    const accentColors = [AppColors.brand, AppColors.positive, AppColors.brandDeep, AppColors.brandLight, AppColors.ink];
+    final accentColors = [AppColors.brand, AppColors.positive, AppColors.brandDeep, AppColors.brandLight, AppColors.brandBlack];
     final accent = accentColors[index % accentColors.length];
-    final bg = Color.lerp(AppColors.surface, accent, 0.32)!;
+    final bg = Color.lerp(AppColors.surface, accent, AppColors.cardTintBlend(accent))!;
 
-    const fg = AppColors.ink;
+    final fg = AppColors.ink;
     final fgMuted = AppColors.ink.withValues(alpha: 0.6);
     final dividerColor = AppColors.ink.withValues(alpha: 0.12);
 
     return SwipeActions(
-      onTap: () => context.push(AppRouter.purchaseDetail, extra: purchase),
+      onTap: () => _showPurchaseDetail(context, ref, purchase, accent),
       actions: [
         SwipeAction(
           icon: Icons.edit_outlined,
@@ -216,7 +218,7 @@ class _PurchaseCard extends ConsumerWidget {
         SwipeAction(
           icon: Icons.delete_outline,
           label: 'Delete',
-          color: AppColors.error,
+          color: AppColors.brandBlack,
           onTap: () => _confirmDelete(context, ref),
         ),
       ],
@@ -237,9 +239,9 @@ class _PurchaseCard extends ConsumerWidget {
                     height: 42,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [accent, accent.withValues(alpha: 0.75)]),
+                      gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: AppColors.accentGradient(accent)),
                       shape: BoxShape.circle,
-                      boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))],
+                      boxShadow: AppColors.shadows([BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))]),
                     ),
                     child: Text(
                       purchase.supplierName.trim().isNotEmpty ? purchase.supplierName.trim()[0].toUpperCase() : '?',
@@ -252,7 +254,7 @@ class _PurchaseCard extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(purchase.supplierName,
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg),
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg),
                             overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 2),
                         Row(children: [
@@ -326,7 +328,7 @@ class _PurchaseCard extends ConsumerWidget {
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+                    SnackBar(content: Text(e.toString()), backgroundColor: AppColors.dangerFill),
                   );
                 }
               }
@@ -338,15 +340,83 @@ class _PurchaseCard extends ConsumerWidget {
     );
   }
 
-  Color _statusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'paid':      return AppColors.accentEmerald;
-      case 'pending':   return AppColors.accentGold;
-      case 'partial':   return AppColors.accentIndigo;
-      case 'cancelled': return AppColors.accentRose;
-      default:          return AppColors.accentSlate;
-    }
+  Color _statusColor(String status) => _purchaseStatusColor(status);
+}
+
+Color _purchaseStatusColor(String status) {
+  switch (status.toLowerCase()) {
+    case 'paid':      return AppColors.accentEmerald;
+    case 'pending':   return AppColors.accentGold;
+    case 'partial':   return AppColors.accentIndigo;
+    case 'cancelled': return AppColors.accentRose;
+    default:          return AppColors.accentSlate;
   }
+}
+
+void _showPurchaseDetail(BuildContext context, WidgetRef ref, Purchase purchase, Color accent) {
+  final fmt = NumberFormat('#,##,##0.00', 'en_IN');
+  final statusColor = _purchaseStatusColor(purchase.paymentStatus);
+  showDetailSheet(context, (ctx) => DetailSheetScaffold(
+    avatarText: purchase.supplierName.trim().isNotEmpty ? purchase.supplierName.trim()[0].toUpperCase() : '?',
+    avatarGradient: AppColors.accentGradient(accent),
+    title: purchase.supplierName,
+    subtitle: purchase.invoiceType,
+    onEdit: () {
+      Navigator.of(ctx).pop();
+      ctx.push(AppRouter.createPurchase, extra: {'purchase': purchase, 'fromMasters': false});
+    },
+    onDelete: () async {
+      final confirmed = await showDialog<bool>(
+        context: ctx,
+        builder: (dCtx) => AlertDialog(
+          backgroundColor: Theme.of(dCtx).scaffoldBackgroundColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Delete Purchase', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.ink)),
+          content: Text('Delete purchase from "${purchase.supplierName}"? This cannot be undone.', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(dCtx).pop(false), child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary))),
+            TextButton(onPressed: () => Navigator.of(dCtx).pop(true), child: Text('Delete', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700))),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      try {
+        await ref.read(purchasesProvider.notifier).deletePurchase(purchase.id);
+        if (ctx.mounted) Navigator.of(ctx).pop();
+      } catch (e) {
+        if (ctx.mounted) {
+          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: AppColors.dangerFill));
+        }
+      }
+    },
+    statusRow: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(16)),
+      child: Row(children: [
+        const Icon(Icons.shopping_bag_rounded, color: AppColors.white, size: 18),
+        const SizedBox(width: 8),
+        Text(purchase.paymentStatus, style: const TextStyle(color: AppColors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+        const Spacer(),
+        Text('₹${fmt.format(purchase.totalAmount)}', style: const TextStyle(color: AppColors.white, fontSize: 15, fontWeight: FontWeight.w800)),
+      ]),
+    ),
+    sections: [
+      DetailSection(title: 'Invoice', items: [
+        DetailRow(icon: Icons.calendar_today_rounded, label: 'Bill Date', value: DateFormat('dd MMM yyyy').format(purchase.billDate)),
+        if (purchase.invoiceType != null) DetailRow(icon: Icons.description_outlined, label: 'Type', value: purchase.invoiceType!, iconColor: AppColors.positive),
+        if (purchase.paymentType != null) DetailRow(icon: Icons.payments_outlined, label: 'Payment Method', value: purchase.paymentType!),
+      ]),
+      DetailSection(title: 'Amount', items: [
+        DetailRow(icon: Icons.receipt_outlined, label: 'Subtotal', value: '₹${fmt.format(purchase.subtotal)}'),
+        DetailRow(icon: Icons.percent_rounded, label: 'Tax', value: '₹${fmt.format(purchase.taxAmount)}', iconColor: AppColors.positive),
+        DetailRow(icon: Icons.account_balance_wallet_outlined, label: 'Total', value: '₹${fmt.format(purchase.totalAmount)}'),
+      ]),
+      if (purchase.notes != null && purchase.notes!.isNotEmpty)
+        DetailSection(title: 'Notes', items: [
+          DetailRow(icon: Icons.notes_rounded, label: 'Notes', value: purchase.notes!),
+        ]),
+    ],
+  ));
 }
 
 class _StatusChip extends StatelessWidget {

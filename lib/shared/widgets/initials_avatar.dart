@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 
-const List<Color> _avatarPalette = [
+List<Color> get _avatarPalette => [
   AppColors.accentIndigo,
   AppColors.accentEmerald,
   AppColors.accentTeal,

@@ -113,13 +113,13 @@ class _TodayBanner extends StatelessWidget {
         color: isDark ? cs.surfaceContainerHighest : AppColors.lightSurface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Theme.of(context).dividerColor),
-        boxShadow: [
+        boxShadow: AppColors.shadows([
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.06),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
-        ],
+        ]),
       ),
       child: Column(
         children: [
@@ -194,14 +194,14 @@ class _TodayBanner extends StatelessWidget {
                       gradient: isDark ? AppColors.silverGradient : null,
                       color: isDark ? null : AppColors.lightPrimary,
                       borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
+                      boxShadow: AppColors.shadows([
                         BoxShadow(
                           color: Colors.black
                               .withValues(alpha: isDark ? 0.25 : 0.15),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
-                      ],
+                      ]),
                     ),
                     child: Column(
                       children: [
@@ -260,13 +260,13 @@ class _CalendarCard extends StatelessWidget {
         color: isDark ? cs.surfaceContainerHighest : AppColors.lightSurface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Theme.of(context).dividerColor),
-        boxShadow: [
+        boxShadow: AppColors.shadows([
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.06),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
-        ],
+        ]),
       ),
       child: Column(
         children: [
@@ -358,13 +358,13 @@ class _NavArrow extends StatelessWidget {
           gradient: isDark ? AppColors.silverGradient : null,
           color: isDark ? null : AppColors.lightPrimary,
           borderRadius: BorderRadius.circular(8),
-          boxShadow: [
+          boxShadow: AppColors.shadows([
             BoxShadow(
               color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.15),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
-          ],
+          ]),
         ),
         child: Icon(icon,
             size: 20,
@@ -721,13 +721,13 @@ class _SummaryCard extends StatelessWidget {
           color: isDark ? cs.surfaceContainerHighest : AppColors.lightSurface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: Theme.of(context).dividerColor),
-          boxShadow: [
+          boxShadow: AppColors.shadows([
             BoxShadow(
               color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.06),
               blurRadius: 10,
               offset: const Offset(0, 3),
             ),
-          ],
+          ]),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(13),

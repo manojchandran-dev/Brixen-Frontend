@@ -33,6 +33,11 @@ class _AuthInterceptor extends Interceptor {
   }
 }
 
+/// Formats a date as `yyyy-MM-dd` for query params that expect an ISO date
+/// (not a full timestamp) — e.g. `from`/`to` on sales, expenses and reports.
+String toIsoDateOnly(DateTime d) =>
+    '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
 /// Helper to map DioException to ApiException.
 ApiException mapDioError(DioException e) {
   if (e.type == DioExceptionType.connectionTimeout ||

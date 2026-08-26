@@ -58,21 +58,13 @@ class _FilledBtn extends StatelessWidget {
           borderRadius: BorderRadius.circular(27),
           boxShadow: disabled
               ? null
-              : isDark
-                  ? [
-                      BoxShadow(
-                        color: AppColors.silver.withValues(alpha: 0.18),
-                        blurRadius: 20,
-                        offset: const Offset(0, 6),
-                      ),
-                    ]
-                  : [
-                      BoxShadow(
-                        color: AppColors.ink.withValues(alpha: 0.25),
-                        blurRadius: 16,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
+              : AppColors.shadows([
+                  BoxShadow(
+                    color: AppColors.shadowDark.withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ]),
         ),
         child: Center(
           child: isLoading

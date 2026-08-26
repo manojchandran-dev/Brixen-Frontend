@@ -18,6 +18,8 @@ class SalesRemoteDatasource {
     String? search,
     String? customerId,
     String? paymentStatus,
+    DateTime? from,
+    DateTime? to,
   }) async {
     try {
       final resp = await _dio.get(ApiEndpoints.sales, queryParameters: {
@@ -26,6 +28,8 @@ class SalesRemoteDatasource {
         if (search != null && search.isNotEmpty) 'search': search,
         if (customerId != null && customerId.isNotEmpty) 'customer_id': customerId,
         if (paymentStatus != null && paymentStatus.isNotEmpty) 'payment_status': paymentStatus,
+        if (from != null) 'from': toIsoDateOnly(from),
+        if (to != null) 'to': toIsoDateOnly(to),
       });
       final data = resp.data['data'] ?? resp.data;
       final list = (data is List) ? data : (data['items'] ?? []);

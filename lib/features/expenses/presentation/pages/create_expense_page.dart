@@ -160,7 +160,7 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.dangerFill),
         );
       }
     } finally {
@@ -183,19 +183,19 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
             margin: const EdgeInsets.all(8),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: AppColors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
-                BoxShadow(color: AppColors.white.withValues(alpha: 0.8), blurRadius: 4, offset: const Offset(-2, -2)),
-              ],
+              boxShadow: AppColors.shadows([
+                BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
+                BoxShadow(color: AppColors.highlightShadow(0.8), blurRadius: 4, offset: const Offset(-2, -2)),
+              ]),
             ),
-            child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
+            child: Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
           ),
         ),
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(_isEditing ? 'Edit Expense' : 'New Expense', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.ink)),
-          Text(_isEditing ? 'Update expense details' : 'Log an expense', style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
+          Text(_isEditing ? 'Edit Expense' : 'New Expense', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.ink)),
+          Text(_isEditing ? 'Update expense details' : 'Log an expense', style: TextStyle(fontSize: 11, color: AppColors.textHint)),
         ]),
       ),
       body: Form(
@@ -270,10 +270,10 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
-                    BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
-                  ],
+                  boxShadow: AppColors.shadows([
+                    BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
+                    BoxShadow(color: AppColors.highlightShadow(0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+                  ]),
                 ),
                 child: Row(children: [
                   Container(
@@ -282,14 +282,14 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.brandLight, AppColors.brand]),
-                      boxShadow: [BoxShadow(color: AppColors.brandLight.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3))],
+                      boxShadow: AppColors.shadows([BoxShadow(color: AppColors.brandLight.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3))]),
                     ),
                     child: const Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.white),
                   ),
                   const SizedBox(width: 12),
-                  Text(DateFormat('dd MMM yyyy').format(_expenseDate), style: const TextStyle(fontSize: 15, color: AppColors.ink)),
+                  Text(DateFormat('dd MMM yyyy').format(_expenseDate), style: TextStyle(fontSize: 15, color: AppColors.ink)),
                   const Spacer(),
-                  const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textHint),
+                  Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textHint),
                 ]),
               ),
             ),
@@ -350,7 +350,7 @@ class _SectionLabel extends StatelessWidget {
   final String text;
   const _SectionLabel(this.text);
   @override
-  Widget build(BuildContext context) => Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textHint));
+  Widget build(BuildContext context) => Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textHint));
 }
 
 class _ReceiptImagePicker extends StatelessWidget {
@@ -371,10 +371,10 @@ class _ReceiptImagePicker extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
-              BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
-            ],
+            boxShadow: AppColors.shadows([
+              BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
+              BoxShadow(color: AppColors.highlightShadow(0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+            ]),
           ),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Container(
@@ -383,12 +383,12 @@ class _ReceiptImagePicker extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.brand, AppColors.brandDeep]),
-                boxShadow: [BoxShadow(color: AppColors.brand.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))],
+                boxShadow: AppColors.shadows([BoxShadow(color: AppColors.brand.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))]),
               ),
               child: const Icon(Icons.upload_file_rounded, size: 20, color: AppColors.white),
             ),
             const SizedBox(height: 8),
-            const Text('Tap to upload receipt', style: TextStyle(fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w500)),
+            Text('Tap to upload receipt', style: TextStyle(fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w500)),
             Text('Camera or Gallery', style: TextStyle(fontSize: 11, color: AppColors.textHint.withValues(alpha: 0.8))),
           ]),
         ),
@@ -402,16 +402,16 @@ class _ReceiptImagePicker extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: AppColors.ink.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, 6)),
-          BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
-        ],
+        boxShadow: AppColors.shadows([
+          BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, 6)),
+          BoxShadow(color: AppColors.highlightShadow(0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+        ]),
       ),
       child: Stack(children: [
         ClipRRect(borderRadius: BorderRadius.circular(16), child: imgWidget),
         Positioned(top: 8, right: 8, child: GestureDetector(
           onTap: onRemoveImage,
-          child: Container(width: 28, height: 28, decoration: BoxDecoration(color: AppColors.ink.withValues(alpha: 0.6), shape: BoxShape.circle), child: const Icon(Icons.close_rounded, size: 16, color: AppColors.white)),
+          child: Container(width: 28, height: 28, decoration: BoxDecoration(color: AppColors.shadowDark.withValues(alpha: 0.6), shape: BoxShape.circle), child: const Icon(Icons.close_rounded, size: 16, color: AppColors.white)),
         )),
       ]),
     );
@@ -430,10 +430,10 @@ class _SourceTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
-            BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
-          ],
+          boxShadow: AppColors.shadows([
+            BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
+            BoxShadow(color: AppColors.highlightShadow(0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+          ]),
         ),
         child: Row(children: [
           Container(
@@ -442,12 +442,12 @@ class _SourceTile extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [accentColor, accentColor.withValues(alpha: 0.75)]),
-              boxShadow: [BoxShadow(color: accentColor.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3))],
+              boxShadow: AppColors.shadows([BoxShadow(color: accentColor.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3))]),
             ),
             child: Icon(icon, size: 17, color: AppColors.white),
           ),
           const SizedBox(width: 14),
-          Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.ink)),
+          Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.ink)),
         ]),
       ),
     );

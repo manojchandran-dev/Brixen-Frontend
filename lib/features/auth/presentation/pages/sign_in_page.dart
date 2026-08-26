@@ -58,7 +58,7 @@ class _SignInViewState extends State<_SignInView> {
             context.go(state.hasPin ? AppRouter.lockScreen : AppRouter.pinSetup);
           } else if (state is AuthError) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message), backgroundColor: AppColors.error),
+              SnackBar(content: Text(state.message), backgroundColor: AppColors.dangerFill),
             );
           }
         },
@@ -85,7 +85,7 @@ class _SignInViewState extends State<_SignInView> {
                         const SizedBox(height: 4),
                         Text.rich(
                           TextSpan(children: [
-                            const TextSpan(text: 'Work smart. ', style: TextStyle(color: AppColors.ink)),
+                            TextSpan(text: 'Work smart. ', style: TextStyle(color: AppColors.ink)),
                             TextSpan(text: 'Grow together.', style: TextStyle(color: AppColors.positive.withValues(alpha: 0.9))),
                           ]),
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
@@ -139,10 +139,10 @@ class _AuthCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 30, offset: const Offset(0, 16)),
-          BoxShadow(color: AppColors.white.withValues(alpha: 0.9), blurRadius: 14, offset: const Offset(-8, -8)),
-        ],
+        boxShadow: AppColors.shadows([
+          BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.10), blurRadius: 30, offset: const Offset(0, 16)),
+          BoxShadow(color: AppColors.highlightShadow(0.9), blurRadius: 14, offset: const Offset(-8, -8)),
+        ]),
       ),
       child: Form(
         key: formKey,
@@ -150,13 +150,13 @@ class _AuthCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              const Text('Welcome ', style: TextStyle(color: AppColors.ink, fontSize: 24, fontWeight: FontWeight.w800)),
+              Text('Welcome ', style: TextStyle(color: AppColors.ink, fontSize: 24, fontWeight: FontWeight.w800)),
               const Text('back', style: TextStyle(color: AppColors.positive, fontSize: 24, fontWeight: FontWeight.w800)),
               const SizedBox(width: 4),
               Container(width: 6, height: 6, margin: const EdgeInsets.only(top: 6), decoration: const BoxDecoration(color: AppColors.brand, shape: BoxShape.circle)),
             ]),
             const SizedBox(height: 6),
-            const Text('Sign in to continue to your account',
+            Text('Sign in to continue to your account',
                 style: TextStyle(color: AppColors.ink, fontSize: 13)),
             const SizedBox(height: 14),
             Container(
@@ -262,7 +262,7 @@ class _AuthField extends StatelessWidget {
         textInputAction: textInputAction,
         onFieldSubmitted: onFieldSubmitted,
         validator: validator,
-        style: const TextStyle(color: AppColors.ink, fontSize: 14),
+        style: TextStyle(color: AppColors.ink, fontSize: 14),
         decoration: InputDecoration(
           isDense: false,
           hintText: hint,
@@ -280,9 +280,9 @@ class _AuthField extends StatelessWidget {
                   end: Alignment.bottomRight,
                   colors: [iconBoxColor, iconBoxColor.withValues(alpha: 0.75)],
                 ),
-                boxShadow: [
+                boxShadow: AppColors.shadows([
                   BoxShadow(color: iconBoxColor.withValues(alpha: 0.45), blurRadius: 8, offset: const Offset(0, 3)),
-                ],
+                ]),
               ),
               child: Icon(icon, color: AppColors.white, size: 17),
             ),
@@ -318,7 +318,7 @@ class _SignInButton extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(27),
           gradient: const LinearGradient(colors: [AppColors.brand, AppColors.positive], begin: Alignment.centerLeft, end: Alignment.centerRight),
-          boxShadow: [BoxShadow(color: AppColors.ink.withValues(alpha: 0.25), blurRadius: 16, offset: const Offset(0, 8))],
+          boxShadow: AppColors.shadows([BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.25), blurRadius: 16, offset: const Offset(0, 8))]),
         ),
         child: Center(
           child: isLoading

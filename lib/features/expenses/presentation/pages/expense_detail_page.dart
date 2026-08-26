@@ -15,7 +15,7 @@ class ExpenseDetailPage extends ConsumerWidget {
   // Category names come from user-defined Masters data, so colors/icons are
   // assigned by hashing the name instead of matching fixed keywords — every
   // distinct category gets a consistent look even for custom category names.
-  static const _categoryColors = [AppColors.brand, AppColors.positive, AppColors.brandDeep, AppColors.brandLight, AppColors.ink];
+  static List<Color> get _categoryColors => [AppColors.brand, AppColors.positive, AppColors.brandDeep, AppColors.brandLight, AppColors.brandBlack];
   static const _categoryIcons = [
     Icons.receipt_rounded, Icons.home_rounded, Icons.people_rounded, Icons.electrical_services_rounded,
     Icons.directions_car_rounded, Icons.restaurant_rounded, Icons.inventory_2_rounded, Icons.campaign_rounded, Icons.build_rounded,
@@ -29,10 +29,10 @@ class ExpenseDetailPage extends ConsumerWidget {
       builder: (_) => AlertDialog(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Expense', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.ink)),
-        content: Text('Delete "${expense.title}"? This cannot be undone.', style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+        title: Text('Delete Expense', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.ink)),
+        content: Text('Delete "${expense.title}"? This cannot be undone.', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary))),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary))),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
@@ -42,12 +42,12 @@ class ExpenseDetailPage extends ConsumerWidget {
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+                    SnackBar(content: Text(e.toString()), backgroundColor: AppColors.dangerFill),
                   );
                 }
               }
             },
-            child: const Text('Delete', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700)),
+            child: Text('Delete', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -72,26 +72,26 @@ class ExpenseDetailPage extends ConsumerWidget {
             margin: const EdgeInsets.all(8),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: AppColors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
-                BoxShadow(color: AppColors.white.withValues(alpha: 0.8), blurRadius: 4, offset: const Offset(-2, -2)),
-              ],
+              boxShadow: AppColors.shadows([
+                BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
+                BoxShadow(color: AppColors.highlightShadow(0.8), blurRadius: 4, offset: const Offset(-2, -2)),
+              ]),
             ),
-            child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
+            child: Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
           ),
         ),
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           GestureDetector(
             onTap: () => context.pop(),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const Text('Expenses', style: TextStyle(fontSize: 12, color: AppColors.textHint, fontWeight: FontWeight.w500)),
-              const Icon(Icons.chevron_right_rounded, size: 14, color: AppColors.textHint),
-              Flexible(child: Text(expense.title, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.ink))),
+              Text('Expenses', style: TextStyle(fontSize: 12, color: AppColors.textHint, fontWeight: FontWeight.w500)),
+              Icon(Icons.chevron_right_rounded, size: 14, color: AppColors.textHint),
+              Flexible(child: Text(expense.title, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.ink))),
             ]),
           ),
-          Text(DateFormat('dd MMM yyyy').format(expense.expenseDate), style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
+          Text(DateFormat('dd MMM yyyy').format(expense.expenseDate), style: TextStyle(fontSize: 11, color: AppColors.textHint)),
         ]),
         actions: [
           GestureDetector(
@@ -103,7 +103,7 @@ class ExpenseDetailPage extends ConsumerWidget {
               decoration: BoxDecoration(
                 gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.brand, AppColors.brandDeep]),
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [BoxShadow(color: AppColors.brand.withValues(alpha: 0.4), blurRadius: 10, offset: const Offset(0, 4))],
+                boxShadow: AppColors.shadows([BoxShadow(color: AppColors.brand.withValues(alpha: 0.4), blurRadius: 10, offset: const Offset(0, 4))]),
               ),
               child: const Icon(Icons.edit_outlined, size: 18, color: AppColors.white),
             ),
@@ -115,11 +115,11 @@ class ExpenseDetailPage extends ConsumerWidget {
               width: 38, height: 38,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: AppColors.white,
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [BoxShadow(color: AppColors.ink.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 4))],
+                boxShadow: AppColors.shadows([BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 4))]),
               ),
-              child: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.ink),
+              child: Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.ink),
             ),
           ),
         ],
@@ -133,19 +133,19 @@ class ExpenseDetailPage extends ConsumerWidget {
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(22),
-              boxShadow: [
-                BoxShadow(color: AppColors.ink.withValues(alpha: 0.07), blurRadius: 20, offset: const Offset(0, 10)),
-                BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 8, offset: const Offset(-3, -3)),
-              ],
+              boxShadow: AppColors.shadows([
+                BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.07), blurRadius: 20, offset: const Offset(0, 10)),
+                BoxShadow(color: AppColors.highlightShadow(0.85), blurRadius: 8, offset: const Offset(-3, -3)),
+              ]),
             ),
             child: Row(children: [
               Container(
                 width: 52, height: 52,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [catColor, catColor.withValues(alpha: 0.75)]),
+                  gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: AppColors.accentGradient(catColor)),
                   shape: BoxShape.circle,
-                  boxShadow: [BoxShadow(color: catColor.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 5))],
+                  boxShadow: AppColors.shadows([BoxShadow(color: catColor.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 5))]),
                 ),
                 child: Icon(_categoryIcon(expense.category), color: AppColors.white, size: 24),
               ),
@@ -153,10 +153,10 @@ class ExpenseDetailPage extends ConsumerWidget {
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(expense.category, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: catColor)),
                 const SizedBox(height: 2),
-                Text(expense.title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.ink), maxLines: 2, overflow: TextOverflow.ellipsis),
+                Text(expense.title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.ink), maxLines: 2, overflow: TextOverflow.ellipsis),
               ])),
               const SizedBox(width: 8),
-              Text('₹${fmt.format(expense.amount)}', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.ink)),
+              Text('₹${fmt.format(expense.amount)}', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.ink)),
             ]),
           ),
           const SizedBox(height: 16),
@@ -181,9 +181,9 @@ class ExpenseDetailPage extends ConsumerWidget {
 
           if (expense.notes != null && expense.notes!.isNotEmpty) ...[
             _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Notes', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textHint, letterSpacing: 0.3)),
+              Text('Notes', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textHint, letterSpacing: 0.3)),
               const SizedBox(height: 8),
-              Text(expense.notes!, style: const TextStyle(fontSize: 14, color: AppColors.ink)),
+              Text(expense.notes!, style: TextStyle(fontSize: 14, color: AppColors.ink)),
             ])),
             const SizedBox(height: 16),
           ],
@@ -205,10 +205,10 @@ class _Card extends StatelessWidget {
     decoration: BoxDecoration(
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(18),
-      boxShadow: [
-        BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 16, offset: const Offset(0, 6)),
-        BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
-      ],
+      boxShadow: AppColors.shadows([
+        BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.06), blurRadius: 16, offset: const Offset(0, 6)),
+        BoxShadow(color: AppColors.highlightShadow(0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+      ]),
     ),
     child: child,
   );
@@ -225,19 +225,19 @@ class _Row extends StatelessWidget {
       width: 32, height: 32,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [iconColor, iconColor.withValues(alpha: 0.75)]),
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: AppColors.accentGradient(iconColor)),
         shape: BoxShape.circle,
-        boxShadow: [BoxShadow(color: iconColor.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3))],
+        boxShadow: AppColors.shadows([BoxShadow(color: iconColor.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3))]),
       ),
       child: Icon(icon, size: 16, color: AppColors.white),
     ),
     const SizedBox(width: 12),
-    Text(label, style: const TextStyle(fontSize: 12.5, color: AppColors.textHint)),
-    Expanded(child: Text(value, textAlign: TextAlign.end, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink))),
+    Text(label, style: TextStyle(fontSize: 12.5, color: AppColors.textHint)),
+    Expanded(child: Text(value, textAlign: TextAlign.end, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink))),
   ]);
 }
 
 class _Divider extends StatelessWidget {
   @override
-  Widget build(BuildContext context) => const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1, color: AppColors.border));
+  Widget build(BuildContext context) => Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1, color: AppColors.border));
 }

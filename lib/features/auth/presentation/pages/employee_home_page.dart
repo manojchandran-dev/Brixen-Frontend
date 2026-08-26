@@ -30,7 +30,7 @@ class _EmployeeHomePageState extends State<EmployeeHomePage> {
 
   void _comingSoon(BuildContext context, String label) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$label — coming soon'), backgroundColor: AppColors.ink),
+      SnackBar(content: Text('$label — coming soon'), backgroundColor: AppColors.dangerFill),
     );
   }
 
@@ -64,11 +64,11 @@ class _EmployeeHomePageState extends State<EmployeeHomePage> {
                       decoration: BoxDecoration(
                         color: AppColors.surface,
                         borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(color: AppColors.ink.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 4)),
-                        ],
+                        boxShadow: AppColors.shadows([
+                          BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 4)),
+                        ]),
                       ),
-                      child: const Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
+                      child: Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
                     ),
                   ),
                 ),
@@ -77,12 +77,12 @@ class _EmployeeHomePageState extends State<EmployeeHomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(children: [
-                        Text(_greeting(), style: const TextStyle(color: AppColors.ink, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+                        Text(_greeting(), style: TextStyle(color: AppColors.ink, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
                         const SizedBox(width: 6),
                         const Text('👋', style: TextStyle(fontSize: 20)),
                       ]),
                       const SizedBox(height: 4),
-                      const Text("Here's what's happening today.", style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                      Text("Here's what's happening today.", style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
                     ],
                   ),
                 ),
@@ -150,7 +150,7 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: Text(title, style: const TextStyle(color: AppColors.ink, fontSize: 17, fontWeight: FontWeight.w800))),
+        Expanded(child: Text(title, style: TextStyle(color: AppColors.ink, fontSize: 17, fontWeight: FontWeight.w800))),
         GestureDetector(
           onTap: onViewAll,
           child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -184,7 +184,7 @@ class _IconBadge extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(14),
-              boxShadow: [BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4))],
+              boxShadow: AppColors.shadows([BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4))]),
             ),
             child: Icon(icon, color: AppColors.ink, size: 20),
           ),
@@ -218,7 +218,7 @@ class _TodayOverviewCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.brand, AppColors.brandDeep]),
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: AppColors.brand.withValues(alpha: 0.35), blurRadius: 24, offset: const Offset(0, 12))],
+        boxShadow: AppColors.shadows([BoxShadow(color: AppColors.brand.withValues(alpha: 0.35), blurRadius: 24, offset: const Offset(0, 12))]),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -315,7 +315,7 @@ class _QuickAction extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(18),
-          boxShadow: [BoxShadow(color: AppColors.ink.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 6))],
+          boxShadow: AppColors.shadows([BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 6))]),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -328,7 +328,7 @@ class _QuickAction extends StatelessWidget {
               child: Icon(icon, color: color, size: 20),
             ),
             const SizedBox(height: 8),
-            Text(label, textAlign: TextAlign.center, maxLines: 2, style: const TextStyle(color: AppColors.ink, fontSize: 10.5, fontWeight: FontWeight.w600, height: 1.2)),
+            Text(label, textAlign: TextAlign.center, maxLines: 2, style: TextStyle(color: AppColors.ink, fontSize: 10.5, fontWeight: FontWeight.w600, height: 1.2)),
           ],
         ),
       ),
@@ -359,21 +359,21 @@ class _MyTasksCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: AppColors.ink.withValues(alpha: 0.05), blurRadius: 18, offset: const Offset(0, 8))],
+        boxShadow: AppColors.shadows([BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.05), blurRadius: 18, offset: const Offset(0, 8))]),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (var i = 0; i < _tasks.length; i++) ...[
             _TaskRow(title: _tasks[i].title, sub: _tasks[i].sub, status: _tasks[i].status),
-            if (i < _tasks.length - 1) const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(height: 1, color: AppColors.border)),
+            if (i < _tasks.length - 1) Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(height: 1, color: AppColors.border)),
           ],
           const SizedBox(height: 16),
           Row(
             children: [
-              Text('$completed of ${_tasks.length} tasks completed', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+              Text('$completed of ${_tasks.length} tasks completed', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
               const Spacer(),
-              Text('${(pct * 100).round()}%', style: const TextStyle(color: AppColors.ink, fontSize: 12, fontWeight: FontWeight.w700)),
+              Text('${(pct * 100).round()}%', style: TextStyle(color: AppColors.ink, fontSize: 12, fontWeight: FontWeight.w700)),
             ],
           ),
           const SizedBox(height: 6),
@@ -417,8 +417,8 @@ class _TaskRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(color: AppColors.ink, fontSize: 13.5, fontWeight: FontWeight.w600)),
-              Text(sub, style: const TextStyle(color: AppColors.textHint, fontSize: 11.5)),
+              Text(title, style: TextStyle(color: AppColors.ink, fontSize: 13.5, fontWeight: FontWeight.w600)),
+              Text(sub, style: TextStyle(color: AppColors.textHint, fontSize: 11.5)),
             ],
           ),
         ),
@@ -445,13 +445,13 @@ class _AttendanceCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: AppColors.ink.withValues(alpha: 0.05), blurRadius: 18, offset: const Offset(0, 8))],
+        boxShadow: AppColors.shadows([BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.05), blurRadius: 18, offset: const Offset(0, 8))]),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            const Expanded(child: Text('Attendance', style: TextStyle(color: AppColors.ink, fontSize: 14, fontWeight: FontWeight.w800))),
+            Expanded(child: Text('Attendance', style: TextStyle(color: AppColors.ink, fontSize: 14, fontWeight: FontWeight.w800))),
             GestureDetector(onTap: onView, child: const Text('View', style: TextStyle(color: AppColors.brand, fontSize: 12, fontWeight: FontWeight.w600))),
           ]),
           const SizedBox(height: 14),
@@ -480,8 +480,8 @@ class _AttendanceCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          const Center(child: Text('Checked In', style: TextStyle(color: AppColors.textHint, fontSize: 11.5))),
-          const Center(child: Text('09:02 AM', style: TextStyle(color: AppColors.ink, fontSize: 15, fontWeight: FontWeight.w800))),
+          Center(child: Text('Checked In', style: TextStyle(color: AppColors.textHint, fontSize: 11.5))),
+          Center(child: Text('09:02 AM', style: TextStyle(color: AppColors.ink, fontSize: 15, fontWeight: FontWeight.w800))),
           const SizedBox(height: 8),
           Center(
             child: Container(
@@ -509,13 +509,13 @@ class _UpcomingMeetingCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: AppColors.ink.withValues(alpha: 0.05), blurRadius: 18, offset: const Offset(0, 8))],
+        boxShadow: AppColors.shadows([BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.05), blurRadius: 18, offset: const Offset(0, 8))]),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            const Expanded(child: Text('Upcoming', style: TextStyle(color: AppColors.ink, fontSize: 14, fontWeight: FontWeight.w800))),
+            Expanded(child: Text('Upcoming', style: TextStyle(color: AppColors.ink, fontSize: 14, fontWeight: FontWeight.w800))),
             GestureDetector(onTap: onView, child: const Text('View', style: TextStyle(color: AppColors.brand, fontSize: 12, fontWeight: FontWeight.w600))),
           ]),
           const SizedBox(height: 14),
@@ -529,8 +529,8 @@ class _UpcomingMeetingCard extends StatelessWidget {
           const SizedBox(height: 12),
           const Text('11:00 AM', style: TextStyle(color: AppColors.brand, fontSize: 12, fontWeight: FontWeight.w700)),
           const SizedBox(height: 2),
-          const Text('Product Review', style: TextStyle(color: AppColors.ink, fontSize: 13.5, fontWeight: FontWeight.w700)),
-          const Text('Meeting Room 2', style: TextStyle(color: AppColors.textHint, fontSize: 11.5)),
+          Text('Product Review', style: TextStyle(color: AppColors.ink, fontSize: 13.5, fontWeight: FontWeight.w700)),
+          Text('Meeting Room 2', style: TextStyle(color: AppColors.textHint, fontSize: 11.5)),
           const SizedBox(height: 10),
           SizedBox(
             height: 26,
@@ -589,7 +589,7 @@ class _AnnouncementBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(children: [
-                  const Text('Company Announcement', style: TextStyle(color: AppColors.ink, fontSize: 13.5, fontWeight: FontWeight.w800)),
+                  Text('Company Announcement', style: TextStyle(color: AppColors.ink, fontSize: 13.5, fontWeight: FontWeight.w800)),
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -598,7 +598,7 @@ class _AnnouncementBanner extends StatelessWidget {
                   ),
                 ]),
                 const SizedBox(height: 4),
-                const Text('Team Outing on 30th Aug 2026.\nGet ready for a fun and memorable day!',
+                Text('Team Outing on 30th Aug 2026.\nGet ready for a fun and memorable day!',
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 12, height: 1.4)),
                 const SizedBox(height: 10),
                 GestureDetector(

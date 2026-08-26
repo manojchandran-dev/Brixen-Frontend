@@ -18,6 +18,8 @@ class ExpensesRemoteDatasource {
     String? search,
     String? categoryId,
     String? unitId,
+    DateTime? from,
+    DateTime? to,
   }) async {
     try {
       final resp = await _dio.get(ApiEndpoints.expenses, queryParameters: {
@@ -26,6 +28,8 @@ class ExpensesRemoteDatasource {
         if (search != null && search.isNotEmpty) 'search': search,
         if (categoryId != null) 'category_id': categoryId,
         if (unitId != null) 'unit_id': unitId,
+        if (from != null) 'from': toIsoDateOnly(from),
+        if (to != null) 'to': toIsoDateOnly(to),
       });
       final data = resp.data['data'] ?? resp.data;
       final list = (data is List) ? data : (data['items'] ?? []);

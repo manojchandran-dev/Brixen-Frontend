@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../domain/entities/company.dart';
 import 'status_badge.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -44,13 +43,23 @@ class CompanyCard extends StatelessWidget {
     // Cycle each card's own background through pale tints of the same 5
     // colours used for the drawer's module icons — light shades only, so
     // text stays black/dark on every card instead of switching to white.
-    const accentColors = [AppColors.brand, AppColors.positive, AppColors.brandDeep, AppColors.brandLight, AppColors.ink];
+    final accentColors = [
+      AppColors.brand,
+      AppColors.positive,
+      AppColors.brandDeep,
+      AppColors.brandLight,
+      AppColors.brandBlack,
+    ];
     final accent = accentColors[index % accentColors.length];
     // Opaque blend toward white — NOT a translucent alpha colour, which
     // would let the swipe-reveal buttons show through the card underneath.
-    final bg = Color.lerp(AppColors.surface, accent, 0.32)!;
+    final bg = Color.lerp(
+      AppColors.surface,
+      accent,
+      AppColors.cardTintBlend(accent),
+    )!;
 
-    const fg = AppColors.ink;
+    final fg = AppColors.ink;
     final fgMuted = AppColors.ink.withValues(alpha: 0.6);
     final dividerColor = AppColors.ink.withValues(alpha: 0.12);
     final chevronBg = AppColors.ink.withValues(alpha: 0.08);
@@ -68,7 +77,9 @@ class CompanyCard extends StatelessWidget {
           ),
           if (isCompleted)
             SwipeAction(
-              icon: company.isActive ? Icons.block_outlined : Icons.check_circle_outline,
+              icon: company.isActive
+                  ? Icons.block_outlined
+                  : Icons.check_circle_outline,
               label: company.isActive ? 'Inactive' : 'Active',
               color: AppColors.accentGold,
               onTap: () => onToggleStatus?.call(),
@@ -76,7 +87,7 @@ class CompanyCard extends StatelessWidget {
           SwipeAction(
             icon: Icons.delete_outline,
             label: 'Delete',
-            color: AppColors.error,
+            color: AppColors.brandBlack,
             onTap: () => onDelete?.call(),
           ),
         ],
@@ -101,10 +112,16 @@ class CompanyCard extends StatelessWidget {
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [accent, accent.withValues(alpha: 0.75)],
+                          colors: AppColors.accentGradient(accent),
                         ),
                         borderRadius: BorderRadius.circular(14),
-                        boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))],
+                        boxShadow: AppColors.shadows([
+                          BoxShadow(
+                            color: accent.withValues(alpha: 0.35),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]),
                       ),
                       child: Text(
                         company.initials,
@@ -131,7 +148,8 @@ class CompanyCard extends StatelessWidget {
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
-                          if (company.email != null && company.email!.isNotEmpty) ...[
+                          if (company.email != null &&
+                              company.email!.isNotEmpty) ...[
                             const SizedBox(height: 2),
                             Text(
                               company.email!,
@@ -146,48 +164,88 @@ class CompanyCard extends StatelessWidget {
                       width: 26,
                       height: 26,
                       alignment: Alignment.center,
-                      decoration: BoxDecoration(color: chevronBg, shape: BoxShape.circle),
-                      child: Icon(Icons.chevron_right_rounded, size: 16, color: fgMuted),
+                      decoration: BoxDecoration(
+                        color: chevronBg,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        size: 16,
+                        color: fgMuted,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 14),
                 RichCardDivider(color: dividerColor),
                 const SizedBox(height: 12),
-                StatGrid(
-                  labelColor: fgMuted,
-                  valueColor: fg,
-                  dividerColor: dividerColor,
-                  items: [
-                    StatGridItem(label: 'Owner', value: company.ownerName),
-                    StatGridItem(label: 'Industry', value: company.industryType ?? '—'),
-                    StatGridItem(label: 'Plan', value: company.subscriptionPlan ?? '—'),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _StatCell(
+                        icon: Icons.person_outline_rounded,
+                        label: 'Owner',
+                        value: company.ownerName,
+                        valueColor: fg,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: SizedBox(
+                        height: 34,
+                        child: VerticalDivider(
+                          width: 1,
+                          thickness: 1,
+                          color: dividerColor,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: _StatCell(
+                        icon: Icons.apartment_rounded,
+                        label: 'Industry',
+                        value: company.industryType ?? '—',
+                        valueColor: fg,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 RichCardDivider(color: dividerColor),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
+                    Expanded(
+                      child: _StatCell(
+                        icon: Icons.workspace_premium_rounded,
+                        label: 'Plan',
+                        value: company.subscriptionPlan ?? '—',
+                        valueColor: fg,
+                      ),
+                    ),
                     if (isCompleted)
                       StatusBadge(isActive: company.isActive)
                     else
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
                           color: onboardingColor,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
                           onboardingLabel,
-                          style: const TextStyle(color: AppColors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                          style: const TextStyle(
+                            color: AppColors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                    Text(
-                      DateFormat('MMM dd, yyyy').format(company.createdAt),
-                      style: TextStyle(color: fgMuted, fontSize: 11),
-                    ),
                   ],
                 ),
               ],
@@ -195,6 +253,57 @@ class CompanyCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Icon + uppercase label above a bold value — the "Owner / Industry / Plan"
+/// cells inside a company card. Icon and label share the same neutral tone
+/// so only the value itself stands out.
+class _StatCell extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color valueColor;
+
+  const _StatCell({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 14, color: AppColors.textHint),
+            const SizedBox(width: 5),
+            Text(
+              label.toUpperCase(),
+              style: TextStyle(
+                color: AppColors.textHint,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            color: valueColor,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
     );
   }
 }

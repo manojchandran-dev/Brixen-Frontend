@@ -7,6 +7,8 @@ import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/app_bottom_nav.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/rich_card_shell.dart';
+import '../../../../shared/widgets/skeleton.dart';
+import '../../../../shared/widgets/detail_sheet.dart';
 import '../../domain/entities/expense.dart';
 import '../providers/expenses_provider.dart';
 
@@ -24,12 +26,10 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
   @override
   void dispose() { _searchCtrl.dispose(); super.dispose(); }
 
-  // Category names come from user-defined Masters data, so colors are
-  // assigned by hashing the name into the fixed 5-color brand palette
-  // instead of matching fixed keywords — every distinct category gets a
-  // consistent color even if the user creates their own category names.
-  static const _categoryColors = [AppColors.brand, AppColors.positive, AppColors.brandDeep, AppColors.brandLight, AppColors.ink];
-  Color _categoryColor(String cat) => _categoryColors[cat.toLowerCase().hashCode.abs() % _categoryColors.length];
+  // Cards cycle through accent colors by list position — same pattern as
+  // every other module — so two consecutive cards never land on the same
+  // (or a near-identical) color, regardless of which category they belong to.
+  static List<Color> get _cardColors => [AppColors.brand, AppColors.positive, AppColors.brandLight, AppColors.brandBlack];
 
   @override
   Widget build(BuildContext context) {
@@ -55,12 +55,12 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
                   decoration: BoxDecoration(
                     color: isDark ? cs.surfaceContainerHighest : AppColors.white,
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
-                      BoxShadow(color: AppColors.white.withValues(alpha: 0.8), blurRadius: 4, offset: const Offset(-2, -2)),
-                    ],
+                    boxShadow: AppColors.shadows([
+                      BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
+                      BoxShadow(color: AppColors.highlightShadow(0.8), blurRadius: 4, offset: const Offset(-2, -2)),
+                    ]),
                   ),
-                  child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
+                  child: Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
                 ),
               )
             : Builder(
@@ -73,12 +73,12 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
                     decoration: BoxDecoration(
                       color: isDark ? cs.surfaceContainerHighest : AppColors.white,
                       borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(color: AppColors.ink.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
-                        BoxShadow(color: AppColors.white.withValues(alpha: 0.8), blurRadius: 4, offset: const Offset(-2, -2)),
-                      ],
+                      boxShadow: AppColors.shadows([
+                        BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
+                        BoxShadow(color: AppColors.highlightShadow(0.8), blurRadius: 4, offset: const Offset(-2, -2)),
+                      ]),
                     ),
-                    child: const Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
+                    child: Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
                   ),
                 ),
               ),
@@ -108,7 +108,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
                     ? AppColors.silverGradient
                     : const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.brand, AppColors.brandDeep]),
                 borderRadius: BorderRadius.circular(13),
-                boxShadow: [BoxShadow(color: AppColors.brand.withValues(alpha: isDark ? 0.0 : 0.4), blurRadius: 10, offset: const Offset(0, 4))],
+                boxShadow: AppColors.shadows([BoxShadow(color: AppColors.brand.withValues(alpha: isDark ? 0.0 : 0.4), blurRadius: 10, offset: const Offset(0, 4))]),
               ),
               child: Icon(Icons.add_rounded, size: 20, color: isDark ? AppColors.black : AppColors.white),
             ),
@@ -126,8 +126,8 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
               boxShadow: isDark
                   ? null
                   : [
-                      BoxShadow(color: AppColors.ink.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
-                      BoxShadow(color: AppColors.white.withValues(alpha: 0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+                      BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
+                      BoxShadow(color: AppColors.highlightShadow(0.85), blurRadius: 6, offset: const Offset(-3, -3)),
                     ],
             ),
             child: TextField(
@@ -145,7 +145,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
         ),
         Expanded(
           child: expensesAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const SkeletonListView(),
             error: (e, _) => Center(child: Text(e.toString(), style: TextStyle(color: cs.error, fontSize: 13))),
             data: (list) {
               final q = _searchCtrl.text.trim().toLowerCase();
@@ -161,8 +161,8 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
               return ListView.separated(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                 itemCount: filtered.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) => _ExpenseCard(expense: filtered[i], categoryColor: _categoryColor(filtered[i].category)),
+                separatorBuilder: (_, __) => const SizedBox(height: 18),
+                itemBuilder: (_, i) => _ExpenseCard(expense: filtered[i], categoryColor: _cardColors[i % _cardColors.length]),
               );
             },
           ),
@@ -185,13 +185,13 @@ class _ExpenseCard extends ConsumerWidget {
 
     // Pale opaque blend of this expense's real category colour — keeps the
     // category signal while matching the matte-3D card look used elsewhere.
-    final bg = Color.lerp(AppColors.surface, categoryColor, 0.32)!;
-    const fg = AppColors.ink;
+    final bg = Color.lerp(AppColors.surface, categoryColor, AppColors.cardTintBlend(categoryColor))!;
+    final fg = AppColors.ink;
     final fgMuted = AppColors.ink.withValues(alpha: 0.6);
     final dividerColor = AppColors.ink.withValues(alpha: 0.12);
 
     return SwipeActions(
-      onTap: () => context.push(AppRouter.expenseDetail, extra: expense),
+      onTap: () => _showExpenseDetail(context, ref, expense, categoryColor),
       actions: [
         SwipeAction(
           icon: Icons.edit_outlined,
@@ -202,7 +202,7 @@ class _ExpenseCard extends ConsumerWidget {
         SwipeAction(
           icon: Icons.delete_outline,
           label: 'Delete',
-          color: AppColors.error,
+          color: AppColors.brandBlack,
           onTap: () => _confirmDelete(context, ref),
         ),
       ],
@@ -214,59 +214,35 @@ class _ExpenseCard extends ConsumerWidget {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Container(
-                width: 38,
-                height: 38,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [categoryColor, categoryColor.withValues(alpha: 0.75)]),
-                  shape: BoxShape.circle,
-                  boxShadow: [BoxShadow(color: categoryColor.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3))],
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(expense.title,
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg, height: 1.25)),
                 ),
-                child: const Icon(Icons.receipt_rounded, size: 17, color: AppColors.white),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(expense.title,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg),
-                    overflow: TextOverflow.ellipsis),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(color: categoryColor, borderRadius: BorderRadius.circular(20)),
-                child: Text(expense.category, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.white)),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                width: 26,
-                height: 26,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(color: AppColors.ink.withValues(alpha: 0.08), shape: BoxShape.circle),
-                child: Icon(Icons.chevron_right_rounded, size: 16, color: fgMuted),
-              ),
-            ]),
-            const SizedBox(height: 14),
-            RichCardDivider(color: dividerColor),
-            const SizedBox(height: 12),
-            StatGrid(
-              labelColor: fgMuted,
-              valueColor: fg,
-              dividerColor: dividerColor,
-              items: [
-                StatGridItem(label: 'Amount', value: '₹${fmt.format(expense.amount)}', color: AppColors.brandDeep, bold: true),
-                StatGridItem(label: 'Payment', value: expense.paymentMethod ?? '—'),
-                StatGridItem(label: 'Unit', value: expense.unit ?? '—'),
+                const SizedBox(width: 16),
+                Text('₹${fmt.format(expense.amount)}',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: fg)),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             RichCardDivider(color: dividerColor),
             const SizedBox(height: 10),
-            Row(children: [
-              Icon(Icons.calendar_today_rounded, size: 12, color: fgMuted),
-              const SizedBox(width: 4),
-              Text(DateFormat('dd MMM yyyy').format(expense.expenseDate), style: TextStyle(fontSize: 12, color: fgMuted)),
-            ]),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Icon(Icons.calendar_today_rounded, size: 12, color: fgMuted),
+                const SizedBox(width: 4),
+                Text(DateFormat('dd MMM yyyy').format(expense.expenseDate), style: TextStyle(fontSize: 12, color: fgMuted)),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                  decoration: BoxDecoration(color: categoryColor, borderRadius: BorderRadius.circular(20)),
+                  child: Text(expense.category, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.white)),
+                ),
+              ],
+            ),
           ]),
         ),
       ),
@@ -292,7 +268,7 @@ class _ExpenseCard extends ConsumerWidget {
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(e.toString()), backgroundColor: AppColors.ink),
+                    SnackBar(content: Text(e.toString()), backgroundColor: AppColors.dangerFill),
                   );
                 }
               }
@@ -303,4 +279,63 @@ class _ExpenseCard extends ConsumerWidget {
       ),
     );
   }
+}
+
+void _showExpenseDetail(BuildContext context, WidgetRef ref, Expense expense, Color categoryColor) {
+  final fmt = NumberFormat('#,##,##0.00', 'en_IN');
+  showDetailSheet(context, (ctx) => DetailSheetScaffold(
+    showAvatar: false,
+    title: expense.title,
+    subtitle: expense.category,
+    onEdit: () {
+      Navigator.of(ctx).pop();
+      ctx.push(AppRouter.createExpense, extra: expense);
+    },
+    onDelete: () async {
+      final confirmed = await showDialog<bool>(
+        context: ctx,
+        builder: (dCtx) => AlertDialog(
+          backgroundColor: Theme.of(dCtx).scaffoldBackgroundColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Delete Expense', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.ink)),
+          content: Text('Delete "${expense.title}"? This cannot be undone.', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(dCtx).pop(false), child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary))),
+            TextButton(onPressed: () => Navigator.of(dCtx).pop(true), child: Text('Delete', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700))),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      try {
+        await ref.read(expensesProvider.notifier).deleteExpense(expense.id);
+        if (ctx.mounted) Navigator.of(ctx).pop();
+      } catch (e) {
+        if (ctx.mounted) {
+          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: AppColors.dangerFill));
+        }
+      }
+    },
+    statusRow: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(color: categoryColor, borderRadius: BorderRadius.circular(16)),
+      child: Row(children: [
+        const Icon(Icons.currency_rupee_rounded, color: AppColors.white, size: 18),
+        const SizedBox(width: 8),
+        const Text('Amount', style: TextStyle(color: AppColors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+        const Spacer(),
+        Text('₹${fmt.format(expense.amount)}', style: const TextStyle(color: AppColors.white, fontSize: 15, fontWeight: FontWeight.w800)),
+      ]),
+    ),
+    sections: [
+      DetailSection(title: 'Details', items: [
+        DetailRow(icon: Icons.calendar_today_rounded, label: 'Date', value: DateFormat('dd MMM yyyy').format(expense.expenseDate)),
+        if (expense.paymentMethod != null) DetailRow(icon: Icons.payments_outlined, label: 'Payment Method', value: expense.paymentMethod!, iconColor: AppColors.positive),
+        if (expense.unit != null) DetailRow(icon: Icons.straighten_rounded, label: 'Unit', value: expense.unit!),
+      ]),
+      if (expense.notes != null && expense.notes!.isNotEmpty)
+        DetailSection(title: 'Notes', items: [
+          DetailRow(icon: Icons.notes_rounded, label: 'Notes', value: expense.notes!),
+        ]),
+    ],
+  ));
 }

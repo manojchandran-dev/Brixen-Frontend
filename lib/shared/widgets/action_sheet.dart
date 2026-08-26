@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_colors.dart';
 
 class ActionSheetItem {
   final IconData icon;
@@ -46,9 +47,9 @@ class _ActionSheet extends StatelessWidget {
         decoration: BoxDecoration(
           color: Theme.of(context).scaffoldBackgroundColor,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
+          boxShadow: AppColors.shadows([
             BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 24, offset: const Offset(0, -4)),
-          ],
+          ]),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,

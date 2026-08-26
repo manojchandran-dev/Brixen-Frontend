@@ -24,13 +24,13 @@ class BrandIllustration extends StatelessWidget {
               width: 160,
               height: 14,
               decoration: BoxDecoration(
-                color: AppColors.ink.withValues(alpha: 0.08),
+                color: AppColors.shadowDark.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(20),
               ),
             ),
           ),
           // Floating accents
-          const Positioned(top: 6, left: 28, child: _Dot(color: AppColors.ink, size: 8)),
+          Positioned(top: 6, left: 28, child: _Dot(color: AppColors.brandBlack, size: 8)),
           Positioned(top: 20, right: 26, child: _Dot(color: AppColors.positive, size: 10)),
           const Positioned(top: 52, left: 6, child: _Dot(color: AppColors.brand, size: 6)),
 
@@ -48,9 +48,9 @@ class BrandIllustration extends StatelessWidget {
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: AppColors.brand, width: 2.5),
-                boxShadow: [
-                  BoxShadow(color: AppColors.ink.withValues(alpha: 0.14), blurRadius: 18, offset: const Offset(0, 10)),
-                ],
+                boxShadow: AppColors.shadows([
+                  BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.14), blurRadius: 18, offset: const Offset(0, 10)),
+                ]),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
