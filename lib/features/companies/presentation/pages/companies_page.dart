@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/theme_cubit.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/services/session_service.dart';
+import '../../../../shared/widgets/company_selector_field.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
 import '../../../../shared/widgets/brixen_button.dart';
@@ -18,6 +20,7 @@ import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/app_bottom_nav.dart';
 import '../../../../shared/widgets/welcome_dashboard_view.dart';
 import '../../../../shared/widgets/skeleton.dart';
+import '../../../../shared/widgets/error_state.dart';
 import '../../../reports/presentation/pages/reports_body.dart';
 import '../../../masters/domain/entities/master_item.dart';
 import '../../../masters/domain/entities/master_type.dart';
@@ -58,14 +61,36 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
 
   bool get _inMenuSub => _navIndex == 3 && _stack.isNotEmpty;
 
+  // Only an ACTUAL drill-down (e.g. inside Masters, or a create/edit form)
+  // is a "sub-page" worth a back-arrow. A single top-level section reached
+  // straight from the drawer (_stack == ['companies'], or one master type)
+  // is a destination in its own right — it keeps the hamburger + drawer
+  // like every other module page, instead of a back-arrow that empties the
+  // stack and reveals whatever the "More" tab happens to render.
+  bool get _isDrilledDown => _stack.length > 1;
+
+  // AppRouter.companiesSection() appends a unique `#nonce` so every
+  // navigation is a distinct `extra` value even for the identical section
+  // twice in a row — strip that back off before using the section for
+  // actual logic (matching 'reports', splitting into stack segments).
+  String? _cleanSection(String? raw) => raw?.split('#').first;
+
   @override
   void initState() {
     super.initState();
-    if (widget.initialSection == 'reports') {
+    final section = _cleanSection(widget.initialSection);
+    if (section == 'reports') {
       _navIndex = 2;
-    } else if (widget.initialSection != null) {
+    } else if (section != null) {
       _navIndex = 3;
-      _stack.addAll(widget.initialSection!.split('/'));
+      _stack.addAll(section.split('/'));
+    } else {
+      // No section at all means this route was reached with no real
+      // destination (e.g. a stale link or manual URL edit) — Dashboard now
+      // lives at AppRouter.dashboard for every role, never here.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.go(AppRouter.dashboard);
+      });
     }
   }
 
@@ -75,9 +100,15 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
     // GoRouter reuses this State when navigating to the same `/companies`
     // route with new `extra` (e.g. re-tapping a drawer item while already
     // here) — initState() won't run again, so re-apply the section here.
-    if (widget.initialSection != null &&
-        widget.initialSection != oldWidget.initialSection) {
-      if (widget.initialSection == 'reports') {
+    // This only fires from an actual `context.go()` to this route (not from
+    // internal rebuilds), so react every time regardless of whether the
+    // section string happens to match last time — re-tapping the same
+    // drawer link twice in a row (e.g. "Companies" → "More" → "Companies"
+    // again) must still navigate there, not silently no-op because the
+    // extra value is identical to what it was on the previous visit.
+    final section = _cleanSection(widget.initialSection);
+    if (section != null) {
+      if (section == 'reports') {
         setState(() {
           _navIndex = 2;
           _stack.clear();
@@ -87,7 +118,7 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
           _navIndex = 3;
           _stack
             ..clear()
-            ..addAll(widget.initialSection!.split('/'));
+            ..addAll(section.split('/'));
         });
       }
     }
@@ -98,11 +129,6 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
     _searchCtrl.dispose();
     super.dispose();
   }
-
-  void _onNavTap(int i) => setState(() {
-    _navIndex = i;
-    _stack.clear();
-  });
 
   bool get _hideNavBar {
     if (_stack.isEmpty) return false;
@@ -120,6 +146,15 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
   void _push(String page) => setState(() => _stack.add(page));
   void _pop() => setState(() {
     if (_stack.isNotEmpty) _stack.removeLast();
+    // 'masters' has no standalone page of its own (see _buildBreadcrumb) —
+    // never leave it as the sole remaining segment. Otherwise _isDrilledDown
+    // flips to false one pop too early while _buildBody() still has no case
+    // for a bare ['masters'], so it falls through to whatever _navIndex is
+    // left over, AND the very next back press escapes this PopScope
+    // entirely (canPop becomes true), jumping out to a stale GoRouter
+    // history entry (e.g. landing back on /dashboard or /report) instead of
+    // a sensible in-app destination.
+    if (_stack.length == 1 && _stack[0] == 'masters') _stack.removeLast();
   });
   void _popTo(int depth) => setState(() {
     while (_stack.length > depth) {
@@ -134,15 +169,15 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return PopScope(
-      canPop: !_inMenuSub,
+      canPop: !_isDrilledDown,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _inMenuSub) _pop();
+        if (!didPop && _isDrilledDown) _pop();
       },
       child: BlocProvider.value(
         value: masterCubit,
         child: Scaffold(
           extendBody: true,
-          drawer: _inMenuSub ? null : const AppDrawer(),
+          drawer: _isDrilledDown ? null : const AppDrawer(),
           appBar: AppBar(
             backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             elevation: 0,
@@ -166,17 +201,17 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
                   shadowColor: AppColors.shadowDark.withValues(alpha: 0.3),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
-                    onTap: _inMenuSub
+                    onTap: _isDrilledDown
                         ? _pop
                         : () => Scaffold.of(ctx).openDrawer(),
                     child: SizedBox(
                       width: 40,
                       height: 40,
                       child: Icon(
-                        _inMenuSub
+                        _isDrilledDown
                             ? Icons.arrow_back_ios_new_rounded
                             : Icons.menu_rounded,
-                        size: _inMenuSub ? 16 : 18,
+                        size: _isDrilledDown ? 16 : 18,
                         color: AppColors.ink,
                       ),
                     ),
@@ -200,14 +235,17 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
           body: _buildBody(),
           bottomNavigationBar: _hideNavBar
               ? null
-              : AppBottomNav(activeIndex: _navIndex, onTap: _onNavTap),
+              : AppBottomNav(activeIndex: _navIndex),
         ),
       ),
     );
   }
 
   Widget _buildBreadcrumb(ColorScheme cs) {
-    final crumbs = <_Crumb>[_Crumb('More', () => _popTo(0))];
+    // No leading "More" crumb — the trail starts directly at the current
+    // section ("Companies", "Company Category", ...) instead of "More >
+    // Companies", since "More" isn't a real page users navigate back to.
+    final crumbs = <_Crumb>[];
     for (int i = 0; i < _stack.length; i++) {
       final seg = _stack[i];
       // 'masters' has no standalone page of its own anymore and isn't
@@ -281,8 +319,9 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
   Widget _buildAction(ColorScheme cs, bool isDark) {
     final last = _stack.isEmpty ? '' : _stack.last;
     VoidCallback? onTap;
-    if (last == 'companies')
+    if (last == 'companies') {
       onTap = () => context.push(AppRouter.createCompany, extra: 'menu');
+    }
     // masterMenu top-level category view or drilled-into category: + opens create
     if (last == 'masterMenu') onTap = () => _push('create');
     if (last.startsWith('cat:')) onTap = () => _push('create');
@@ -330,8 +369,9 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
   Widget _buildBody() {
     if (_navIndex == 3 && _stack.isNotEmpty) {
       final path = _stack.join('/');
-      if (path == 'companies')
+      if (path == 'companies') {
         return _CompaniesListBody(searchCtrl: _searchCtrl);
+      }
 
       // ── masterMenu: 2-level drill-down ──────────────────────────────────────
       if (path == 'masters/masterMenu') {
@@ -392,7 +432,7 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
     }
     switch (_navIndex) {
       case 0:
-        return const WelcomeDashboardView();
+        return const WelcomeDashboardView(showMenuButton: false);
       // Attendance module disabled for now — uncomment to re-enable.
       // case 1: return const AttendanceBody();
       case 2:
@@ -425,13 +465,9 @@ class _CompaniesListBody extends ConsumerWidget {
     return companiesAsync.when(
       loading: () =>
           const SkeletonListView(padding: EdgeInsets.fromLTRB(14, 70, 14, 100)),
-      error: (e, _) => Center(
-        child: Text(
-          e.toString(),
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
+      error: (e, _) => ErrorCard(
+        error: e,
+        onRetry: () => ref.invalidate(companiesProvider),
       ),
       data: (companies) {
         return Column(
@@ -583,6 +619,10 @@ class _CompaniesListBody extends ConsumerWidget {
                           onEdit: () => context.push(
                             AppRouter.createCompany,
                             extra: {'edit': c},
+                          ),
+                          onPermissions: () => context.push(
+                            AppRouter.createPermission,
+                            extra: c,
                           ),
                         );
                       },
@@ -2144,6 +2184,7 @@ class _MasterCard extends StatelessWidget {
         child: RichCardShell(
           accentColor: color,
           backgroundColor: bg,
+          backgroundGradient: AppColors.cardTintGradient(color),
           showAccentBar: false,
           edgeColor: color,
           child: Padding(
@@ -2276,11 +2317,12 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
   String? _loadError;
   String? _selectedCategoryId;
   String? _selectedCategoryName;
+  Company? _selectedCompany; // superAdmin only — companyAdmin/employee use Session.companyId
 
   bool get _isEdit => widget.editId != null;
   bool get _needsCategory =>
       masterTypeFor(widget.typeKey)?.hasParentAssignment ?? false;
-  bool get _isRemote => masterCubit.remoteDatasourceFor(widget.typeKey) != null;
+  bool get _isRemote => masterCubit.isRemote(widget.typeKey);
   bool get _isUnit => widget.typeKey == 'unit';
 
   @override
@@ -2322,9 +2364,7 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
   Future<void> _loadItemFromApi() async {
     setState(() => _loadingItem = true);
     try {
-      final item = await masterCubit
-          .remoteDatasourceFor(widget.typeKey)!
-          .getById(widget.editId!);
+      final item = await masterCubit.fetchByIdRemote(widget.typeKey, widget.editId!);
       if (!mounted) return;
       setState(() => _fillFrom(item));
     } catch (e) {
@@ -2347,6 +2387,12 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
     if (_needsCategory && _selectedCategoryId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a company category')),
+      );
+      return;
+    }
+    if (!_isEdit && Session.isSuperAdmin && _selectedCompany == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a company'), backgroundColor: AppColors.dangerFill),
       );
       return;
     }
@@ -2386,6 +2432,7 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
             assignedCategoryId: _selectedCategoryId,
             assignedCategoryName: _selectedCategoryName,
           ),
+          companyId: (Session.isSuperAdmin ? _selectedCompany!.id : Session.companyId)!,
         );
       }
       if (mounted) widget.onSaved();
@@ -2428,6 +2475,13 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
               children: [
+                if (!_isEdit && Session.isSuperAdmin) ...[
+                  CompanySelectorField(
+                    value: _selectedCompany,
+                    onChanged: (c) => setState(() => _selectedCompany = c),
+                  ),
+                  const SizedBox(height: 18),
+                ],
                 if (_isUnit) ...[
                   BrixenTextField(
                     label: 'Unit *',
@@ -2830,13 +2884,9 @@ class _DashboardBody extends ConsumerWidget {
       loading: () => const Center(
         child: CircularProgressIndicator(color: AppColors.silver),
       ),
-      error: (e, _) => Center(
-        child: Text(
-          e.toString(),
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
+      error: (e, _) => ErrorCard(
+        error: e,
+        onRetry: () => ref.invalidate(companiesProvider),
       ),
       data: (all) {
         final active = all.where((c) => c.isActive).length;

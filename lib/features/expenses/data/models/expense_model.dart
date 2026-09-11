@@ -3,6 +3,7 @@ import '../../domain/entities/expense.dart';
 class ExpenseModel extends Expense {
   const ExpenseModel({
     required super.id,
+    super.companyId,
     required super.categoryId,
     required super.category,
     super.unitId,
@@ -21,6 +22,7 @@ class ExpenseModel extends Expense {
   factory ExpenseModel.fromJson(Map<String, dynamic> json) {
     return ExpenseModel(
       id: json['id'].toString(),
+      companyId: json['company_id']?.toString(),
       categoryId: (json['category_id'] ?? '').toString(),
       category: '',
       unitId: json['unit_id']?.toString(),
@@ -44,7 +46,8 @@ class ExpenseModel extends Expense {
   /// this doubles as how the backend expects a unit to be cleared on PUT.
   /// `receipt_url` is omitted — there's no upload endpoint yet, so a locally
   /// picked receipt image stays local-only for now.
-  static Map<String, dynamic> toBody(Expense e) => {
+  static Map<String, dynamic> toBody(Expense e, {String? companyId}) => {
+        if (companyId != null) 'company_id': int.parse(companyId),
         'category_id': e.categoryId,
         'title': e.title,
         'amount': e.amount,

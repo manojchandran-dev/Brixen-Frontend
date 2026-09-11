@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/services/session_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/app_bottom_nav.dart';
@@ -9,7 +10,11 @@ import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/rich_card_shell.dart';
 import '../../../../shared/widgets/skeleton.dart';
 import '../../../../shared/widgets/detail_sheet.dart';
+import '../../../../shared/widgets/error_state.dart';
+import '../../../../shared/widgets/super_admin_company_filter_bar.dart';
+import '../../data/repositories/sales_repository_impl.dart';
 import '../../domain/entities/sale.dart';
+import '../../domain/entities/sale_item.dart';
 import '../providers/sales_provider.dart';
 
 class SalesPage extends ConsumerStatefulWidget {
@@ -276,16 +281,15 @@ class _SalesPageState extends ConsumerState<SalesPage> {
               ),
             ),
           ),
+          const SuperAdminCompanyFilterBar(),
 
           // List
           Expanded(
             child: salesAsync.when(
               loading: () => const SkeletonListView(),
-              error: (e, _) => Center(
-                child: Text(
-                  e.toString(),
-                  style: TextStyle(color: cs.error, fontSize: 13),
-                ),
+              error: (e, _) => ErrorCard(
+                error: e,
+                onRetry: () => ref.invalidate(salesProvider),
               ),
               data: (list) {
                 final q = _searchCtrl.text.trim().toLowerCase();
@@ -376,11 +380,6 @@ class _SaleCard extends ConsumerWidget {
       AppColors.brandBlack,
     ];
     final accent = accentColors[index % accentColors.length];
-    final bg = Color.lerp(
-      AppColors.surface,
-      accent,
-      AppColors.cardTintBlend(accent),
-    )!;
 
     final fg = AppColors.ink;
     final fgMuted = AppColors.ink.withValues(alpha: 0.6);
@@ -432,7 +431,13 @@ class _SaleCard extends ConsumerWidget {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-                color: bg,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: AppColors.cardTintGradient(accent),
+                  ),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -635,7 +640,10 @@ class _SaleCard extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(context);
               try {
-                await ref.read(salesProvider.notifier).deleteSale(sale.id);
+                await ref.read(salesProvider.notifier).deleteSale(
+                      sale.id,
+                      companyId: Session.isSuperAdmin ? sale.companyId : null,
+                    );
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -745,7 +753,10 @@ void _showSaleDetail(
         );
         if (confirmed != true) return;
         try {
-          await ref.read(salesProvider.notifier).deleteSale(sale.id);
+          await ref.read(salesProvider.notifier).deleteSale(
+                      sale.id,
+                      companyId: Session.isSuperAdmin ? sale.companyId : null,
+                    );
           if (ctx.mounted) Navigator.of(ctx).pop();
         } catch (e) {
           if (ctx.mounted) {
@@ -816,6 +827,7 @@ void _showSaleDetail(
               ),
           ],
         ),
+        _SaleItemsSection(sale: sale),
         DetailSection(
           title: 'Amount',
           items: [
@@ -851,6 +863,78 @@ void _showSaleDetail(
       ],
     ),
   );
+}
+
+/// Fetches `GET /sales/:id/items` on open and renders the line items as
+/// their own detail section — the sale list/detail payload doesn't carry
+/// them, so this is a dedicated on-demand call each time the sheet opens.
+class _SaleItemsSection extends ConsumerStatefulWidget {
+  final Sale sale;
+  const _SaleItemsSection({required this.sale});
+
+  @override
+  ConsumerState<_SaleItemsSection> createState() => _SaleItemsSectionState();
+}
+
+class _SaleItemsSectionState extends ConsumerState<_SaleItemsSection> {
+  bool _loading = true;
+  String? _error;
+  List<SaleItem> _items = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final items = await ref.read(salesRepositoryProvider).getSaleItems(
+            widget.sale.id,
+            companyId: Session.isSuperAdmin ? widget.sale.companyId : null,
+          );
+      if (!mounted) return;
+      setState(() {
+        _items = items;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: SizedBox(
+          width: 20, height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        )),
+      );
+    }
+    if (_error != null) return const SizedBox.shrink();
+    if (_items.isEmpty) return const SizedBox.shrink();
+
+    final fmt = NumberFormat('#,##,##0.00', 'en_IN');
+    return DetailSection(
+      title: 'Products',
+      items: _items
+          .map((it) => DetailRow(
+                icon: Icons.checkroom_rounded,
+                label:
+                    '${it.productName} (${it.priceType == 'wholesale' ? 'Wholesale' : 'Retail'})',
+                value: '${it.quantity} × ₹${fmt.format(it.price)} = ₹${fmt.format(it.amount)}',
+                iconColor: AppColors.accentIndigo,
+              ))
+          .toList(),
+    );
+  }
 }
 
 class _StatusChip extends StatelessWidget {

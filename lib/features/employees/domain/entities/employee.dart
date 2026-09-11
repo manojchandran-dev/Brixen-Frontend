@@ -1,5 +1,6 @@
 class Employee {
   final String id;
+  final String? companyId;
   final String employeeCode;
   final String firstName;
   final String? lastName;
@@ -28,6 +29,7 @@ class Employee {
 
   const Employee({
     required this.id,
+    this.companyId,
     required this.employeeCode,
     required this.firstName,
     this.lastName,
@@ -59,6 +61,7 @@ class Employee {
 
   Employee copyWith({
     String? id,
+    String? companyId,
     String? employeeCode,
     String? firstName,
     String? lastName,
@@ -87,6 +90,7 @@ class Employee {
   }) {
     return Employee(
       id: id ?? this.id,
+      companyId: companyId ?? this.companyId,
       employeeCode: employeeCode ?? this.employeeCode,
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,

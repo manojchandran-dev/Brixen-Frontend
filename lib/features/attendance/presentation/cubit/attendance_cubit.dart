@@ -4,6 +4,10 @@ import 'attendance_state.dart';
 
 final attendanceCubit = AttendanceCubit();
 
+// No repository layer yet — this feature has no backend datasource at all
+// (pure in-memory Cubit, and the feature is currently disabled in the
+// bottom nav). Add one only when a real attendance_remote_datasource.dart
+// exists to wrap.
 class AttendanceCubit extends Cubit<AttendanceState> {
   final List<AttendanceRecord> _records = [];
 

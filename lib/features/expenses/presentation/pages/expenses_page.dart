@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/services/session_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/app_bottom_nav.dart';
@@ -9,6 +10,8 @@ import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/rich_card_shell.dart';
 import '../../../../shared/widgets/skeleton.dart';
 import '../../../../shared/widgets/detail_sheet.dart';
+import '../../../../shared/widgets/error_state.dart';
+import '../../../../shared/widgets/super_admin_company_filter_bar.dart';
 import '../../domain/entities/expense.dart';
 import '../providers/expenses_provider.dart';
 
@@ -143,10 +146,14 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
             ),
           ),
         ),
+        const SuperAdminCompanyFilterBar(),
         Expanded(
           child: expensesAsync.when(
             loading: () => const SkeletonListView(),
-            error: (e, _) => Center(child: Text(e.toString(), style: TextStyle(color: cs.error, fontSize: 13))),
+            error: (e, _) => ErrorCard(
+              error: e,
+              onRetry: () => ref.invalidate(expensesProvider),
+            ),
             data: (list) {
               final q = _searchCtrl.text.trim().toLowerCase();
               final filtered = q.isEmpty ? list : list.where((e) => e.title.toLowerCase().contains(q) || e.category.toLowerCase().contains(q)).toList();
@@ -161,7 +168,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
               return ListView.separated(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                 itemCount: filtered.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 18),
+                separatorBuilder: (_, _) => const SizedBox(height: 18),
                 itemBuilder: (_, i) => _ExpenseCard(expense: filtered[i], categoryColor: _cardColors[i % _cardColors.length]),
               );
             },
@@ -264,7 +271,10 @@ class _ExpenseCard extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(context);
               try {
-                await ref.read(expensesProvider.notifier).deleteExpense(expense.id);
+                await ref.read(expensesProvider.notifier).deleteExpense(
+                      expense.id,
+                      companyId: Session.isSuperAdmin ? expense.companyId : null,
+                    );
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -307,7 +317,10 @@ void _showExpenseDetail(BuildContext context, WidgetRef ref, Expense expense, Co
       );
       if (confirmed != true) return;
       try {
-        await ref.read(expensesProvider.notifier).deleteExpense(expense.id);
+        await ref.read(expensesProvider.notifier).deleteExpense(
+                      expense.id,
+                      companyId: Session.isSuperAdmin ? expense.companyId : null,
+                    );
         if (ctx.mounted) Navigator.of(ctx).pop();
       } catch (e) {
         if (ctx.mounted) {

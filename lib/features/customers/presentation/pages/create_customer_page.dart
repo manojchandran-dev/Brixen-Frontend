@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/services/session_service.dart';
 import '../../../../shared/widgets/brixen_button.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
+import '../../../../shared/widgets/company_selector_field.dart';
+import '../../../companies/domain/entities/company.dart';
 import '../../domain/entities/customer.dart';
 import '../providers/customers_provider.dart';
 
@@ -20,6 +23,7 @@ class CreateCustomerPage extends ConsumerStatefulWidget {
 class _CreateCustomerPageState extends ConsumerState<CreateCustomerPage> {
   final _formKey = GlobalKey<FormState>();
   bool _submitting = false;
+  Company? _selectedCompany; // superAdmin only — companyAdmin/employee use Session.companyId
 
   final _nameCtrl     = TextEditingController();
   final _shopNameCtrl = TextEditingController();
@@ -29,6 +33,16 @@ class _CreateCustomerPageState extends ConsumerState<CreateCustomerPage> {
   final _gstCtrl      = TextEditingController();
 
   bool get _isEditing => widget.editCustomer != null;
+
+  /// The company this customer belongs to, for every write in this form.
+  /// superAdmin-only — companyAdmin/employee writes are scoped by
+  /// `Session.companyId` automatically. Editing uses the customer's own
+  /// owning company (not whatever the list-page browse filter happens to be
+  /// set to); creating uses the company picked in this form's own field.
+  String? get _effectiveCompanyId {
+    if (!Session.isSuperAdmin) return null;
+    return _isEditing ? widget.editCustomer!.companyId : _selectedCompany?.id;
+  }
 
   @override
   void initState() {
@@ -57,6 +71,12 @@ class _CreateCustomerPageState extends ConsumerState<CreateCustomerPage> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_isEditing && Session.isSuperAdmin && _selectedCompany == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a company'), backgroundColor: AppColors.dangerFill),
+      );
+      return;
+    }
     setState(() => _submitting = true);
 
     final customer = Customer(
@@ -72,9 +92,14 @@ class _CreateCustomerPageState extends ConsumerState<CreateCustomerPage> {
 
     try {
       if (_isEditing) {
-        await ref.read(customersProvider.notifier).updateCustomer(customer);
+        await ref
+            .read(customersProvider.notifier)
+            .updateCustomer(customer, companyId: _effectiveCompanyId);
       } else {
-        await ref.read(customersProvider.notifier).addCustomer(customer);
+        await ref.read(customersProvider.notifier).addCustomer(
+              customer,
+              companyId: (Session.isSuperAdmin ? _selectedCompany!.id : Session.companyId)!,
+            );
       }
       if (mounted) context.pop();
     } catch (e) {
@@ -131,7 +156,7 @@ class _CreateCustomerPageState extends ConsumerState<CreateCustomerPage> {
                 child: Row(
                   children: [
                     GestureDetector(
-                      onTap: () => context.go(AppRouter.companies),
+                      onTap: () => context.go(AppRouter.more),
                       child: Text('Menu', style: TextStyle(
                           color: cs.onSurfaceVariant.withValues(alpha: 0.6), fontSize: 11)),
                     ),
@@ -176,6 +201,13 @@ class _CreateCustomerPageState extends ConsumerState<CreateCustomerPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
           children: [
+            if (!_isEditing && Session.isSuperAdmin) ...[
+              CompanySelectorField(
+                value: _selectedCompany,
+                onChanged: (c) => setState(() => _selectedCompany = c),
+              ),
+              const SizedBox(height: 20),
+            ],
             // Name
             BrixenTextField(
               label: 'Name *',

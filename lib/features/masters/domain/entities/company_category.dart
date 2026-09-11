@@ -15,14 +15,17 @@ class CompanyCategory extends Equatable {
     required this.createdAt,
   });
 
-  CompanyCategory copyWith({String? name, String? description, bool? isActive}) =>
-      CompanyCategory(
-        id: id,
-        name: name ?? this.name,
-        description: description ?? this.description,
-        isActive: isActive ?? this.isActive,
-        createdAt: createdAt,
-      );
+  CompanyCategory copyWith({
+    String? name,
+    String? description,
+    bool? isActive,
+  }) => CompanyCategory(
+    id: id,
+    name: name ?? this.name,
+    description: description ?? this.description,
+    isActive: isActive ?? this.isActive,
+    createdAt: createdAt,
+  );
 
   @override
   List<Object?> get props => [id, name, isActive, createdAt];

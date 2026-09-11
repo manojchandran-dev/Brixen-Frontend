@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/token_service.dart';
@@ -149,7 +148,8 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
                           ),
                         ],
                       ),
-                      style: GoogleFonts.spaceGrotesk(
+                      style: const TextStyle(
+                        fontFamily: 'SpaceGrotesk',
                         fontSize: 36,
                         fontWeight: FontWeight.w700,
                         letterSpacing: -1,
@@ -259,11 +259,14 @@ class _BarLogoMarkState extends State<_BarLogoMark>
   late final Animation<double> _lineProgress;
   late final List<Animation<double>> _nodePop;
 
-  // [x, barWidth, topFraction (0 = tallest reach, 1 = baseline), color]
+  // [x, barWidth, topFraction (0 = tallest reach, 1 = baseline), color] —
+  // dx values are shifted so the 0.80-wide group of bars sits centered in
+  // the 0..1 box (0.10 margin either side) instead of flush against the
+  // left edge with all the slack on the right.
   static const _bars = [
-    (dx: 0.0, w: 0.20, topFrac: 0.68),
-    (dx: 0.29, w: 0.20, topFrac: 0.40),
-    (dx: 0.58, w: 0.22, topFrac: 0.12),
+    (dx: 0.10, w: 0.20, topFrac: 0.68),
+    (dx: 0.39, w: 0.20, topFrac: 0.40),
+    (dx: 0.68, w: 0.22, topFrac: 0.12),
   ];
 
   @override
@@ -315,8 +318,11 @@ class _BarLogoMarkState extends State<_BarLogoMark>
   @override
   Widget build(BuildContext context) {
     final s = widget.size;
-    final baseline = s * 0.86;
-    final maxBarTop = s * 0.30; // topFrac 0 lands here (tallest bar)
+    // Balances the top margin (tallest node, ~14px above the tallest bar)
+    // against the bottom margin (baseline to the box edge) so the whole
+    // mark sits centered in the box instead of low with headroom to spare.
+    final baseline = s * 0.80;
+    final maxBarTop = s * 0.24; // topFrac 0 lands here (tallest bar)
 
     return SizedBox(
       width: s,

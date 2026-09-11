@@ -8,7 +8,11 @@ import '../../domain/entities/master_item.dart';
 /// for types with no such column (e.g. categories) — implementations just
 /// ignore what doesn't apply to them.
 abstract class RemoteMasterDatasource {
-  Future<List<MasterItem>> getAll({int page = 1, int limit = 100, String? search});
+  Future<List<MasterItem>> getAll({
+    int page = 1,
+    int limit = 100,
+    String? search,
+  });
 
   Future<MasterItem> getById(String id);
 
@@ -17,6 +21,7 @@ abstract class RemoteMasterDatasource {
     String? description,
     String? fullForm,
     bool isActive = true,
+    required String companyId,
   });
 
   Future<MasterItem> update(

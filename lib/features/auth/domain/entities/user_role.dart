@@ -8,6 +8,7 @@ extension UserRoleX on UserRole {
         return UserRole.superAdmin;
       case 'company_admin':
       case 'companyadmin':
+      case 'company':
       case 'admin':
         return UserRole.companyAdmin;
       case 'employee':
@@ -15,4 +16,12 @@ extension UserRoleX on UserRole {
         return UserRole.employee;
     }
   }
+
+  /// Canonical `user_type` value the server expects back — e.g. on
+  /// `GET /api/v1/modules?user_type=...`.
+  String get apiValue => switch (this) {
+    UserRole.superAdmin => 'superadmin',
+    UserRole.companyAdmin => 'company',
+    UserRole.employee => 'employee',
+  };
 }

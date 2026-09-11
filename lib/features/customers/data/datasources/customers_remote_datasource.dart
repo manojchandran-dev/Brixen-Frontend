@@ -63,9 +63,12 @@ class CustomersRemoteDatasource {
     }
   }
 
-  Future<void> deleteCustomer(String id) async {
+  Future<void> deleteCustomer(String id, {String? companyId}) async {
     try {
-      await _dio.delete(ApiEndpoints.customerById(id));
+      await _dio.delete(
+        ApiEndpoints.customerById(id),
+        queryParameters: companyId != null ? {'company_id': companyId} : null,
+      );
     } on DioException catch (e) {
       throw mapDioError(e);
     }

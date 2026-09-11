@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/brixen_button.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
@@ -180,11 +179,7 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
             ),
           );
           if (!mounted) return;
-          if (widget.fromMenu) {
-            context.pop();
-          } else {
-            context.go(AppRouter.companies);
-          }
+          context.pop();
       }
     } catch (e) {
       if (!mounted) return;
@@ -213,11 +208,7 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
         leading: GestureDetector(
           onTap: () {
             if (_currentStep == 0) {
-              if (widget.fromMenu) {
-                context.pop();
-              } else {
-                context.go(AppRouter.companies);
-              }
+              context.pop();
             } else {
               _back();
             }

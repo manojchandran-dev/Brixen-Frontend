@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/datasources/dashboard_remote_datasource.dart';
+import '../../../navigation/presentation/providers/nav_modules_provider.dart';
+import '../../data/repositories/dashboard_repository_impl.dart';
 import '../../domain/entities/dashboard_summary.dart';
 
 final dashboardSummaryProvider = AsyncNotifierProvider<DashboardSummaryNotifier, DashboardSummary>(
@@ -9,11 +10,17 @@ final dashboardSummaryProvider = AsyncNotifierProvider<DashboardSummaryNotifier,
 class DashboardSummaryNotifier extends AsyncNotifier<DashboardSummary> {
   @override
   Future<DashboardSummary> build() async {
-    return ref.read(dashboardRemoteDatasourceProvider).getSummary();
+    // Same fix as navModulesProvider: without depending on auth state, this
+    // stays cached across a logout/login in the same app session — a
+    // superAdmin's platform-wide summary would keep showing after a
+    // companyAdmin logs in right after, instead of refetching the
+    // company-scoped branch.
+    ref.watch(authStateProvider);
+    return ref.read(dashboardRepositoryProvider).getSummary();
   }
 
   Future<void> refresh() async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() => ref.read(dashboardRemoteDatasourceProvider).getSummary());
+    state = await AsyncValue.guard(() => ref.read(dashboardRepositoryProvider).getSummary());
   }
 }

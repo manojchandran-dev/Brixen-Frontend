@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/brand_illustration.dart';
 import '../../data/datasources/password_reset_remote_datasource.dart';
@@ -255,7 +254,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       const TextSpan(text: 'Brix', style: TextStyle(color: AppColors.brand)),
                       const TextSpan(text: 'en', style: TextStyle(color: AppColors.positive)),
                     ]),
-                    style: GoogleFonts.spaceGrotesk(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+                    style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.5),
                   ),
                 ),
                 const SizedBox(height: 4),

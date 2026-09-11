@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/brixen_button.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
+import '../../../../shared/widgets/picked_image.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
 import '../../domain/entities/purchase.dart';
 import '../providers/purchases_provider.dart';
@@ -456,7 +456,7 @@ class _ImagePicker extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     if (image != null) {
       return Stack(children: [
-        ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.file(File(image!.path), width: double.infinity, height: 180, fit: BoxFit.cover)),
+        ClipRRect(borderRadius: BorderRadius.circular(12), child: pickedImage(image!.path, width: double.infinity, height: 180)),
         Positioned(top: 8, right: 8, child: GestureDetector(onTap: onRemove, child: Container(width: 28, height: 28, decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), shape: BoxShape.circle), child: const Icon(Icons.close_rounded, size: 16, color: Colors.white)))),
         Positioned(bottom: 8, left: 8, child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(20)), child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.check_circle_rounded, size: 12, color: Colors.white), SizedBox(width: 4), Text('Bill attached', style: TextStyle(fontSize: 11, color: Colors.white))]))),
       ]);

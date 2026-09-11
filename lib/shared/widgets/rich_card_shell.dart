@@ -77,6 +77,11 @@ class RichCardShell extends StatelessWidget {
   final Color accentColor;
   final List<Color>? accentGradient;
   final Color? backgroundColor;
+  // A subtle two-tone card fill (e.g. AppColors.cardTintGradient(accent))
+  // instead of a flat backgroundColor — used so a card's fill can pick up
+  // the same blue→green wash as its edgeColor/avatar in dark mode instead
+  // of reading as plain next to a gradient border.
+  final List<Color>? backgroundGradient;
   final bool showAccentBar;
   // A solid color+shadow "hard edge" on the right/bottom sides, like the
   // card is a solid block sitting on the page — a stronger 3D cue than a
@@ -90,6 +95,7 @@ class RichCardShell extends StatelessWidget {
     required this.accentColor,
     this.accentGradient,
     this.backgroundColor,
+    this.backgroundGradient,
     this.showAccentBar = true,
     this.edgeColor,
     this.onTap,
@@ -135,7 +141,14 @@ class RichCardShell extends StatelessWidget {
 
     final card = Container(
       decoration: BoxDecoration(
-        color: bg,
+        color: backgroundGradient == null ? bg : null,
+        gradient: backgroundGradient == null
+            ? null
+            : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: backgroundGradient!,
+              ),
         borderRadius: BorderRadius.circular(18),
         boxShadow: AppColors.shadows([
           if (edgeColor != null)

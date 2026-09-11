@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
+import '../../../../core/utils/date_utils.dart';
 import '../models/expense_model.dart';
 
 final expensesRemoteDatasourceProvider = Provider<ExpensesRemoteDatasource>((ref) {
@@ -26,8 +27,8 @@ class ExpensesRemoteDatasource {
         'page': page,
         'limit': limit,
         if (search != null && search.isNotEmpty) 'search': search,
-        if (categoryId != null) 'category_id': categoryId,
-        if (unitId != null) 'unit_id': unitId,
+        'category_id': ?categoryId,
+        'unit_id': ?unitId,
         if (from != null) 'from': toIsoDateOnly(from),
         if (to != null) 'to': toIsoDateOnly(to),
       });
@@ -71,9 +72,12 @@ class ExpensesRemoteDatasource {
     }
   }
 
-  Future<void> deleteExpense(String id) async {
+  Future<void> deleteExpense(String id, {String? companyId}) async {
     try {
-      await _dio.delete(ApiEndpoints.expenseById(id));
+      await _dio.delete(
+        ApiEndpoints.expenseById(id),
+        queryParameters: companyId != null ? {'company_id': companyId} : null,
+      );
     } on DioException catch (e) {
       throw mapDioError(e);
     }

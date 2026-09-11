@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/services/session_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/app_bottom_nav.dart';
@@ -8,6 +9,8 @@ import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/rich_card_shell.dart';
 import '../../../../shared/widgets/skeleton.dart';
 import '../../../../shared/widgets/detail_sheet.dart';
+import '../../../../shared/widgets/error_state.dart';
+import '../../../../shared/widgets/super_admin_company_filter_bar.dart';
 import 'package:intl/intl.dart';
 import '../../domain/entities/customer.dart';
 import '../providers/customers_provider.dart';
@@ -174,11 +177,14 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
               ),
             ),
           ),
+          const SuperAdminCompanyFilterBar(),
           Expanded(
             child: customersAsync.when(
               loading: () => const SkeletonListView(),
-              error: (e, _) => Center(
-                  child: Text(e.toString(), style: TextStyle(color: cs.error, fontSize: 13))),
+              error: (e, _) => ErrorCard(
+                error: e,
+                onRetry: () => ref.invalidate(customersProvider),
+              ),
               data: (list) {
                 final q = _searchCtrl.text.trim().toLowerCase();
                 final filtered = q.isEmpty
@@ -346,7 +352,10 @@ class _CustomerCard extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(context);
               try {
-                await ref.read(customersProvider.notifier).deleteCustomer(customer.id);
+                await ref.read(customersProvider.notifier).deleteCustomer(
+                      customer.id,
+                      companyId: Session.isSuperAdmin ? customer.companyId : null,
+                    );
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -390,7 +399,10 @@ void _showCustomerDetail(BuildContext context, WidgetRef ref, Customer customer,
       );
       if (confirmed != true) return;
       try {
-        await ref.read(customersProvider.notifier).deleteCustomer(customer.id);
+        await ref.read(customersProvider.notifier).deleteCustomer(
+                      customer.id,
+                      companyId: Session.isSuperAdmin ? customer.companyId : null,
+                    );
         if (ctx.mounted) Navigator.of(ctx).pop();
       } catch (e) {
         if (ctx.mounted) {

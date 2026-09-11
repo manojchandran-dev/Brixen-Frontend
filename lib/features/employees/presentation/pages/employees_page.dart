@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/services/session_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/action_sheet.dart';
@@ -9,6 +10,8 @@ import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/rich_card_shell.dart';
 import '../../../../shared/widgets/skeleton.dart';
 import '../../../../shared/widgets/detail_sheet.dart';
+import '../../../../shared/widgets/error_state.dart';
+import '../../../../shared/widgets/super_admin_company_filter_bar.dart';
 import 'package:intl/intl.dart';
 import '../../domain/entities/employee.dart';
 import '../providers/employees_provider.dart';
@@ -275,14 +278,13 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
               ),
             ),
           ),
+          const SuperAdminCompanyFilterBar(),
           Expanded(
             child: employeesAsync.when(
               loading: () => const SkeletonListView(),
-              error: (e, _) => Center(
-                child: Text(
-                  e.toString(),
-                  style: TextStyle(color: cs.error, fontSize: 13),
-                ),
+              error: (e, _) => ErrorCard(
+                error: e,
+                onRetry: () => ref.invalidate(employeesProvider),
               ),
               data: (list) {
                 final q = _searchCtrl.text.trim().toLowerCase();
@@ -335,7 +337,7 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
                 return ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
                   itemCount: filtered.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (_, i) =>
                       _EmployeeCard(employee: filtered[i], index: i),
                 );
@@ -474,6 +476,7 @@ class _EmployeeCard extends ConsumerWidget {
       child: RichCardShell(
         accentColor: accent,
         backgroundColor: bg,
+        backgroundGradient: AppColors.cardTintGradient(accent),
         edgeColor: accent,
         showAccentBar: false,
         child: Padding(
@@ -580,7 +583,10 @@ class _EmployeeCard extends ConsumerWidget {
               try {
                 await ref
                     .read(employeesProvider.notifier)
-                    .deleteEmployee(employee.id);
+                    .deleteEmployee(
+                      employee.id,
+                      companyId: Session.isSuperAdmin ? employee.companyId : null,
+                    );
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -640,7 +646,10 @@ void _openEmployeeStatusPicker(
               try {
                 await ref
                     .read(employeesProvider.notifier)
-                    .updateEmployee(employee.copyWith(status: s));
+                    .updateEmployee(
+                      employee.copyWith(status: s),
+                      companyId: Session.isSuperAdmin ? employee.companyId : null,
+                    );
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -723,7 +732,10 @@ void _showEmployeeDetail(
         try {
           await ref
               .read(employeesProvider.notifier)
-              .deleteEmployee(employee.id);
+              .deleteEmployee(
+                employee.id,
+                companyId: Session.isSuperAdmin ? employee.companyId : null,
+              );
           if (ctx.mounted) Navigator.of(ctx).pop();
         } catch (e) {
           if (ctx.mounted) {

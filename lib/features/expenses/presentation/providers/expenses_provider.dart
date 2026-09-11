@@ -1,7 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../shared/providers/super_admin_company_filter_provider.dart';
 import '../../../masters/presentation/cubit/master_cubit.dart';
-import '../../data/datasources/expenses_remote_datasource.dart';
 import '../../data/models/expense_model.dart';
+import '../../data/repositories/expenses_repository_impl.dart';
 import '../../domain/entities/expense.dart';
 
 final expensesProvider = AsyncNotifierProvider<ExpensesNotifier, List<Expense>>(
@@ -13,10 +14,11 @@ class ExpensesNotifier extends AsyncNotifier<List<Expense>> {
 
   @override
   Future<List<Expense>> build() async {
+    ref.watch(superAdminCompanyFilterProvider);
     // Ensure category/unit master data is cached so names can be resolved.
     await masterCubit.load('expenseCategory');
     await masterCubit.load('unit');
-    final list = await ref.read(expensesRemoteDatasourceProvider).getExpenses();
+    final list = await ref.read(expensesRepositoryProvider).getExpenses();
     _all = _resolveNames(list);
     return _all;
   }
@@ -42,26 +44,26 @@ class ExpensesNotifier extends AsyncNotifier<List<Expense>> {
     )).toList();
   }
 
-  Future<Expense> addExpense(Expense expense) async {
+  Future<Expense> addExpense(Expense expense, {required String companyId}) async {
     final created = await ref
-        .read(expensesRemoteDatasourceProvider)
-        .createExpense(ExpenseModel.toBody(expense));
+        .read(expensesRepositoryProvider)
+        .createExpense(ExpenseModel.toBody(expense, companyId: companyId));
     _all = _resolveNames([..._all, created]);
     state = AsyncData(List.from(_all));
     return created;
   }
 
-  Future<Expense> updateExpense(Expense expense) async {
+  Future<Expense> updateExpense(Expense expense, {String? companyId}) async {
     final updated = await ref
-        .read(expensesRemoteDatasourceProvider)
-        .updateExpense(expense.id, ExpenseModel.toBody(expense));
+        .read(expensesRepositoryProvider)
+        .updateExpense(expense.id, ExpenseModel.toBody(expense, companyId: companyId));
     _all = _resolveNames(_all.map((e) => e.id == updated.id ? updated : e).toList());
     state = AsyncData(List.from(_all));
     return updated;
   }
 
-  Future<void> deleteExpense(String id) async {
-    await ref.read(expensesRemoteDatasourceProvider).deleteExpense(id);
+  Future<void> deleteExpense(String id, {String? companyId}) async {
+    await ref.read(expensesRepositoryProvider).deleteExpense(id, companyId: companyId);
     _all = _all.where((e) => e.id != id).toList();
     state = AsyncData(List.from(_all));
   }

@@ -16,11 +16,24 @@ class MasterTypeConfig {
 }
 
 const kMasterTypes = <MasterTypeConfig>[
-  MasterTypeConfig('companyCategory', 'Company Category', Icons.category_outlined),
+  MasterTypeConfig(
+    'companyCategory',
+    'Company Category',
+    Icons.category_outlined,
+  ),
   // Master Menu hidden for now — uncomment to re-enable.
   // MasterTypeConfig('masterMenu',      'Master Menu',      Icons.add_to_queue_outlined, hasParentAssignment: true),
-  MasterTypeConfig('expenseCategory', 'Expense Category', Icons.receipt_outlined),
-  MasterTypeConfig('unit',            'Unit',             Icons.straighten_outlined),
+  MasterTypeConfig(
+    'expenseCategory',
+    'Expense Category',
+    Icons.receipt_outlined,
+  ),
+  MasterTypeConfig(
+    'productCategory',
+    'Product Category',
+    Icons.checkroom_outlined,
+  ),
+  MasterTypeConfig('unit', 'Unit', Icons.straighten_outlined),
 ];
 
 MasterTypeConfig? masterTypeFor(String key) {

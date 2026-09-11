@@ -12,8 +12,10 @@ class BrixenTextField extends StatefulWidget {
   final Color iconColor;
   final TextInputAction? textInputAction;
   final void Function(String)? onFieldSubmitted;
+  final void Function(String)? onChanged;
   final TextCapitalization textCapitalization;
   final int maxLines;
+  final bool readOnly;
 
   const BrixenTextField({
     super.key,
@@ -27,8 +29,10 @@ class BrixenTextField extends StatefulWidget {
     this.iconColor = AppColors.brand,
     this.textInputAction,
     this.onFieldSubmitted,
+    this.onChanged,
     this.textCapitalization = TextCapitalization.none,
     this.maxLines = 1,
+    this.readOnly = false,
   });
 
   @override
@@ -50,9 +54,14 @@ class _BrixenTextFieldState extends State<BrixenTextField> {
       keyboardType: widget.keyboardType,
       textInputAction: widget.textInputAction,
       onFieldSubmitted: widget.onFieldSubmitted,
+      onChanged: widget.onChanged,
       textCapitalization: widget.textCapitalization,
       maxLines: widget.isPassword ? 1 : widget.maxLines,
-      style: TextStyle(color: onSurface, fontSize: 15),
+      readOnly: widget.readOnly,
+      style: TextStyle(
+        color: widget.readOnly ? onSurfaceVariant : onSurface,
+        fontSize: 15,
+      ),
       decoration: InputDecoration(
         labelText: widget.label,
         hintText: widget.hint,
@@ -68,10 +77,14 @@ class _BrixenTextFieldState extends State<BrixenTextField> {
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [widget.iconColor, widget.iconColor.withValues(alpha: 0.75)],
+                      colors: AppColors.accentGradient(widget.iconColor),
                     ),
                     boxShadow: AppColors.shadows([
-                      BoxShadow(color: widget.iconColor.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3)),
+                      BoxShadow(
+                        color: widget.iconColor.withValues(alpha: 0.4),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
                     ]),
                   ),
                   child: IconTheme(

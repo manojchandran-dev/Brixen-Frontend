@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/brand_illustration.dart';
@@ -80,7 +79,7 @@ class _SignInViewState extends State<_SignInView> {
                             const TextSpan(text: 'Brix', style: TextStyle(color: AppColors.brand)),
                             const TextSpan(text: 'en', style: TextStyle(color: AppColors.positive)),
                           ]),
-                          style: GoogleFonts.spaceGrotesk(fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: -1),
+                          style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: -1),
                         ),
                         const SizedBox(height: 4),
                         Text.rich(

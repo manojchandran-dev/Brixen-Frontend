@@ -4,15 +4,84 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
+import '../../features/customers/presentation/providers/customers_provider.dart';
 import '../../features/dashboard/domain/entities/dashboard_summary.dart';
 import '../../features/dashboard/presentation/providers/dashboard_provider.dart';
+import 'error_state.dart';
 import 'skeleton.dart';
+
+enum _DaySession { morning, afternoon, evening, night }
+
+_DaySession _currentSession() {
+  final h = DateTime.now().hour;
+  if (h < 12) return _DaySession.morning;
+  if (h < 17) return _DaySession.afternoon;
+  if (h < 21) return _DaySession.evening;
+  return _DaySession.night;
+}
+
+/// A simple sunrise/sun/sunset icon, or a moon with a small star for night —
+/// sitting in the top-right corner of the greeting header as a plain time-
+/// of-day marker, rather than a hand-drawn scene.
+class _SessionIcon extends StatelessWidget {
+  final _DaySession session;
+  const _SessionIcon({required this.session});
+
+  @override
+  Widget build(BuildContext context) {
+    switch (session) {
+      case _DaySession.morning:
+        return const Icon(
+          Icons.wb_twilight_rounded,
+          size: 46,
+          color: Color(0xFFFFD54F),
+        );
+      case _DaySession.afternoon:
+        return const Icon(
+          Icons.wb_sunny_rounded,
+          size: 42,
+          color: Color(0xFFFFF59D),
+        );
+      case _DaySession.evening:
+        return const Icon(
+          Icons.wb_twilight_rounded,
+          size: 46,
+          color: Color(0xFFFF8A65),
+        );
+      case _DaySession.night:
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Icon(
+              Icons.nightlight_round,
+              size: 38,
+              color: Color(0xFFE8EAF6),
+            ),
+            Positioned(
+              top: -4,
+              left: -6,
+              child: Icon(
+                Icons.star_rounded,
+                size: 16,
+                color: Colors.white.withValues(alpha: 0.85),
+              ),
+            ),
+          ],
+        );
+    }
+  }
+}
 
 /// The main "Dashboard" tab — backed by a single aggregate call,
 /// `GET /api/v1/dashboard/summary`, instead of pulling the full
 /// companies/employees/sales lists and aggregating client-side.
 class WelcomeDashboardView extends ConsumerWidget {
-  const WelcomeDashboardView({super.key});
+  // `/dashboard` (via AppShell) has no AppBar of its own, so this view needs
+  // to show its own hamburger to open the drawer. `companies_page.dart`
+  // embeds this same view inside ITS OWN Scaffold, which already has an
+  // AppBar + hamburger — pass false there to avoid a duplicate.
+  final bool showMenuButton;
+  const WelcomeDashboardView({super.key, this.showMenuButton = true});
 
   static String _greeting() {
     final h = DateTime.now().hour;
@@ -21,58 +90,37 @@ class WelcomeDashboardView extends ConsumerWidget {
     return 'Good evening';
   }
 
-  // Header band tints by time of day — morning/afternoon/evening/night —
-  // all still built from the brand's own blue/green/black set, just
-  // shifted in depth, rather than introducing warm sunrise/sunset hues.
+  // One consistent brand gradient — blue→green in light mode, deep
+  // blue→black in dark mode — regardless of time of day. The session icon
+  // alone (sunrise/sun/sunset/moon) carries the "time of day" meaning, so
+  // the header itself stays within the app's own four colours.
   static List<Color> _sessionGradient() {
-    final h = DateTime.now().hour;
-    if (h < 12) {
-      return [
-        AppColors.brandPale,
-        AppColors.brandLight,
-      ]; // morning — crisp, pale
-    }
-    if (h < 17) {
-      return [
-        AppColors.brandLight,
-        AppColors.brand,
-      ]; // afternoon — full brand blue
-    }
-    if (h < 21) {
-      return [AppColors.brand, AppColors.brandDeep]; // evening — deeper blue
-    }
-    return [AppColors.brandDeep, AppColors.brandBlack]; // night — near-black
+    return AppColors.isDark
+        ? [AppColors.brandDeep, AppColors.brandBlack]
+        : [AppColors.brand, AppColors.positive];
   }
 
-  static bool _sessionIsDark() {
-    final h = DateTime.now().hour;
-    return h >= 17;
-  }
+  static bool _sessionIsDark() => true;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summaryAsync = ref.watch(dashboardSummaryProvider);
 
     return summaryAsync.when(
-      loading: () => const _DashboardSkeleton(),
-      error: (e, _) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            e.toString(),
-            style: TextStyle(color: AppColors.textSecondary),
-            textAlign: TextAlign.center,
-          ),
-        ),
+      loading: () => _DashboardSkeleton(showMenuButton: showMenuButton),
+      error: (e, _) => ErrorCard(
+        error: e,
+        onRetry: () => ref.invalidate(dashboardSummaryProvider),
       ),
-      data: (summary) => _DashboardContent(summary: summary),
+      data: (summary) => _DashboardContent(summary: summary, showMenuButton: showMenuButton),
     );
   }
 }
 
-class _DashboardContent extends StatelessWidget {
+class _DashboardContent extends ConsumerWidget {
   final DashboardSummary summary;
-  const _DashboardContent({required this.summary});
+  final bool showMenuButton;
+  const _DashboardContent({required this.summary, required this.showMenuButton});
 
   // Placeholder figures shown only until real records exist, so the
   // dashboard doesn't render as an empty/broken screen on a fresh
@@ -81,11 +129,12 @@ class _DashboardContent extends StatelessWidget {
   static const _placeholderTotal = 24;
   static const _placeholderActive = 18;
   static const _placeholderEmployees = 12;
+  static const _placeholderCustomers = 30;
   static const _placeholderPlanName = 'Professional';
   static const _placeholderShare = 0.65;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final hasCompanies = summary.totalCompanies > 0;
 
     final totalCompanies = hasCompanies
@@ -100,6 +149,14 @@ class _DashboardContent extends StatelessWidget {
     final employeesCount = summary.totalEmployees > 0
         ? summary.totalEmployees
         : _placeholderEmployees;
+    // Not part of the dashboard-summary aggregate yet — reuse the same
+    // list the Customers module already loads instead of adding a new
+    // backend field just for this count.
+    final customersAsync = ref.watch(customersProvider);
+    final customersCount = customersAsync.maybeWhen(
+      data: (list) => list.isNotEmpty ? list.length : _placeholderCustomers,
+      orElse: () => _placeholderCustomers,
+    );
 
     final sortedPlans = [...summary.subscriptionPlans]
       ..sort((a, b) => b.count.compareTo(a.count));
@@ -115,6 +172,42 @@ class _DashboardContent extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
       children: [
+        if (showMenuButton) ...[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Builder(
+                builder: (ctx) => GestureDetector(
+                  onTap: () => Scaffold.of(ctx).openDrawer(),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: AppColors.shadows([
+                        BoxShadow(
+                          color: AppColors.shadowDark.withValues(alpha: 0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]),
+                    ),
+                    child: Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Dashboard',
+                style: TextStyle(color: AppColors.ink, fontSize: 17, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+        ],
         Builder(
           builder: (context) {
             final sessionDark = WelcomeDashboardView._sessionIsDark();
@@ -124,7 +217,6 @@ class _DashboardContent extends StatelessWidget {
                 : AppColors.textSecondary;
             return Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
@@ -140,55 +232,50 @@ class _DashboardContent extends StatelessWidget {
                   ),
                 ]),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${WelcomeDashboardView._greeting()} 👋',
-                          style: TextStyle(
-                            color: fg,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                      ),
-                      Icon(Icons.search_rounded, color: fg, size: 24),
-                      const SizedBox(width: 16),
-                      Stack(
-                        clipBehavior: Clip.none,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: Stack(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.notifications_none_rounded,
-                            color: fg,
-                            size: 24,
-                          ),
-                          Positioned(
-                            top: -1,
-                            right: -1,
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: AppColors.positive,
-                                shape: BoxShape.circle,
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '${WelcomeDashboardView._greeting()} 👋',
+                                  style: TextStyle(
+                                    color: fg,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.5,
+                                  ),
+                                ),
                               ),
-                            ),
+                              SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: FittedBox(
+                                  child: _SessionIcon(
+                                    session: _currentSession(),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Welcome to your Brixen workspace',
+                            style: TextStyle(color: fgMuted, fontSize: 13),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Welcome to your Brixen workspace',
-                    style: TextStyle(color: fgMuted, fontSize: 13),
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -343,7 +430,7 @@ class _DashboardContent extends StatelessWidget {
         ),
         const SizedBox(height: 14),
 
-        // ── Split card — Companies / Employees counts ───────────────
+        // ── Split card — Companies / Employees / Customers counts ────
         IntrinsicHeight(
           child: Row(
             children: [
@@ -355,13 +442,24 @@ class _DashboardContent extends StatelessWidget {
                   label: 'Companies',
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: _KpiHalf(
-                  filled: false,
+                  filled: true,
                   icon: Icons.badge_rounded,
                   value: '$employeesCount',
                   label: 'Employees',
+                  accentColor: AppColors.positive,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _KpiHalf(
+                  filled: false,
+                  icon: Icons.people_alt_rounded,
+                  value: '$customersCount',
+                  label: 'Customers',
+                  accentColor: AppColors.brandDeep,
                 ),
               ),
             ],
@@ -626,30 +724,40 @@ class _KpiHalf extends StatelessWidget {
   final IconData icon;
   final String value;
   final String label;
+  final Color accentColor;
   const _KpiHalf({
     required this.filled,
     required this.icon,
     required this.value,
     required this.label,
+    this.accentColor = AppColors.brand,
   });
 
   @override
   Widget build(BuildContext context) {
     final fg = filled ? AppColors.white : AppColors.ink;
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: filled ? AppColors.brand : AppColors.surface,
+        color: filled ? accentColor : AppColors.surface,
         borderRadius: BorderRadius.circular(22),
         boxShadow: filled
             ? AppColors.shadows([
                 BoxShadow(
-                  color: AppColors.brandDeep.withValues(alpha: 0.4),
+                  color: Color.lerp(
+                    accentColor,
+                    Colors.black,
+                    0.3,
+                  )!.withValues(alpha: 0.4),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
                 BoxShadow(
-                  color: AppColors.brandLight.withValues(alpha: 0.5),
+                  color: Color.lerp(
+                    accentColor,
+                    Colors.white,
+                    0.4,
+                  )!.withValues(alpha: 0.5),
                   blurRadius: 10,
                   offset: const Offset(-5, -5),
                 ),
@@ -677,21 +785,21 @@ class _KpiHalf extends StatelessWidget {
             decoration: BoxDecoration(
               color: filled
                   ? Colors.white.withValues(alpha: 0.16)
-                  : AppColors.brand.withValues(alpha: 0.1),
+                  : accentColor.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: Icon(
               icon,
               size: 16,
-              color: filled ? AppColors.white : AppColors.brand,
+              color: filled ? AppColors.white : accentColor,
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Text(
             value,
             style: TextStyle(
               color: fg,
-              fontSize: 26,
+              fontSize: 22,
               fontWeight: FontWeight.w800,
               height: 1,
             ),
@@ -703,9 +811,10 @@ class _KpiHalf extends StatelessWidget {
               color: filled
                   ? Colors.white.withValues(alpha: 0.85)
                   : AppColors.textHint,
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -850,7 +959,8 @@ class _RecentSaleRow extends StatelessWidget {
 /// Mirrors the real dashboard's hero / split / status / recent-sales shape
 /// so nothing jumps in size once the summary call resolves.
 class _DashboardSkeleton extends StatelessWidget {
-  const _DashboardSkeleton();
+  final bool showMenuButton;
+  const _DashboardSkeleton({required this.showMenuButton});
 
   @override
   Widget build(BuildContext context) {
@@ -859,6 +969,35 @@ class _DashboardSkeleton extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         physics: const NeverScrollableScrollPhysics(),
         children: [
+          if (showMenuButton) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Builder(
+                  builder: (ctx) => GestureDetector(
+                    onTap: () => Scaffold.of(ctx).openDrawer(),
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Dashboard',
+                  style: TextStyle(color: AppColors.ink, fontSize: 17, fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+          ],
           Row(
             children: [
               const SkeletonBox(width: 170, height: 24, radius: 6),

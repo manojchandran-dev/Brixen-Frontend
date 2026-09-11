@@ -11,6 +11,7 @@ class CompanyCard extends StatelessWidget {
   final VoidCallback? onToggleStatus;
   final VoidCallback? onView;
   final VoidCallback? onEdit;
+  final VoidCallback? onPermissions;
 
   const CompanyCard({
     super.key,
@@ -20,6 +21,7 @@ class CompanyCard extends StatelessWidget {
     this.onToggleStatus,
     this.onView,
     this.onEdit,
+    this.onPermissions,
   });
 
   @override
@@ -77,6 +79,13 @@ class CompanyCard extends StatelessWidget {
           ),
           if (isCompleted)
             SwipeAction(
+              icon: Icons.admin_panel_settings_outlined,
+              label: 'Permissions',
+              color: AppColors.positive,
+              onTap: () => onPermissions?.call(),
+            ),
+          if (isCompleted)
+            SwipeAction(
               icon: company.isActive
                   ? Icons.block_outlined
                   : Icons.check_circle_outline,
@@ -94,6 +103,7 @@ class CompanyCard extends StatelessWidget {
         child: RichCardShell(
           accentColor: onboardingColor,
           backgroundColor: bg,
+          backgroundGradient: AppColors.cardTintGradient(accent),
           edgeColor: accent,
           showAccentBar: false,
           child: Padding(

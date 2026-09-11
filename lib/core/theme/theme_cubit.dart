@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../constants/storage_keys.dart';
 
 // Global singleton — safe to access from anywhere without context
 final themeCubit = ThemeCubit();
 
 class ThemeCubit extends Cubit<ThemeMode> {
-  static const _kDarkMode = 'dark_mode_enabled';
+  static const _kDarkMode = StorageKeys.darkModeEnabled;
 
   // User-toggleable light/dark, set from the "More" page. Defaults to light.
   ThemeCubit() : super(ThemeMode.light);

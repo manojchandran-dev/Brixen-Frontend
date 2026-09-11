@@ -3,9 +3,15 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/router/app_router.dart';
 
+/// Dashboard / Report / More are each their own route now
+/// (AppRouter.dashboard/report/more) — every role lands on the same three
+/// paths, with each route deciding its own role-appropriate content. This
+/// nav bar navigates between them by default; [onTap] is only kept for
+/// `CompaniesPage`'s own internal Companies/Masters drill-down nav, which
+/// switches an internal tab index instead of the route.
 class AppBottomNav extends StatelessWidget {
   final int activeIndex;
-  final ValueChanged<int>? onTap;
+  final void Function(int)? onTap;
   const AppBottomNav({super.key, required this.activeIndex, this.onTap});
 
   void _onTap(BuildContext context, int index) {
@@ -16,12 +22,11 @@ class AppBottomNav extends StatelessWidget {
     }
     switch (index) {
       case 2:
-        context.go(AppRouter.companies, extra: 'reports');
-        return;
-      case 0:
-      case 1:
+        context.go(AppRouter.report);
       case 3:
-        context.go(AppRouter.companies);
+        context.go(AppRouter.more);
+      default:
+        context.go(AppRouter.dashboard);
     }
   }
 
@@ -58,11 +63,29 @@ class AppBottomNav extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _NavBtn(icon: Icons.dashboard_outlined,    activeIcon: Icons.dashboard_rounded,           label: 'Dashboard',  isActive: activeIndex == 0, onTap: () => _onTap(context, 0)),
+              _NavBtn(
+                icon: Icons.dashboard_outlined,
+                activeIcon: Icons.dashboard_rounded,
+                label: 'Dashboard',
+                isActive: activeIndex == 0,
+                onTap: () => _onTap(context, 0),
+              ),
               // Attendance module disabled for now — uncomment to re-enable.
               // _NavBtn(icon: Icons.access_time_outlined,  activeIcon: Icons.access_time_filled_rounded,  label: 'Attendance', isActive: activeIndex == 1, onTap: () => _onTap(context, 1)),
-              _NavBtn(icon: Icons.bar_chart_outlined,    activeIcon: Icons.bar_chart_rounded,           label: 'Report',     isActive: activeIndex == 2, onTap: () => _onTap(context, 2)),
-              _NavBtn(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded,             label: 'More',       isActive: activeIndex == 3, onTap: () => _onTap(context, 3)),
+              _NavBtn(
+                icon: Icons.bar_chart_outlined,
+                activeIcon: Icons.bar_chart_rounded,
+                label: 'Report',
+                isActive: activeIndex == 2,
+                onTap: () => _onTap(context, 2),
+              ),
+              _NavBtn(
+                icon: Icons.person_outline_rounded,
+                activeIcon: Icons.person_rounded,
+                label: 'More',
+                isActive: activeIndex == 3,
+                onTap: () => _onTap(context, 3),
+              ),
             ],
           ),
         ),
@@ -70,7 +93,6 @@ class AppBottomNav extends StatelessWidget {
     );
   }
 }
-
 
 class _NavBtn extends StatelessWidget {
   final IconData icon;
@@ -92,7 +114,9 @@ class _NavBtn extends StatelessWidget {
     // Same pill treatment in both themes — solid bar (black in light mode,
     // brand blue in dark mode) with the active icon inside a filled green
     // circle, so the highlight colour reads consistently either way.
-    final iconColor = isActive ? AppColors.white : Colors.white.withValues(alpha: 0.75);
+    final iconColor = isActive
+        ? AppColors.white
+        : Colors.white.withValues(alpha: 0.75);
     return SizedBox(
       width: 52,
       child: GestureDetector(

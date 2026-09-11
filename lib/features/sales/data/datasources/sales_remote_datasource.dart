@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
+import '../../../../core/utils/date_utils.dart';
+import '../../domain/entities/sale_item.dart';
 import '../models/sale_model.dart';
 
 final salesRemoteDatasourceProvider = Provider<SalesRemoteDatasource>((ref) {
@@ -71,9 +73,46 @@ class SalesRemoteDatasource {
     }
   }
 
-  Future<void> deleteSale(String id) async {
+  Future<SaleModel> updateSaleItems(
+    String id,
+    Map<String, dynamic> body, {
+    String? companyId,
+  }) async {
     try {
-      await _dio.delete(ApiEndpoints.saleById(id));
+      final resp = await _dio.put(
+        ApiEndpoints.saleStep2(id),
+        data: body,
+        queryParameters: companyId != null ? {'company_id': companyId} : null,
+      );
+      final data = resp.data['data'] ?? resp.data;
+      return SaleModel.fromJson(data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  Future<List<SaleItem>> getSaleItems(String id, {String? companyId}) async {
+    try {
+      final resp = await _dio.get(
+        ApiEndpoints.saleItems(id),
+        queryParameters: companyId != null ? {'company_id': companyId} : null,
+      );
+      final data = resp.data['data'] ?? resp.data;
+      final list = (data is List) ? data : (data['items'] ?? []);
+      return (list as List)
+          .map((e) => SaleItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  Future<void> deleteSale(String id, {String? companyId}) async {
+    try {
+      await _dio.delete(
+        ApiEndpoints.saleById(id),
+        queryParameters: companyId != null ? {'company_id': companyId} : null,
+      );
     } on DioException catch (e) {
       throw mapDioError(e);
     }

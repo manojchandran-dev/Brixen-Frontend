@@ -1,12 +1,13 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/datasources/company_categories_remote_datasource.dart';
 import '../../data/datasources/expense_categories_remote_datasource.dart';
+import '../../data/datasources/product_categories_remote_datasource.dart';
 import '../../data/datasources/remote_master_datasource.dart';
 import '../../data/datasources/units_remote_datasource.dart';
+import '../../data/repositories/masters_repository_impl.dart';
 import '../../domain/entities/master_item.dart';
+import '../../domain/repositories/masters_repository.dart';
 import 'master_state.dart';
-
-final masterCubit = MasterCubit();
 
 // Master types backed by a real API — everything else still lives in the
 // in-memory `_store` below. Add an entry here for any new type once its
@@ -14,30 +15,34 @@ final masterCubit = MasterCubit();
 final Map<String, RemoteMasterDatasource> _remoteDatasources = {
   'expenseCategory': expenseCategoriesRemoteDatasource,
   'companyCategory': companyCategoriesRemoteDatasource,
+  'productCategory': productCategoriesRemoteDatasource,
   'unit': unitsRemoteDatasource,
 };
 
-class MasterCubit extends Cubit<MasterState> {
-  MasterCubit() : super(MasterLoading());
+final masterCubit = MasterCubit(MastersRepositoryImpl(_remoteDatasources));
 
+class MasterCubit extends Cubit<MasterState> {
+  MasterCubit(this._repository) : super(MasterLoading());
+
+  final MastersRepository _repository;
   final Map<String, List<MasterItem>> _store = {};
   String _activeType = '';
   String _query = '';
 
-  RemoteMasterDatasource? _remoteFor(String typeKey) => _remoteDatasources[typeKey];
+  bool isRemote(String typeKey) => _repository.isRemote(typeKey);
 
   /// Exposed for the edit form, which needs to fetch a single item fresh
   /// (rather than from the cached list) when the type is remote-backed.
-  RemoteMasterDatasource? remoteDatasourceFor(String typeKey) => _remoteFor(typeKey);
+  Future<MasterItem> fetchByIdRemote(String typeKey, String id) =>
+      _repository.getById(typeKey, id);
 
   Future<void> load(String typeKey) async {
     _activeType = typeKey;
     _query = '';
-    final remote = _remoteFor(typeKey);
-    if (remote != null) {
+    if (_repository.isRemote(typeKey)) {
       emit(MasterLoading());
       try {
-        _store[typeKey] = await remote.getAll();
+        _store[typeKey] = await _repository.getAll(typeKey);
       } catch (e) {
         emit(MasterError(e.toString()));
         return;
@@ -49,14 +54,15 @@ class MasterCubit extends Cubit<MasterState> {
     _emit();
   }
 
-  Future<void> add(MasterItem item) async {
-    final remote = _remoteFor(item.typeKey);
-    if (remote != null) {
-      final created = await remote.create(
+  Future<void> add(MasterItem item, {required String companyId}) async {
+    if (_repository.isRemote(item.typeKey)) {
+      final created = await _repository.create(
+        item.typeKey,
         name: item.name,
         description: item.description,
         fullForm: item.fullForm,
         isActive: item.isActive,
+        companyId: companyId,
       );
       _store[item.typeKey] = [...(_store[item.typeKey] ?? []), created];
       _emit();
@@ -67,9 +73,9 @@ class MasterCubit extends Cubit<MasterState> {
   }
 
   Future<void> update(MasterItem updated) async {
-    final remote = _remoteFor(updated.typeKey);
-    if (remote != null) {
-      final saved = await remote.update(
+    if (_repository.isRemote(updated.typeKey)) {
+      final saved = await _repository.update(
+        updated.typeKey,
         updated.id,
         name: updated.name,
         description: updated.description,
@@ -91,10 +97,9 @@ class MasterCubit extends Cubit<MasterState> {
 
   /// Returns null on success, or an error message string on failure.
   Future<String?> delete(String id) async {
-    final remote = _remoteFor(_activeType);
-    if (remote != null) {
+    if (_repository.isRemote(_activeType)) {
       try {
-        await remote.delete(id);
+        await _repository.delete(_activeType, id);
       } catch (e) {
         return e.toString();
       }
@@ -116,7 +121,8 @@ class MasterCubit extends Cubit<MasterState> {
   /// Unfiltered — includes inactive items too. Used for resolving a
   /// display name for a reference that may point at something no longer
   /// active (e.g. an expense's category/unit).
-  List<MasterItem> allItemsOfType(String typeKey) => List.from(_store[typeKey] ?? []);
+  List<MasterItem> allItemsOfType(String typeKey) =>
+      List.from(_store[typeKey] ?? []);
 
   /// Returns master menu items assigned to a specific company category.
   List<MasterItem> masterMenusForCategory(String categoryId) =>
@@ -124,9 +130,11 @@ class MasterCubit extends Cubit<MasterState> {
           .where((x) => x.isActive && x.assignedCategoryId == categoryId)
           .toList();
 
-  void _emit() => emit(MasterLoaded(
-    typeKey: _activeType,
-    items: List.from(_store[_activeType] ?? []),
-    query: _query,
-  ));
+  void _emit() => emit(
+    MasterLoaded(
+      typeKey: _activeType,
+      items: List.from(_store[_activeType] ?? []),
+      query: _query,
+    ),
+  );
 }

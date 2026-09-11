@@ -5,35 +5,52 @@ class ApiEndpoints {
 
   static const String baseUrl = AppConfig.baseUrl;
 
-  static const String health         = '/api/health';
-  static const String login          = '/api/v1/auth/login';
-  static const String authPin        = '/api/v1/auth/pin';
-  static const String authPinVerify  = '/api/v1/auth/pin/verify';
+  static const String health = '/api/health';
+  static const String login = '/api/v1/auth/login';
+  static const String authPin = '/api/v1/auth/pin';
+  static const String authPinVerify = '/api/v1/auth/pin/verify';
   static const String forgotPassword = '/api/v1/auth/forgot-password';
-  static const String verifyOtp      = '/api/v1/auth/verify-otp';
-  static const String resetPassword  = '/api/v1/auth/reset-password';
-  static const String companies      = '/api/v1/companies';
+  static const String verifyOtp = '/api/v1/auth/verify-otp';
+  static const String resetPassword = '/api/v1/auth/reset-password';
+  static const String companies = '/api/v1/companies';
   static const String expenseCategories = '/api/v1/expense-categories';
   static const String companyCategories = '/api/v1/company-categories';
-  static const String employees      = '/api/v1/employees';
-  static const String units          = '/api/v1/units';
-  static const String expenses       = '/api/v1/expenses';
-  static const String customers      = '/api/v1/customers';
-  static const String sales          = '/api/v1/sales';
+  static const String productCategories = '/api/v1/product-categories';
+  static const String employees = '/api/v1/employees';
+  static const String units = '/api/v1/units';
+  static const String expenses = '/api/v1/expenses';
+  static const String customers = '/api/v1/customers';
+  static const String sales = '/api/v1/sales';
+  static const String products = '/api/v1/products';
   static const String dashboardSummary = '/api/v1/dashboard/summary';
-  static const String reportsSummary   = '/api/v1/reports/summary';
+  static const String reportsSummary = '/api/v1/reports/summary';
+  static const String modules = '/api/v1/modules';
+  static const String uploads = '/api/v1/uploads';
+  static const String permissions = '/api/v1/permissions';
+  static const String permissionsBulk = '/api/v1/permissions/bulk';
+  static String permissionById(String id) => '/api/v1/permissions/$id';
 
-  static String companyById(String id)     => '/api/v1/companies/$id';
-  static String companyStatus(String id)   => '/api/v1/companies/$id/status';
-  static String companyStep2(String id)    => '/api/v1/companies/$id/step2';
-  static String companyStep3(String id)    => '/api/v1/companies/$id/step3';
-  static String expenseCategoryById(String id) => '/api/v1/expense-categories/$id';
-  static String companyCategoryById(String id) => '/api/v1/company-categories/$id';
-  static String employeeById(String id)    => '/api/v1/employees/$id';
-  static String employeeStep2(String id)   => '/api/v1/employees/$id/step2';
-  static String employeeStep3(String id)   => '/api/v1/employees/$id/step3';
-  static String unitById(String id)        => '/api/v1/units/$id';
-  static String expenseById(String id)     => '/api/v1/expenses/$id';
-  static String customerById(String id)    => '/api/v1/customers/$id';
-  static String saleById(String id)        => '/api/v1/sales/$id';
+  static String companyById(String id) => '/api/v1/companies/$id';
+  static String companyStatus(String id) => '/api/v1/companies/$id/status';
+  static String companyStep2(String id) => '/api/v1/companies/$id/step2';
+  static String companyStep3(String id) => '/api/v1/companies/$id/step3';
+  static String expenseCategoryById(String id) =>
+      '/api/v1/expense-categories/$id';
+  static String companyCategoryById(String id) =>
+      '/api/v1/company-categories/$id';
+  static String productCategoryById(String id) =>
+      '/api/v1/product-categories/$id';
+  static String employeeById(String id) => '/api/v1/employees/$id';
+  static String employeeStep2(String id) => '/api/v1/employees/$id/step2';
+  static String employeeStep3(String id) => '/api/v1/employees/$id/step3';
+  static String unitById(String id) => '/api/v1/units/$id';
+  static String expenseById(String id) => '/api/v1/expenses/$id';
+  static String customerById(String id) => '/api/v1/customers/$id';
+  static String saleById(String id) => '/api/v1/sales/$id';
+  static String saleStep2(String id) => '/api/v1/sales/$id/step2';
+  static String saleItems(String id) => '/api/v1/sales/$id/items';
+  static String productById(String id) => '/api/v1/products/$id';
+  static String productStep2(String id) => '/api/v1/products/$id/step2';
+  static String productStep3(String id) => '/api/v1/products/$id/step3';
+  static String productStep4(String id) => '/api/v1/products/$id/step4';
 }

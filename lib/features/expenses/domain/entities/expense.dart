@@ -1,5 +1,6 @@
 class Expense {
   final String id;
+  final String? companyId;
   final String categoryId;
   final String category; // display name, resolved client-side from Masters
   final String? unitId;
@@ -14,6 +15,7 @@ class Expense {
 
   const Expense({
     required this.id,
+    this.companyId,
     required this.categoryId,
     required this.category,
     this.unitId,
@@ -29,6 +31,7 @@ class Expense {
 
   Expense copyWith({
     String? id,
+    String? companyId,
     String? categoryId,
     String? category,
     String? unitId,
@@ -43,6 +46,7 @@ class Expense {
   }) {
     return Expense(
       id: id ?? this.id,
+      companyId: companyId ?? this.companyId,
       categoryId: categoryId ?? this.categoryId,
       category: category ?? this.category,
       unitId: unitId ?? this.unitId,

@@ -5,6 +5,9 @@ final purchasesProvider = AsyncNotifierProvider<PurchasesNotifier, List<Purchase
   PurchasesNotifier.new,
 );
 
+// No repository layer yet — this feature has no backend datasource at all
+// (pure in-memory notifier). Add one only when a real
+// purchases_remote_datasource.dart exists to wrap.
 class PurchasesNotifier extends AsyncNotifier<List<Purchase>> {
   List<Purchase> _all = [];
 

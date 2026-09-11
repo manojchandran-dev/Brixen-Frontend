@@ -53,9 +53,13 @@ class EmployeesRemoteDatasource {
     }
   }
 
-  Future<EmployeeModel> updateStep2(String id, Map<String, dynamic> body) async {
+  Future<EmployeeModel> updateStep2(String id, Map<String, dynamic> body, {String? companyId}) async {
     try {
-      final resp = await _dio.put(ApiEndpoints.employeeStep2(id), data: body);
+      final resp = await _dio.put(
+        ApiEndpoints.employeeStep2(id),
+        data: body,
+        queryParameters: _companyIdParam(companyId),
+      );
       final data = resp.data['data'] ?? resp.data;
       return EmployeeModel.fromJson(data as Map<String, dynamic>);
     } on DioException catch (e) {
@@ -63,9 +67,13 @@ class EmployeesRemoteDatasource {
     }
   }
 
-  Future<EmployeeModel> updateStep3(String id, Map<String, dynamic> body) async {
+  Future<EmployeeModel> updateStep3(String id, Map<String, dynamic> body, {String? companyId}) async {
     try {
-      final resp = await _dio.put(ApiEndpoints.employeeStep3(id), data: body);
+      final resp = await _dio.put(
+        ApiEndpoints.employeeStep3(id),
+        data: body,
+        queryParameters: _companyIdParam(companyId),
+      );
       final data = resp.data['data'] ?? resp.data;
       return EmployeeModel.fromJson(data as Map<String, dynamic>);
     } on DioException catch (e) {
@@ -73,9 +81,13 @@ class EmployeesRemoteDatasource {
     }
   }
 
-  Future<EmployeeModel> updateEmployee(String id, Map<String, dynamic> body) async {
+  Future<EmployeeModel> updateEmployee(String id, Map<String, dynamic> body, {String? companyId}) async {
     try {
-      final resp = await _dio.put(ApiEndpoints.employeeById(id), data: body);
+      final resp = await _dio.put(
+        ApiEndpoints.employeeById(id),
+        data: body,
+        queryParameters: _companyIdParam(companyId),
+      );
       final data = resp.data['data'] ?? resp.data;
       return EmployeeModel.fromJson(data as Map<String, dynamic>);
     } on DioException catch (e) {
@@ -83,11 +95,17 @@ class EmployeesRemoteDatasource {
     }
   }
 
-  Future<void> deleteEmployee(String id) async {
+  Future<void> deleteEmployee(String id, {String? companyId}) async {
     try {
-      await _dio.delete(ApiEndpoints.employeeById(id));
+      await _dio.delete(
+        ApiEndpoints.employeeById(id),
+        queryParameters: _companyIdParam(companyId),
+      );
     } on DioException catch (e) {
       throw mapDioError(e);
     }
   }
+
+  Map<String, dynamic>? _companyIdParam(String? companyId) =>
+      companyId != null ? {'company_id': companyId} : null;
 }

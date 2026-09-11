@@ -16,7 +16,9 @@ class CompanyCategoryLoaded extends CompanyCategoryState {
 
   List<CompanyCategory> get filtered => query.isEmpty
       ? items
-      : items.where((c) => c.name.toLowerCase().contains(query.toLowerCase())).toList();
+      : items
+            .where((c) => c.name.toLowerCase().contains(query.toLowerCase()))
+            .toList();
 
   @override
   List<Object?> get props => [items, query];

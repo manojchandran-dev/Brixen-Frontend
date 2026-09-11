@@ -32,21 +32,27 @@ class MasterItem extends Equatable {
     String? assignedCategoryId,
     String? assignedCategoryName,
     String? fullForm,
-  }) =>
-      MasterItem(
-        id: id,
-        typeKey: typeKey,
-        name: name ?? this.name,
-        description: description ?? this.description,
-        isActive: isActive ?? this.isActive,
-        createdAt: createdAt,
-        assignedCategoryId: assignedCategoryId ?? this.assignedCategoryId,
-        assignedCategoryName: assignedCategoryName ?? this.assignedCategoryName,
-        fullForm: fullForm ?? this.fullForm,
-      );
+  }) => MasterItem(
+    id: id,
+    typeKey: typeKey,
+    name: name ?? this.name,
+    description: description ?? this.description,
+    isActive: isActive ?? this.isActive,
+    createdAt: createdAt,
+    assignedCategoryId: assignedCategoryId ?? this.assignedCategoryId,
+    assignedCategoryName: assignedCategoryName ?? this.assignedCategoryName,
+    fullForm: fullForm ?? this.fullForm,
+  );
 
   @override
-  List<Object?> get props => [id, typeKey, name, isActive, createdAt, assignedCategoryId];
+  List<Object?> get props => [
+    id,
+    typeKey,
+    name,
+    isActive,
+    createdAt,
+    assignedCategoryId,
+  ];
 
   /// Human-readable reference code shown in the UI.
   String? get displayCode => codeFor(typeKey, id);
@@ -59,6 +65,9 @@ class MasterItem extends Equatable {
         return n == null ? null : 'EXCAT${n.toString().padLeft(11, '0')}';
       case 'companyCategory':
         // Backend id is already the formatted code, e.g. "COCAT65618502479".
+        return id;
+      case 'productCategory':
+        // Backend id is already the formatted code, e.g. "PRCAT65618502479".
         return id;
       case 'unit':
         // Backend id is already the formatted code, e.g. "UNIT533111998460".

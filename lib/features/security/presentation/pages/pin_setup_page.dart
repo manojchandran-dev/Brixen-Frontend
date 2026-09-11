@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
-import '../../../../core/services/token_service.dart';
 import '../../../../shared/widgets/brand_illustration.dart';
 import '../../../../shared/widgets/pin_pad.dart';
-import '../../../auth/domain/entities/user_role.dart';
 import '../cubit/security_cubit.dart';
 import '../cubit/security_state.dart';
 
@@ -39,17 +36,7 @@ class _PinSetupPageState extends State<PinSetupPage> {
     });
   }
 
-  void _goToDashboard() {
-    final role = UserRoleX.fromString(TokenService.role);
-    switch (role) {
-      case UserRole.superAdmin:
-        context.go(AppRouter.companies);
-      case UserRole.companyAdmin:
-        context.go(AppRouter.companyAdminHome);
-      case UserRole.employee:
-        context.go(AppRouter.employeeHome);
-    }
-  }
+  void _goToDashboard() => context.go(AppRouter.dashboard);
 
   Future<void> _onPinEntered() async {
     setState(() {
@@ -210,7 +197,7 @@ class _PinStep extends StatelessWidget {
                           const TextSpan(text: 'Brix', style: TextStyle(color: AppColors.brand)),
                           const TextSpan(text: 'en', style: TextStyle(color: AppColors.positive)),
                         ]),
-                        style: GoogleFonts.spaceGrotesk(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+                        style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.5),
                       ),
                       const SizedBox(height: 4),
                       Text.rich(

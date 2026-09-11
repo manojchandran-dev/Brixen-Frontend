@@ -20,9 +20,9 @@ class AppColors {
   static bool get isDark => _isDark;
 
   // ── The four brand colours — fixed across themes ─────────────────
-  static const Color brand = Color(0xFF356B86);       // blue — 60%
-  static const Color paper = Color(0xFFFFFFFF);        // white — 25%
-  static const Color positive = Color(0xFF80C080);     // green — 10%
+  static const Color brand = Color(0xFF356B86); // blue — 60%
+  static const Color paper = Color(0xFFFFFFFF); // white — 25%
+  static const Color positive = Color(0xFF80C080); // green — 10%
 
   // Blue tints/shades — still "blue", used for hierarchy within the
   // dominant colour rather than introducing a new hue.
@@ -58,7 +58,8 @@ class AppColors {
 
   static const Color _lightSurfaceElevated = Color(0xFFE9F0F3);
   static const Color _darkSurfaceElevated = Color(0xFF242E33);
-  static Color get surfaceElevated => _isDark ? _darkSurfaceElevated : _lightSurfaceElevated;
+  static Color get surfaceElevated =>
+      _isDark ? _darkSurfaceElevated : _lightSurfaceElevated;
 
   static const Color lightBackground = _lightBackground;
   static const Color lightSurface = _lightSurface;
@@ -72,7 +73,8 @@ class AppColors {
   static Color get textPrimary => ink;
   static const Color _lightTextSecondary = Color(0xFF4A4A4A);
   static const Color _darkTextSecondary = Color(0xFFB8C2C6);
-  static Color get textSecondary => _isDark ? _darkTextSecondary : _lightTextSecondary;
+  static Color get textSecondary =>
+      _isDark ? _darkTextSecondary : _lightTextSecondary;
 
   static const Color _lightTextHint = Color(0xFF7A7A7A);
   static const Color _darkTextHint = Color(0xFF8A9599);
@@ -107,7 +109,8 @@ class AppColors {
   // highlight only reads correctly against a light card — on a dark card
   // in dark mode it shows up as a stray white glow, so drop it entirely
   // there rather than trying to find a dark-mode equivalent tone.
-  static Color highlightShadow(double alpha) => _isDark ? Colors.transparent : Colors.white.withValues(alpha: alpha);
+  static Color highlightShadow(double alpha) =>
+      _isDark ? Colors.transparent : Colors.white.withValues(alpha: alpha);
 
   // Icon/avatar badges rotate through the 5-colour accent set and render
   // as a `[base, base@75%]` gradient. The `brandBlack` bucket is a flat,
@@ -124,7 +127,8 @@ class AppColors {
   // dark-appropriate shadow tones — on a dark surface a drop shadow just
   // reads as a smudge, not depth. Wrap any `boxShadow: AppColors.shadows([...])` list with
   // this so it collapses to nothing once dark mode is on.
-  static List<BoxShadow> shadows(List<BoxShadow> list) => _isDark ? const [] : list;
+  static List<BoxShadow> shadows(List<BoxShadow> list) =>
+      _isDark ? const [] : list;
 
   // ── Legacy "silver" aliases — now resolve to blue ────────────────
   static const Color silver = brand;
@@ -135,7 +139,7 @@ class AppColors {
   static const Color white = paper;
   static Color get black => ink;
 
-  static Color get error => ink;      // no red in the palette — danger reads as ink
+  static Color get error => ink; // no red in the palette — danger reads as ink
   static const Color success = positive;
 
   // ── List-card pale-tint blend ────────────────────────────────────
@@ -153,14 +157,30 @@ class AppColors {
     return 0.30; // brand, positive
   }
 
+  // Same idea as [cardTintBlend], but for the "black" bucket in dark mode —
+  // where the border/avatar already swap to a blue→green gradient via
+  // [accentGradient] — the card's own background stayed a single flat
+  // blended colour, reading as plain/no colour at all next to that
+  // gradient edge. Blending both accentGradient stops into the surface
+  // gives the background the same subtle two-tone wash instead.
+  static List<Color> cardTintGradient(Color accent) {
+    final blend = cardTintBlend(accent);
+    final base = Color.lerp(surface, accent, blend)!;
+    if (!(_isDark && accent == brandBlack)) return [base, base];
+    return [
+      Color.lerp(surface, brand, blend)!,
+      Color.lerp(surface, positive, blend)!,
+    ];
+  }
+
   // ── Legacy per-module accent aliases — collapsed onto the 4-colour set ──
-  static const Color accentIndigo  = brand;       // companies
-  static const Color accentEmerald = positive;    // active, present
-  static const Color accentTeal    = brand;       // employees, info
-  static const Color accentGold    = brandLight;  // subscriptions, pending
-  static const Color accentRose  = brandBlack;    // inactive, absent, danger
-  static const Color accentViolet  = brandDeep;   // enterprise
-  static const Color accentSlate   = brandLight;  // neutral, activity
+  static const Color accentIndigo = brand; // companies
+  static const Color accentEmerald = positive; // active, present
+  static const Color accentTeal = brand; // employees, info
+  static const Color accentGold = brandLight; // subscriptions, pending
+  static const Color accentRose = brandBlack; // inactive, absent, danger
+  static const Color accentViolet = brandDeep; // enterprise
+  static const Color accentSlate = brandLight; // neutral, activity
 
   // ── Gradients ─────────────────────────────────────────────────
   static const LinearGradient silverGradient = LinearGradient(

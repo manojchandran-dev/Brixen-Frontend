@@ -4,9 +4,12 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/services/session_service.dart';
 import '../../../../shared/widgets/brixen_button.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
+import '../../../../shared/widgets/company_selector_field.dart';
+import '../../../companies/domain/entities/company.dart';
 import '../../domain/entities/employee.dart';
 import '../providers/employees_provider.dart';
 
@@ -28,6 +31,7 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
   bool _submitting = false;
   String? _employeeId; // set once step 1 succeeds — used by steps 2/3/4
   Employee? _reviewEmployee; // freshly fetched for the Review step
+  Company? _selectedCompany; // superAdmin only — companyAdmin/employee use Session.companyId
 
   static const _labels = ['Personal', 'Employment', 'Banking', 'Review'];
 
@@ -65,6 +69,16 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
   static const _statuses = ['Active', 'Inactive', 'On Leave'];
 
   bool get _isEditing => widget.editEmployee != null;
+
+  /// The company this employee belongs to, for every write in this wizard.
+  /// superAdmin-only — companyAdmin/employee writes are scoped by
+  /// `Session.companyId` automatically. Editing uses the employee's own
+  /// owning company (not whatever the list-page browse filter happens to be
+  /// set to); creating uses the company picked in this wizard's own field.
+  String? get _effectiveCompanyId {
+    if (!Session.isSuperAdmin) return null;
+    return _isEditing ? widget.editEmployee!.companyId : _selectedCompany?.id;
+  }
 
   @override
   void initState() {
@@ -121,6 +135,12 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
 
   Future<void> _handleNext() async {
     if (_currentFormKey != null && !_currentFormKey!.currentState!.validate()) return;
+    if (_currentStep == 0 && !_isEditing && Session.isSuperAdmin && _selectedCompany == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a company'), backgroundColor: AppColors.dangerFill),
+      );
+      return;
+    }
     setState(() => _submitting = true);
     final notifier = ref.read(employeesProvider.notifier);
     try {
@@ -138,7 +158,7 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
               emergencyContactName: _emergencyNameCtrl.text.trim().isEmpty ? null : _emergencyNameCtrl.text.trim(),
               emergencyContactPhone: _emergencyPhoneCtrl.text.trim().isEmpty ? null : _emergencyPhoneCtrl.text.trim(),
             );
-            await notifier.updateEmployee(merged);
+            await notifier.updateEmployee(merged, companyId: _effectiveCompanyId);
             _employeeId = widget.editEmployee!.id;
           } else {
             final personal = Employee(
@@ -155,7 +175,10 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
               emergencyContactPhone: _emergencyPhoneCtrl.text.trim().isEmpty ? null : _emergencyPhoneCtrl.text.trim(),
               createdAt: DateTime.now(),
             );
-            final created = await notifier.createStep1(personal);
+            final created = await notifier.createStep1(
+              personal,
+              companyId: (Session.isSuperAdmin ? _selectedCompany!.id : Session.companyId)!,
+            );
             _employeeId = created.id;
           }
           setState(() => _currentStep = 1);
@@ -173,7 +196,7 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
             status: _status,
             createdAt: DateTime.now(),
           );
-          await notifier.updateStep2(_employeeId!, employment);
+          await notifier.updateStep2(_employeeId!, employment, companyId: _effectiveCompanyId);
           setState(() => _currentStep = 2);
         case 2:
           final banking = Employee(
@@ -187,7 +210,7 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
             ifscCode: _ifscCtrl.text.trim().isEmpty ? null : _ifscCtrl.text.trim().toUpperCase(),
             createdAt: DateTime.now(),
           );
-          await notifier.updateStep3(_employeeId!, banking);
+          await notifier.updateStep3(_employeeId!, banking, companyId: _effectiveCompanyId);
           _reviewEmployee = await notifier.fetchEmployeeDetail(_employeeId!);
           setState(() => _currentStep = 3);
         case 3:
@@ -275,6 +298,9 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
           gender: _gender, genders: _genders, onGenderChanged: (v) => setState(() => _gender = v),
           dateOfBirth: _dateOfBirth, onDobChanged: (d) => setState(() => _dateOfBirth = d),
           emergencyNameCtrl: _emergencyNameCtrl, emergencyPhoneCtrl: _emergencyPhoneCtrl,
+          showCompanyField: !_isEditing && Session.isSuperAdmin,
+          selectedCompany: _selectedCompany,
+          onCompanyChanged: (c) => setState(() => _selectedCompany = c),
         );
       case 1:
         return _Step2(
@@ -395,6 +421,9 @@ class _Step1 extends StatelessWidget {
   final void Function(String?) onGenderChanged;
   final DateTime? dateOfBirth;
   final void Function(DateTime?) onDobChanged;
+  final bool showCompanyField;
+  final Company? selectedCompany;
+  final void Function(Company?) onCompanyChanged;
 
   const _Step1({
     required this.formKey, required this.firstNameCtrl, required this.lastNameCtrl,
@@ -402,6 +431,7 @@ class _Step1 extends StatelessWidget {
     required this.emergencyNameCtrl, required this.emergencyPhoneCtrl,
     required this.gender, required this.genders, required this.onGenderChanged,
     required this.dateOfBirth, required this.onDobChanged,
+    required this.showCompanyField, required this.selectedCompany, required this.onCompanyChanged,
   });
 
   @override
@@ -409,6 +439,10 @@ class _Step1 extends StatelessWidget {
     return Form(
       key: formKey,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 28, 16, 16), children: [
+        if (showCompanyField) ...[
+          CompanySelectorField(value: selectedCompany, onChanged: onCompanyChanged),
+          const SizedBox(height: 22),
+        ],
         BrixenTextField(
           label: 'First Name *', hint: 'Enter first name',
           controller: firstNameCtrl, textInputAction: TextInputAction.next,

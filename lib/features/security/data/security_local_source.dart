@@ -1,9 +1,10 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/constants/storage_keys.dart';
 
 class SecurityLocalSource {
-  static const _pinKey        = 'sec_pin';
-  static const _pinEnabledKey = 'sec_pin_enabled';
-  static const _bioEnabledKey = 'sec_bio_enabled';
+  static const _pinKey        = StorageKeys.securityPin;
+  static const _pinEnabledKey = StorageKeys.securityPinEnabled;
+  static const _bioEnabledKey = StorageKeys.securityBioEnabled;
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 

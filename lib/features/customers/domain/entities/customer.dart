@@ -1,5 +1,6 @@
 class Customer {
   final String id;
+  final String? companyId;
   final String name;
   final String? shopName;
   final String? phone;
@@ -10,6 +11,7 @@ class Customer {
 
   const Customer({
     required this.id,
+    this.companyId,
     required this.name,
     this.shopName,
     this.phone,
@@ -21,6 +23,7 @@ class Customer {
 
   Customer copyWith({
     String? id,
+    String? companyId,
     String? name,
     String? shopName,
     String? phone,
@@ -31,6 +34,7 @@ class Customer {
   }) {
     return Customer(
       id: id ?? this.id,
+      companyId: companyId ?? this.companyId,
       name: name ?? this.name,
       shopName: shopName ?? this.shopName,
       phone: phone ?? this.phone,

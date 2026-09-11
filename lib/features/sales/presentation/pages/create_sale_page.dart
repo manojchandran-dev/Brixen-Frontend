@@ -1,18 +1,38 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/picked_image.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/services/session_service.dart';
 import '../../../../shared/widgets/brixen_button.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
+import '../../../../shared/widgets/company_selector_field.dart';
+import '../../../companies/domain/entities/company.dart';
 import '../../domain/entities/sale.dart';
+import '../../domain/entities/sale_item.dart';
 import '../providers/sales_provider.dart';
 import '../../../customers/domain/entities/customer.dart';
 import '../../../customers/presentation/providers/customers_provider.dart';
+import '../../../products/domain/entities/product.dart';
+import '../../../products/presentation/providers/products_provider.dart';
+
+const _priceTypes = ['Retail', 'Wholesale'];
+
+/// A product picked onto this sale's bill, purely a client-side calculator —
+/// `Sale` has no line-item field on the backend, only the aggregate
+/// `subtotal`/`taxAmount`/`totalAmount` this feeds into.
+class _SaleLineItem {
+  final Product product;
+  int quantity;
+  String priceType; // one of _priceTypes
+  _SaleLineItem({required this.product, required this.quantity, required this.priceType});
+  double get unitPrice => priceType == 'Wholesale' ? product.wholesalePrice : product.retailPrice;
+  double get amount => unitPrice * quantity;
+}
 
 class CreateSalePage extends ConsumerStatefulWidget {
   final bool fromMenu;
@@ -42,19 +62,32 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
   String? _invoiceType;
   XFile? _billImage;
   Customer? _selectedCustomer;
+  Company? _selectedCompany; // superAdmin only — companyAdmin/employee use Session.companyId
   final _picker = ImagePicker();
 
   // Step 2 — Amounts
   final _subtotalCtrl = TextEditingController();
   final _taxAmountCtrl = TextEditingController();
+  final _taxPercentCtrl = TextEditingController();
   final _totalAmountCtrl = TextEditingController();
   String? _paymentType;
   String? _paymentStatus;
+  final List<_SaleLineItem> _lineItems = [];
 
   // Step 3 — Notes
   final _notesCtrl = TextEditingController();
 
   bool get _isEditing => widget.editSale != null;
+
+  /// The company this sale belongs to, for every write in this form.
+  /// superAdmin-only — companyAdmin/employee writes are scoped by
+  /// `Session.companyId` automatically. Editing uses the sale's own owning
+  /// company (not whatever the list-page browse filter happens to be set
+  /// to); creating uses the company picked in this form's own field.
+  String? get _effectiveCompanyId {
+    if (!Session.isSuperAdmin) return null;
+    return _isEditing ? widget.editSale!.companyId : _selectedCompany?.id;
+  }
 
   @override
   void initState() {
@@ -67,19 +100,47 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
       _subtotalCtrl.text = s.subtotal.toString();
       _taxAmountCtrl.text = s.taxAmount.toString();
       _totalAmountCtrl.text = s.totalAmount.toString();
+      if (s.taxPercentage != null) {
+        _taxPercentCtrl.text = _trimmed(s.taxPercentage!);
+      } else if (s.subtotal > 0) {
+        // Older sales / list responses without a stored percentage — back
+        // -compute one from the saved amounts instead of a blank field.
+        _taxPercentCtrl.text = _trimmed(s.taxAmount / s.subtotal * 100);
+      }
       _paymentType = s.paymentType;
       _paymentStatus = s.paymentStatus;
       _notesCtrl.text = s.notes ?? '';
-      // Pre-select customer after provider loads
-      if (s.customerId != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Pre-select customer, and rebuild the line-item rows from the saved
+      // sale_items, once the Customers/Products providers have data.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (s.customerId != null) {
           final customers = ref.read(customersProvider).valueOrNull ?? [];
           final matches = customers.where((c) => c.id == s.customerId);
-          if (matches.isNotEmpty && mounted) {
+          if (matches.isNotEmpty) {
             setState(() => _selectedCustomer = matches.first);
           }
-        });
-      }
+        }
+        if (s.items.isNotEmpty) {
+          final products = ref.read(productsProvider).valueOrNull ?? [];
+          final byId = {for (final p in products) p.id: p};
+          final restored = s.items
+              .map((item) {
+                final product = byId[item.productId];
+                if (product == null) return null;
+                return _SaleLineItem(
+                  product: product,
+                  quantity: item.quantity,
+                  priceType: item.priceType == 'wholesale' ? 'Wholesale' : 'Retail',
+                );
+              })
+              .whereType<_SaleLineItem>()
+              .toList();
+          if (restored.isNotEmpty) {
+            setState(() => _lineItems.addAll(restored));
+          }
+        }
+      });
     }
   }
 
@@ -96,9 +157,64 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
 
   @override
   void dispose() {
-    _subtotalCtrl.dispose(); _taxAmountCtrl.dispose(); _totalAmountCtrl.dispose();
+    _subtotalCtrl.dispose(); _taxAmountCtrl.dispose(); _taxPercentCtrl.dispose();
+    _totalAmountCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
+  }
+
+  static String _trimmed(double v) =>
+      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
+
+  /// Checking a product in the multi-select picker adds it as a row (default
+  /// qty 1, Retail); unchecking removes it. Price tier and quantity are then
+  /// adjusted per-row below, not at selection time.
+  void _toggleProduct(Product product) {
+    setState(() {
+      final i = _lineItems.indexWhere((l) => l.product.id == product.id);
+      if (i != -1) {
+        _lineItems.removeAt(i);
+      } else {
+        _lineItems.add(_SaleLineItem(product: product, quantity: 1, priceType: 'Retail'));
+      }
+    });
+    _recalcFromLineItems();
+  }
+
+  void _removeLineItem(int index) {
+    setState(() => _lineItems.removeAt(index));
+    _recalcFromLineItems();
+  }
+
+  void _updateLineItemQty(int index, int qty) {
+    if (qty <= 0) return;
+    setState(() => _lineItems[index].quantity = qty);
+    _recalcFromLineItems();
+  }
+
+  void _updateLineItemPriceType(int index, String priceType) {
+    setState(() => _lineItems[index].priceType = priceType);
+    _recalcFromLineItems();
+  }
+
+  /// Subtotal always mirrors the sum of the line items once any exist —
+  /// editing it by hand only applies while no products have been added.
+  void _recalcFromLineItems() {
+    final sum = _lineItems.fold<double>(0, (s, item) => s + item.amount);
+    _subtotalCtrl.text = sum.toStringAsFixed(2);
+    _recalcTaxAndTotal();
+  }
+
+  /// Tax is entered as a percentage of the subtotal — this derives the
+  /// actual amount the backend stores, then the total.
+  void _recalcTaxAndTotal() {
+    final sub = double.tryParse(_subtotalCtrl.text) ?? 0;
+    final pct = double.tryParse(_taxPercentCtrl.text) ?? 0;
+    final taxAmt = sub * pct / 100;
+    setState(() {
+      _taxAmountCtrl.text = taxAmt.toStringAsFixed(2);
+      _totalAmountCtrl.text = (sub + taxAmt).toStringAsFixed(2);
+    });
   }
 
   GlobalKey<FormState> get _currentFormKey =>
@@ -170,25 +286,25 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
     );
   }
 
-  void _recalcTotal() {
-    final sub = double.tryParse(_subtotalCtrl.text) ?? 0;
-    final tax = double.tryParse(_taxAmountCtrl.text) ?? 0;
-    _totalAmountCtrl.text = (sub + tax).toStringAsFixed(2);
-  }
-
   Future<void> _submit() async {
     if (!_currentFormKey.currentState!.validate()) return;
+    if (!_isEditing && Session.isSuperAdmin && _selectedCompany == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a company'), backgroundColor: AppColors.dangerFill),
+      );
+      return;
+    }
     setState(() => _submitting = true);
-    final sub = double.tryParse(_subtotalCtrl.text) ?? 0;
-    final tax = double.tryParse(_taxAmountCtrl.text) ?? 0;
-    final sale = Sale(
+    // Header fields only — subtotal/tax/total are no longer sent here, the
+    // server derives them from the line items posted in the step2 call below.
+    final headerSale = Sale(
       id: _isEditing ? widget.editSale!.id : '',
       customerId: _selectedCustomer?.id,
       billDate: _billDate,
       invoiceType: _invoiceType,
-      subtotal: sub,
-      taxAmount: tax,
-      totalAmount: double.tryParse(_totalAmountCtrl.text) ?? (sub + tax),
+      subtotal: 0,
+      taxAmount: 0,
+      totalAmount: 0,
       paymentType: _paymentType,
       paymentStatus: _paymentStatus ?? 'Pending',
       notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
@@ -196,10 +312,30 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
       createdAt: _isEditing ? widget.editSale!.createdAt : DateTime.now(),
     );
     try {
-      if (_isEditing) {
-        await ref.read(salesProvider.notifier).updateSale(sale);
-      } else {
-        await ref.read(salesProvider.notifier).addSale(sale);
+      final notifier = ref.read(salesProvider.notifier);
+      final saved = _isEditing
+          ? await notifier.updateSale(headerSale, companyId: _effectiveCompanyId)
+          : await notifier.addSale(
+              headerSale,
+              companyId: (Session.isSuperAdmin ? _selectedCompany!.id : Session.companyId)!,
+            );
+      if (_lineItems.isNotEmpty) {
+        final items = _lineItems
+            .map((l) => SaleItem(
+                  productId: l.product.id,
+                  productName: l.product.productName,
+                  priceType: l.priceType.toLowerCase(),
+                  price: l.unitPrice,
+                  quantity: l.quantity,
+                ))
+            .toList();
+        final taxPct = double.tryParse(_taxPercentCtrl.text) ?? 0;
+        await notifier.updateSaleItems(
+          saved.id,
+          items,
+          taxPct,
+          companyId: _effectiveCompanyId,
+        );
       }
       if (!mounted) return;
       if (widget.fromMenu || widget.fromMasters) {
@@ -366,11 +502,22 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
           onPickImage: _showImageSourceSheet,
           onRemoveImage: () => setState(() => _billImage = null),
           onCustomerChanged: (c) => setState(() => _selectedCustomer = c),
+          showCompanyField: !_isEditing && Session.isSuperAdmin,
+          selectedCompany: _selectedCompany,
+          onCompanyChanged: (c) => setState(() => _selectedCompany = c),
         );
       case 1:
+        final products = ref.watch(productsProvider).valueOrNull ?? [];
         return _Step2(
           formKey: _step2Key,
+          products: products,
+          lineItems: _lineItems,
+          onToggleProduct: _toggleProduct,
+          onRemoveLineItem: _removeLineItem,
+          onLineItemQtyChanged: _updateLineItemQty,
+          onLineItemPriceTypeChanged: _updateLineItemPriceType,
           subtotalCtrl: _subtotalCtrl,
+          taxPercentCtrl: _taxPercentCtrl,
           taxAmountCtrl: _taxAmountCtrl,
           totalAmountCtrl: _totalAmountCtrl,
           paymentType: _paymentType,
@@ -379,7 +526,7 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
           paymentStatuses: _paymentStatuses,
           onPaymentTypeChanged: (v) => setState(() => _paymentType = v),
           onPaymentStatusChanged: (v) => setState(() => _paymentStatus = v),
-          onRecalc: _recalcTotal,
+          onRecalc: _recalcTaxAndTotal,
         );
       default:
         return _Step3(
@@ -394,7 +541,10 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
     if (_selectedCustomer != null) 'Customer': _selectedCustomer!.name,
     'Date': DateFormat('dd MMM yyyy').format(_billDate),
     'Invoice Type': _invoiceType ?? '—',
+    if (_lineItems.isNotEmpty)
+      'Items': _lineItems.map((l) => '${l.product.productName} ×${l.quantity}').join(', '),
     'Subtotal': '₹${_subtotalCtrl.text.isEmpty ? '0.00' : _subtotalCtrl.text}',
+    if (_taxPercentCtrl.text.isNotEmpty) 'Tax %': _taxPercentCtrl.text,
     'Tax': '₹${_taxAmountCtrl.text.isEmpty ? '0.00' : _taxAmountCtrl.text}',
     'Total': '₹${_totalAmountCtrl.text.isEmpty ? '0.00' : _totalAmountCtrl.text}',
     'Payment Type': _paymentType ?? '—',
@@ -543,6 +693,9 @@ class _Step1 extends StatelessWidget {
   final VoidCallback onPickImage;
   final VoidCallback onRemoveImage;
   final void Function(Customer?) onCustomerChanged;
+  final bool showCompanyField;
+  final Company? selectedCompany;
+  final void Function(Company?) onCompanyChanged;
 
   const _Step1({
     required this.formKey,
@@ -557,6 +710,9 @@ class _Step1 extends StatelessWidget {
     required this.onPickImage,
     required this.onRemoveImage,
     required this.onCustomerChanged,
+    required this.showCompanyField,
+    required this.selectedCompany,
+    required this.onCompanyChanged,
   });
 
   @override
@@ -566,6 +722,10 @@ class _Step1 extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
         children: [
+          if (showCompanyField) ...[
+            CompanySelectorField(value: selectedCompany, onChanged: onCompanyChanged),
+            const SizedBox(height: 22),
+          ],
           _DatePickerField(
             label: 'Bill Date *',
             value: billDate,
@@ -609,7 +769,13 @@ class _Step1 extends StatelessWidget {
 
 class _Step2 extends StatelessWidget {
   final GlobalKey<FormState> formKey;
-  final TextEditingController subtotalCtrl, taxAmountCtrl, totalAmountCtrl;
+  final List<Product> products;
+  final List<_SaleLineItem> lineItems;
+  final void Function(Product) onToggleProduct;
+  final void Function(int index) onRemoveLineItem;
+  final void Function(int index, int qty) onLineItemQtyChanged;
+  final void Function(int index, String priceType) onLineItemPriceTypeChanged;
+  final TextEditingController subtotalCtrl, taxPercentCtrl, taxAmountCtrl, totalAmountCtrl;
   final String? paymentType, paymentStatus;
   final List<String> paymentTypes, paymentStatuses;
   final void Function(String?) onPaymentTypeChanged;
@@ -618,7 +784,14 @@ class _Step2 extends StatelessWidget {
 
   const _Step2({
     required this.formKey,
+    required this.products,
+    required this.lineItems,
+    required this.onToggleProduct,
+    required this.onRemoveLineItem,
+    required this.onLineItemQtyChanged,
+    required this.onLineItemPriceTypeChanged,
     required this.subtotalCtrl,
+    required this.taxPercentCtrl,
     required this.taxAmountCtrl,
     required this.totalAmountCtrl,
     required this.paymentType,
@@ -632,20 +805,77 @@ class _Step2 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final hasLineItems = lineItems.isNotEmpty;
+
     return Form(
       key: formKey,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
         children: [
+          Text('Add Products',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface)),
+          const SizedBox(height: 3),
+          Text('Optional — pick products to auto-fill the subtotal below',
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant.withValues(alpha: 0.7))),
+          const SizedBox(height: 12),
+
+          _ProductMultiSelectField(
+            products: products,
+            lineItems: lineItems,
+            onToggle: onToggleProduct,
+          ),
+
+          if (hasLineItems) ...[
+            const SizedBox(height: 14),
+            Container(
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Theme.of(context).dividerColor),
+              ),
+              child: Column(
+                children: List.generate(lineItems.length, (i) {
+                  final item = lineItems[i];
+                  final isLast = i == lineItems.length - 1;
+                  return Column(
+                    children: [
+                      _LineItemRow(
+                        item: item,
+                        onQtyChanged: (q) => onLineItemQtyChanged(i, q),
+                        onPriceTypeChanged: (t) => onLineItemPriceTypeChanged(i, t),
+                        onRemove: () => onRemoveLineItem(i),
+                      ),
+                      if (!isLast) Divider(height: 1, color: Theme.of(context).dividerColor),
+                    ],
+                  );
+                }),
+              ),
+            ),
+          ],
+          const SizedBox(height: 22),
+
           BrixenTextField(
             label: 'Subtotal *',
             hint: '0.00',
             controller: subtotalCtrl,
+            readOnly: hasLineItems,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textInputAction: TextInputAction.next,
             prefixIcon: const Icon(Icons.currency_rupee_rounded),
-            onFieldSubmitted: (_) => onRecalc(),
+            onChanged: hasLineItems ? null : (_) => onRecalc(),
             validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+          ),
+          const SizedBox(height: 22),
+
+          BrixenTextField(
+            label: 'Tax %',
+            hint: 'e.g. 5',
+            controller: taxPercentCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textInputAction: TextInputAction.next,
+            prefixIcon: const Icon(Icons.percent_rounded),
+            onChanged: (_) => onRecalc(),
           ),
           const SizedBox(height: 22),
 
@@ -653,21 +883,18 @@ class _Step2 extends StatelessWidget {
             label: 'Tax Amount',
             hint: '0.00',
             controller: taxAmountCtrl,
+            readOnly: true,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textInputAction: TextInputAction.next,
-            prefixIcon: const Icon(Icons.percent_rounded),
-            onFieldSubmitted: (_) => onRecalc(),
+            prefixIcon: const Icon(Icons.currency_rupee_rounded),
           ),
-          const SizedBox(height: 8),
-          _RecalcButton(onTap: onRecalc),
           const SizedBox(height: 22),
 
           BrixenTextField(
             label: 'Total Amount',
             hint: '0.00',
             controller: totalAmountCtrl,
+            readOnly: true,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textInputAction: TextInputAction.next,
             prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
           ),
           const SizedBox(height: 22),
@@ -827,36 +1054,330 @@ class _DatePickerField extends StatelessWidget {
   }
 }
 
-class _RecalcButton extends StatelessWidget {
-  final VoidCallback onTap;
-  const _RecalcButton({required this.onTap});
+// ── Line-item picker (Sales — Amounts step) ────────────────────────────────
+
+class _QtyStepper extends StatelessWidget {
+  final int value;
+  final void Function(int) onChanged;
+  const _QtyStepper({required this.value, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.accentIndigo.withValues(alpha: 0.4)),
-            borderRadius: BorderRadius.circular(8),
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _QtyButton(
+            icon: Icons.remove_rounded,
+            onTap: value > 1 ? () => onChanged(value - 1) : null,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.calculate_outlined,
-                  size: 14, color: AppColors.accentIndigo),
-              const SizedBox(width: 6),
-              Text('Auto-calculate total',
+          SizedBox(
+            width: 28,
+            child: Text(
+              '$value',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: cs.onSurface),
+            ),
+          ),
+          _QtyButton(icon: Icons.add_rounded, onTap: () => onChanged(value + 1)),
+        ],
+      ),
+    );
+  }
+}
+
+class _QtyButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  const _QtyButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.all(9),
+        child: Icon(
+          icon,
+          size: 16,
+          color: onTap == null ? cs.onSurfaceVariant.withValues(alpha: 0.3) : cs.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+/// Tappable trigger styled like [BrixenDropdown] but opens a checklist
+/// (`_ProductMultiSelectSheet`) instead of a single-select panel — checking
+/// a product adds it as a line item immediately, unchecking removes it.
+class _ProductMultiSelectField extends StatelessWidget {
+  final List<Product> products;
+  final List<_SaleLineItem> lineItems;
+  final void Function(Product) onToggle;
+  const _ProductMultiSelectField({
+    required this.products,
+    required this.lineItems,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final label = lineItems.isEmpty ? null : '${lineItems.length} product(s) selected';
+
+    return GestureDetector(
+      onTap: () => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _ProductMultiSelectSheet(
+          products: products,
+          selectedIds: lineItems.map((l) => l.product.id).toSet(),
+          onToggle: onToggle,
+        ),
+      ),
+      child: Container(
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: isDark ? cs.surfaceContainerHighest : AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: isDark ? Border.all(color: Theme.of(context).dividerColor) : null,
+          boxShadow: isDark
+              ? null
+              : [
+                  BoxShadow(
+                    color: AppColors.shadowDark.withValues(alpha: 0.06),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.checkroom_rounded, size: 20, color: cs.onSurfaceVariant),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label ?? 'Select Products',
+                style: TextStyle(
+                  color: label != null ? cs.onSurface : cs.onSurfaceVariant,
+                  fontSize: 15,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Icon(Icons.checklist_rounded, size: 20, color: cs.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductMultiSelectSheet extends StatefulWidget {
+  final List<Product> products;
+  final Set<String> selectedIds;
+  final void Function(Product) onToggle;
+  const _ProductMultiSelectSheet({
+    required this.products,
+    required this.selectedIds,
+    required this.onToggle,
+  });
+
+  @override
+  State<_ProductMultiSelectSheet> createState() => _ProductMultiSelectSheetState();
+}
+
+class _ProductMultiSelectSheetState extends State<_ProductMultiSelectSheet> {
+  late final Set<String> _selectedIds = {...widget.selectedIds};
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.35,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (context, scrollController) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: cs.onSurfaceVariant.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Select Products',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: cs.onSurface)),
+                  Text('${_selectedIds.length} selected',
+                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: Theme.of(context).dividerColor),
+            Expanded(
+              child: widget.products.isEmpty
+                  ? Center(
+                      child: Text('No products available',
+                          style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13)),
+                    )
+                  : ListView.separated(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      itemCount: widget.products.length,
+                      separatorBuilder: (_, _) => Divider(height: 1, color: Theme.of(context).dividerColor),
+                      itemBuilder: (_, i) {
+                        final product = widget.products[i];
+                        final selected = _selectedIds.contains(product.id);
+                        return CheckboxListTile(
+                          value: selected,
+                          onChanged: (_) {
+                            setState(() {
+                              selected ? _selectedIds.remove(product.id) : _selectedIds.add(product.id);
+                            });
+                            widget.onToggle(product);
+                          },
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: Text(product.productName,
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
+                          subtitle: Text(
+                            'Retail ₹${product.retailPrice.toStringAsFixed(0)} · '
+                            'Wholesale ₹${product.wholesalePrice.toStringAsFixed(0)}',
+                            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 12),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact per-row Retail/Wholesale switch — a full dropdown per line item
+/// would crowd the row, so this reuses the same two options as chips.
+class _PriceTypeChips extends StatelessWidget {
+  final String value;
+  final void Function(String) onChanged;
+  const _PriceTypeChips({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: _priceTypes.map((t) {
+          final selected = t == value;
+          return GestureDetector(
+            onTap: () => onChanged(t),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: selected ? AppColors.accentIndigo.withValues(alpha: 0.15) : null,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(t,
                   style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.accentIndigo,
-                      fontWeight: FontWeight.w500)),
+                    fontSize: 11,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: selected ? AppColors.accentIndigo : cs.onSurfaceVariant,
+                  )),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _LineItemRow extends StatelessWidget {
+  final _SaleLineItem item;
+  final void Function(int) onQtyChanged;
+  final void Function(String) onPriceTypeChanged;
+  final VoidCallback onRemove;
+  const _LineItemRow({
+    required this.item,
+    required this.onQtyChanged,
+    required this.onPriceTypeChanged,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(item.product.productName,
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: cs.onSurface),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+              IconButton(
+                onPressed: onRemove,
+                icon: const Icon(Icons.close_rounded, size: 18),
+                color: AppColors.dangerFill,
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              ),
             ],
           ),
-        ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              _PriceTypeChips(value: item.priceType, onChanged: onPriceTypeChanged),
+              const Spacer(),
+              _QtyStepper(value: item.quantity, onChanged: onQtyChanged),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 60,
+                child: Text('₹${item.amount.toStringAsFixed(0)}',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: cs.onSurface)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text('₹${item.unitPrice.toStringAsFixed(0)} each (${item.priceType})',
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+        ],
       ),
     );
   }
@@ -982,12 +1503,7 @@ class _BillImagePicker extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: Image.file(
-              File(image!.path),
-              width: double.infinity,
-              height: 180,
-              fit: BoxFit.cover,
-            ),
+            child: pickedImage(image!.path, width: double.infinity, height: 180),
           ),
           Positioned(
             top: 8,

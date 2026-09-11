@@ -134,6 +134,73 @@ class SkeletonListCard extends StatelessWidget {
   }
 }
 
+/// Mimics a single [AppDrawer] menu row (icon badge + title/subtitle,
+/// chevron) so the drawer doesn't jump in size once the real menu loads.
+class SkeletonDrawerTile extends StatelessWidget {
+  final bool compact;
+  const SkeletonDrawerTile({super.key, this.compact = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final size = compact ? 34.0 : 42.0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(compact ? 15 : 18),
+      ),
+      child: Row(
+        children: [
+          SkeletonBox(width: size, height: size, radius: compact ? size / 2 : 12),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SkeletonBox(width: compact ? 100 : 120, height: 12, radius: 4),
+                const SizedBox(height: 6),
+                SkeletonBox(width: compact ? 70 : 90, height: 9, radius: 4),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A ready-to-drop-in skeleton for the whole [AppDrawer] menu while
+/// `GET /api/v1/modules` is loading — same tile count/shape as a typical
+/// menu (top-level tiles, then a shorter "Masters"-style group).
+class SkeletonDrawerMenu extends StatelessWidget {
+  const SkeletonDrawerMenu({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+        physics: const NeverScrollableScrollPhysics(),
+        children: [
+          for (var i = 0; i < 6; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: SkeletonDrawerTile(),
+            ),
+          const SizedBox(height: 18),
+          SkeletonBox(width: 90, height: 12, radius: 4),
+          const SizedBox(height: 14),
+          for (var i = 0; i < 3; i++)
+            Padding(
+              padding: const EdgeInsets.only(left: 12, bottom: 9),
+              child: SkeletonDrawerTile(compact: true),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 /// A ready-to-drop-in skeleton for any "loading" branch on a list page —
 /// pass the same padding the real `ListView` uses so nothing visibly
 /// shifts once data arrives.
@@ -153,8 +220,8 @@ class SkeletonListView extends StatelessWidget {
         padding: padding,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: count,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (_, __) => const SkeletonListCard(),
+        separatorBuilder: (_, _) => const SizedBox(height: 10),
+        itemBuilder: (_, _) => const SkeletonListCard(),
       ),
     );
   }

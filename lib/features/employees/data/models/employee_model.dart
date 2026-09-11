@@ -3,6 +3,7 @@ import '../../domain/entities/employee.dart';
 class EmployeeModel extends Employee {
   const EmployeeModel({
     required super.id,
+    super.companyId,
     required super.employeeCode,
     required super.firstName,
     super.lastName,
@@ -33,6 +34,7 @@ class EmployeeModel extends Employee {
   factory EmployeeModel.fromJson(Map<String, dynamic> json) {
     return EmployeeModel(
       id: json['id'].toString(),
+      companyId: json['company_id']?.toString(),
       employeeCode: (json['employee_code'] ?? json['employeeCode'] ?? '').toString(),
       firstName: (json['first_name'] ?? json['firstName'] ?? '').toString(),
       lastName: json['last_name'] ?? json['lastName'],
@@ -63,8 +65,11 @@ class EmployeeModel extends Employee {
     );
   }
 
-  /// Step 1 (Personal) — POST /employees.
-  static Map<String, dynamic> toStep1Body(Employee e) => {
+  /// Step 1 (Personal) — POST /employees. `companyId` is required: the
+  /// company this employee belongs to (chosen by a superAdmin, or implicit
+  /// for a companyAdmin/employee session — see `Session.companyId`).
+  static Map<String, dynamic> toStep1Body(Employee e, {required String companyId}) => {
+        'company_id': int.parse(companyId),
         'first_name': e.firstName,
         if (e.lastName != null && e.lastName!.isNotEmpty) 'last_name': e.lastName,
         if (e.gender != null) 'gender': e.gender,

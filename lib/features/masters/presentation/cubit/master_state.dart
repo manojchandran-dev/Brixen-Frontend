@@ -25,7 +25,9 @@ class MasterLoaded extends MasterState {
 
   List<MasterItem> get filtered => query.isEmpty
       ? items
-      : items.where((i) => i.name.toLowerCase().contains(query.toLowerCase())).toList();
+      : items
+            .where((i) => i.name.toLowerCase().contains(query.toLowerCase()))
+            .toList();
 
   @override
   List<Object?> get props => [typeKey, items, query];

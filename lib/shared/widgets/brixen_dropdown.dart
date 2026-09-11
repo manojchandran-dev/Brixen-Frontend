@@ -37,7 +37,9 @@ class _BrixenDropdownState<T> extends State<BrixenDropdown<T>>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 200));
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
     _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
   }
 
@@ -54,44 +56,46 @@ class _BrixenDropdownState<T> extends State<BrixenDropdown<T>>
     final width = rb.size.width;
     final height = rb.size.height;
 
-    _entry = OverlayEntry(builder: (ctx) {
-      return GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: _hide,
-        child: Stack(
-          children: [
-            CompositedTransformFollower(
-              link: _link,
-              showWhenUnlinked: false,
-              targetAnchor: Alignment.bottomLeft,
-              followerAnchor: Alignment.topLeft,
-              offset: Offset(0, height > 0 ? 0 : 56),
-              child: SizedBox(
-                width: width,
-                child: AnimatedBuilder(
-                  animation: _anim,
-                  builder: (context, _) => Opacity(
-                    opacity: _anim.value,
-                    child: Transform.translate(
-                      offset: Offset(0, (1 - _anim.value) * -6),
-                      child: _BrixenDropdownPanel<T>(
-                        items: widget.items,
-                        value: widget.value,
-                        labelOf: widget.labelOf,
-                        onSelect: (v) {
-                          widget.onChanged(v);
-                          _hide();
-                        },
+    _entry = OverlayEntry(
+      builder: (ctx) {
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: _hide,
+          child: Stack(
+            children: [
+              CompositedTransformFollower(
+                link: _link,
+                showWhenUnlinked: false,
+                targetAnchor: Alignment.bottomLeft,
+                followerAnchor: Alignment.topLeft,
+                offset: Offset(0, height > 0 ? 0 : 56),
+                child: SizedBox(
+                  width: width,
+                  child: AnimatedBuilder(
+                    animation: _anim,
+                    builder: (context, _) => Opacity(
+                      opacity: _anim.value,
+                      child: Transform.translate(
+                        offset: Offset(0, (1 - _anim.value) * -6),
+                        child: _BrixenDropdownPanel<T>(
+                          items: widget.items,
+                          value: widget.value,
+                          labelOf: widget.labelOf,
+                          onSelect: (v) {
+                            widget.onChanged(v);
+                            _hide();
+                          },
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
-      );
-    });
+            ],
+          ),
+        );
+      },
+    );
 
     Overlay.of(context).insert(_entry!);
     _ctrl.forward();
@@ -112,8 +116,9 @@ class _BrixenDropdownState<T> extends State<BrixenDropdown<T>>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final label =
-        widget.value != null ? widget.labelOf(widget.value as T) : null;
+    final label = widget.value != null
+        ? widget.labelOf(widget.value as T)
+        : null;
 
     return CompositedTransformTarget(
       link: _link,
@@ -128,13 +133,26 @@ class _BrixenDropdownState<T> extends State<BrixenDropdown<T>>
                 ? const BorderRadius.vertical(top: Radius.circular(16))
                 : BorderRadius.circular(16),
             border: isDark
-                ? Border.all(color: _isOpen ? AppColors.silver : Theme.of(context).dividerColor, width: _isOpen ? 1.5 : 1)
+                ? Border.all(
+                    color: _isOpen
+                        ? AppColors.silver
+                        : Theme.of(context).dividerColor,
+                    width: _isOpen ? 1.5 : 1,
+                  )
                 : null,
             boxShadow: isDark
                 ? null
                 : [
-                    BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
-                    BoxShadow(color: AppColors.highlightShadow(0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+                    BoxShadow(
+                      color: AppColors.shadowDark.withValues(alpha: 0.06),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                    BoxShadow(
+                      color: AppColors.highlightShadow(0.85),
+                      blurRadius: 6,
+                      offset: const Offset(-3, -3),
+                    ),
                   ],
           ),
           child: Row(
@@ -150,22 +168,28 @@ class _BrixenDropdownState<T> extends State<BrixenDropdown<T>>
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [widget.iconColor, widget.iconColor.withValues(alpha: 0.75)],
+                          colors: AppColors.accentGradient(widget.iconColor),
                         ),
                         boxShadow: AppColors.shadows([
-                          BoxShadow(color: widget.iconColor.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3)),
+                          BoxShadow(
+                            color: widget.iconColor.withValues(alpha: 0.4),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
                         ]),
                       ),
-                      child: Icon(widget.icon, size: 17, color: AppColors.white),
+                      child: Icon(
+                        widget.icon,
+                        size: 17,
+                        color: AppColors.white,
+                      ),
                     ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   label ?? widget.hint,
                   style: TextStyle(
-                    color: label != null
-                        ? cs.onSurface
-                        : cs.onSurfaceVariant,
+                    color: label != null ? cs.onSurface : cs.onSurfaceVariant,
                     fontSize: 15,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -174,8 +198,11 @@ class _BrixenDropdownState<T> extends State<BrixenDropdown<T>>
               AnimatedRotation(
                 turns: _isOpen ? 0.5 : 0,
                 duration: const Duration(milliseconds: 200),
-                child: Icon(Icons.keyboard_arrow_down_rounded,
-                    color: cs.onSurfaceVariant, size: 22),
+                child: Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: cs.onSurfaceVariant,
+                  size: 22,
+                ),
               ),
             ],
           ),
@@ -202,28 +229,28 @@ class _BrixenDropdownPanel<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg =
-        isDark ? cs.surfaceContainerHighest : AppColors.lightSurface;
+    final bg = isDark ? cs.surfaceContainerHighest : AppColors.lightSurface;
 
     if (items.isEmpty) {
       return Material(
         elevation: 10,
         shadowColor: Colors.black.withValues(alpha: 0.15),
-        borderRadius:
-            const BorderRadius.vertical(bottom: Radius.circular(12)),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
         color: bg,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            borderRadius:
-                const BorderRadius.vertical(bottom: Radius.circular(12)),
+            borderRadius: const BorderRadius.vertical(
+              bottom: Radius.circular(12),
+            ),
             border: Border.all(
-                color: AppColors.silver
-                    .withValues(alpha: isDark ? 0.3 : 0.2)),
+              color: AppColors.silver.withValues(alpha: isDark ? 0.3 : 0.2),
+            ),
           ),
-          child: Text('No options available',
-              style: TextStyle(
-                  color: cs.onSurfaceVariant, fontSize: 14)),
+          child: Text(
+            'No options available',
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
+          ),
         ),
       );
     }
@@ -231,21 +258,22 @@ class _BrixenDropdownPanel<T> extends StatelessWidget {
     return Material(
       elevation: isDark ? 0 : 10,
       shadowColor: Colors.black.withValues(alpha: 0.15),
-      borderRadius:
-          const BorderRadius.vertical(bottom: Radius.circular(12)),
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
       color: bg,
       child: Container(
         constraints: const BoxConstraints(maxHeight: 224),
         decoration: BoxDecoration(
-          borderRadius:
-              const BorderRadius.vertical(bottom: Radius.circular(12)),
+          borderRadius: const BorderRadius.vertical(
+            bottom: Radius.circular(12),
+          ),
           border: Border.all(
-              color:
-                  AppColors.silver.withValues(alpha: isDark ? 0.3 : 0.2)),
+            color: AppColors.silver.withValues(alpha: isDark ? 0.3 : 0.2),
+          ),
         ),
         child: ClipRRect(
-          borderRadius:
-              const BorderRadius.vertical(bottom: Radius.circular(12)),
+          borderRadius: const BorderRadius.vertical(
+            bottom: Radius.circular(12),
+          ),
           child: ListView.separated(
             padding: EdgeInsets.zero,
             shrinkWrap: true,
@@ -260,10 +288,11 @@ class _BrixenDropdownPanel<T> extends StatelessWidget {
                 onTap: () => onSelect(item),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 13),
+                    horizontal: 16,
+                    vertical: 13,
+                  ),
                   color: selected
-                      ? AppColors.silver
-                          .withValues(alpha: isDark ? 0.12 : 0.07)
+                      ? AppColors.silver.withValues(alpha: isDark ? 0.12 : 0.07)
                       : Colors.transparent,
                   child: Row(
                     children: [
@@ -273,8 +302,8 @@ class _BrixenDropdownPanel<T> extends StatelessWidget {
                           style: TextStyle(
                             color: selected
                                 ? (isDark
-                                    ? AppColors.silver
-                                    : AppColors.lightPrimary)
+                                      ? AppColors.silver
+                                      : AppColors.lightPrimary)
                                 : cs.onSurface,
                             fontSize: 15,
                             fontWeight: selected
@@ -284,11 +313,13 @@ class _BrixenDropdownPanel<T> extends StatelessWidget {
                         ),
                       ),
                       if (selected)
-                        Icon(Icons.check_rounded,
-                            size: 16,
-                            color: isDark
-                                ? AppColors.silver
-                                : AppColors.lightPrimary),
+                        Icon(
+                          Icons.check_rounded,
+                          size: 16,
+                          color: isDark
+                              ? AppColors.silver
+                              : AppColors.lightPrimary,
+                        ),
                     ],
                   ),
                 ),

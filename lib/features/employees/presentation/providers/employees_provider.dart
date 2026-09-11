@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/datasources/employees_remote_datasource.dart';
+import '../../../../shared/providers/super_admin_company_filter_provider.dart';
 import '../../data/models/employee_model.dart';
+import '../../data/repositories/employees_repository_impl.dart';
 import '../../domain/entities/employee.dart';
 
 final employeesProvider = AsyncNotifierProvider<EmployeesNotifier, List<Employee>>(
@@ -12,7 +13,10 @@ class EmployeesNotifier extends AsyncNotifier<List<Employee>> {
 
   @override
   Future<List<Employee>> build() async {
-    final list = await ref.read(employeesRemoteDatasourceProvider).getEmployees();
+    // superAdmin's "browse as company X" filter — refetch whenever it
+    // changes, since CompanyScopeInterceptor reads it to scope this call.
+    ref.watch(superAdminCompanyFilterProvider);
+    final list = await ref.read(employeesRepositoryProvider).getEmployees();
     _all = _resolveManagerNames(list);
     return _all;
   }
@@ -30,10 +34,10 @@ class EmployeesNotifier extends AsyncNotifier<List<Employee>> {
     }).toList();
   }
 
-  Future<Employee> updateEmployee(Employee employee) async {
+  Future<Employee> updateEmployee(Employee employee, {String? companyId}) async {
     final updated = await ref
-        .read(employeesRemoteDatasourceProvider)
-        .updateEmployee(employee.id, EmployeeModel.toBody(employee));
+        .read(employeesRepositoryProvider)
+        .updateEmployee(employee.id, EmployeeModel.toBody(employee), companyId: companyId);
     _replace(updated);
     return updated;
   }
@@ -42,29 +46,29 @@ class EmployeesNotifier extends AsyncNotifier<List<Employee>> {
 
   /// Step 1 (Personal) — POST, creates the employee and returns it with the
   /// server-generated id/employee_code.
-  Future<Employee> createStep1(Employee employee) async {
+  Future<Employee> createStep1(Employee employee, {required String companyId}) async {
     final created = await ref
-        .read(employeesRemoteDatasourceProvider)
-        .createEmployee(EmployeeModel.toStep1Body(employee));
+        .read(employeesRepositoryProvider)
+        .createEmployee(EmployeeModel.toStep1Body(employee, companyId: companyId));
     _all = _resolveManagerNames([..._all, created]);
     state = AsyncData(List.from(_all));
     return created;
   }
 
   /// Step 2 (Employment) — PUT /:id/step2.
-  Future<Employee> updateStep2(String id, Employee employee) async {
+  Future<Employee> updateStep2(String id, Employee employee, {String? companyId}) async {
     final updated = await ref
-        .read(employeesRemoteDatasourceProvider)
-        .updateStep2(id, EmployeeModel.toStep2Body(employee));
+        .read(employeesRepositoryProvider)
+        .updateStep2(id, EmployeeModel.toStep2Body(employee), companyId: companyId);
     _replace(updated);
     return updated;
   }
 
   /// Step 3 (Banking) — PUT /:id/step3.
-  Future<Employee> updateStep3(String id, Employee employee) async {
+  Future<Employee> updateStep3(String id, Employee employee, {String? companyId}) async {
     final updated = await ref
-        .read(employeesRemoteDatasourceProvider)
-        .updateStep3(id, EmployeeModel.toStep3Body(employee));
+        .read(employeesRepositoryProvider)
+        .updateStep3(id, EmployeeModel.toStep3Body(employee), companyId: companyId);
     _replace(updated);
     return updated;
   }
@@ -72,13 +76,13 @@ class EmployeesNotifier extends AsyncNotifier<List<Employee>> {
   /// Step 4 (Review) — re-fetches from the server so the summary reflects
   /// exactly what was persisted, not just local form state.
   Future<Employee> fetchEmployeeDetail(String id) async {
-    final fetched = await ref.read(employeesRemoteDatasourceProvider).getEmployeeById(id);
+    final fetched = await ref.read(employeesRepositoryProvider).getEmployeeById(id);
     _replace(fetched);
     return fetched;
   }
 
-  Future<void> deleteEmployee(String id) async {
-    await ref.read(employeesRemoteDatasourceProvider).deleteEmployee(id);
+  Future<void> deleteEmployee(String id, {String? companyId}) async {
+    await ref.read(employeesRepositoryProvider).deleteEmployee(id, companyId: companyId);
     _all = _all.where((e) => e.id != id).toList();
     state = AsyncData(List.from(_all));
   }

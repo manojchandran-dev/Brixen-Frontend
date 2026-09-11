@@ -1,83 +1,32 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/router/app_router.dart';
+import '../../features/navigation/domain/entities/nav_module.dart';
+import '../../features/navigation/presentation/module_visuals.dart';
+import '../../features/navigation/presentation/providers/nav_modules_provider.dart';
+import 'error_state.dart';
+import 'skeleton.dart';
 
 /// Slide-out navigation drawer used across module pages (Employees, Sales,
 /// Customers, Expenses, Purchases, Companies) — opened via the hamburger
 /// icon in the AppBar. Shows modules only — profile, theme and settings
 /// live in the "More" bottom-nav tab instead.
-class AppDrawer extends StatelessWidget {
+///
+/// The menu itself (which modules exist, their names/descriptions, and the
+/// Masters group's children) comes from `GET /api/v1/modules` — nothing
+/// here is a hardcoded list. Icons/colours/routes aren't part of that API
+/// (it's pure navigation metadata), so [_visualFor] maps a module's name to
+/// a look + destination on the client, with a generic fallback for any
+/// module name it doesn't recognise.
+class AppDrawer extends ConsumerWidget {
   const AppDrawer({super.key});
 
-  static final List<_DrawerItem> _moduleItems = [
-    _DrawerItem(
-      icon: Icons.business_rounded,
-      label: 'Companies',
-      subtitle: 'All companies',
-      color: AppColors.brand,
-      onTap: (context) => context.go(AppRouter.companies, extra: 'companies'),
-    ),
-    _DrawerItem(
-      icon: Icons.badge_rounded,
-      label: 'Employees',
-      subtitle: 'Manage staff',
-      color: AppColors.positive,
-      onTap: (context) => context.go(AppRouter.employees),
-    ),
-    _DrawerItem(
-      icon: Icons.receipt_long_rounded,
-      label: 'Sales',
-      subtitle: 'Invoices',
-      color: AppColors.brandDeep,
-      onTap: (context) => context.go(AppRouter.sales),
-    ),
-    _DrawerItem(
-      icon: Icons.people_alt_rounded,
-      label: 'Customers',
-      subtitle: 'Customer records',
-      color: AppColors.brandLight,
-      onTap: (context) => context.go(AppRouter.customers),
-    ),
-    _DrawerItem(
-      icon: Icons.receipt_outlined,
-      label: 'Expenses',
-      subtitle: 'Track spending',
-      color: AppColors.brandBlack,
-      onTap: (context) => context.go(AppRouter.expenses),
-    ),
-  ];
-
-  static final List<_DrawerItem> _masterItems = [
-    _DrawerItem(
-      icon: Icons.apartment_rounded,
-      label: 'Company Category',
-      subtitle: 'Company types',
-      color: AppColors.brand,
-      onTap: (context) =>
-          context.go(AppRouter.companies, extra: 'masters/companyCategory'),
-    ),
-    _DrawerItem(
-      icon: Icons.sell_rounded,
-      label: 'Expense Category',
-      subtitle: 'Spending types',
-      color: AppColors.positive,
-      onTap: (context) =>
-          context.go(AppRouter.companies, extra: 'masters/expenseCategory'),
-    ),
-    _DrawerItem(
-      icon: Icons.straighten_rounded,
-      label: 'Units',
-      subtitle: 'Measurement units',
-      color: AppColors.brandDeep,
-      onTap: (context) =>
-          context.go(AppRouter.companies, extra: 'masters/unit'),
-    ),
-  ];
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final modulesAsync = ref.watch(navModulesProvider);
+
     return Drawer(
       backgroundColor: AppColors.background,
       width: MediaQuery.of(context).size.width * 0.86,
@@ -136,7 +85,8 @@ class AppDrawer extends StatelessWidget {
                         ),
                       ],
                     ),
-                    style: GoogleFonts.spaceGrotesk(
+                    style: const TextStyle(
+                      fontFamily: 'SpaceGrotesk',
                       fontSize: 32,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.2,
@@ -161,66 +111,28 @@ class AppDrawer extends StatelessWidget {
               child: Container(height: 1, color: AppColors.border),
             ),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
-                children: [
-                  ..._moduleItems.map(
-                    (item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _DrawerTile(item: item),
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  Row(
-                    children: [
-                      Container(
-                        width: 28,
-                        height: 28,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppColors.ink.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(8),
+              child: modulesAsync.when(
+                loading: () => const SkeletonDrawerMenu(),
+                error: (e, _) => ErrorCard(
+                  error: e,
+                  onRetry: () => ref.invalidate(navModulesProvider),
+                ),
+                data: (modules) => ListView(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+                  children: [
+                    for (final m in modules)
+                      if (m.children.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _DrawerTile(module: m),
+                        )
+                      else
+                        Padding(
+                          padding: const EdgeInsets.only(top: 18, bottom: 14),
+                          child: _GroupSection(module: m),
                         ),
-                        child: Icon(
-                          Icons.dashboard_customize_rounded,
-                          size: 14,
-                          color: AppColors.ink,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Masters',
-                        style: TextStyle(
-                          color: AppColors.ink,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.1,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Container(height: 1, color: AppColors.border),
-                      ),
-                    ],
-                  ),
-                  Padding(
-                    padding: EdgeInsets.only(left: 38, top: 3),
-                    child: Text(
-                      'Categories & units',
-                      style: TextStyle(
-                        color: AppColors.textHint,
-                        fontSize: 11.5,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  ..._masterItems.map(
-                    (item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 9),
-                      child: _MasterRowTile(item: item),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],
@@ -230,16 +142,72 @@ class AppDrawer extends StatelessWidget {
   }
 }
 
+/// Where a menu entry navigates to, keyed by the module's name — the API
+/// only carries id/name/description/parent_id/children, no route info.
+/// Icon/colour come from the shared [moduleVisualFor] instead of being
+/// duplicated here.
+void Function(BuildContext context) _destinationFor(NavModule module) {
+  final key = module.name.toLowerCase().replaceAll(RegExp(r'\s+'), '');
+  switch (key) {
+    case 'companies':
+      return (context) => context.go(
+        AppRouter.companies,
+        extra: AppRouter.companiesSection('companies'),
+      );
+    case 'permissions':
+      return (context) => context.go(AppRouter.permissions);
+    case 'employees':
+      return (context) => context.go(AppRouter.employees);
+    case 'sales':
+      return (context) => context.go(AppRouter.sales);
+    case 'purchases':
+      return (context) => context.go(AppRouter.purchases);
+    case 'customers':
+      return (context) => context.go(AppRouter.customers);
+    case 'expenses':
+      return (context) => context.go(AppRouter.expenses);
+    case 'products':
+      return (context) => context.go(AppRouter.products);
+    case 'companycategory':
+      return (context) => context.go(
+        AppRouter.companies,
+        extra: AppRouter.companiesSection('masters/companyCategory'),
+      );
+    case 'expensecategory':
+      return (context) => context.go(
+        AppRouter.companies,
+        extra: AppRouter.companiesSection('masters/expenseCategory'),
+      );
+    case 'units':
+    case 'unit':
+      return (context) => context.go(
+        AppRouter.companies,
+        extra: AppRouter.companiesSection('masters/unit'),
+      );
+    case 'productcategory':
+      return (context) => context.go(
+        AppRouter.companies,
+        extra: AppRouter.companiesSection('masters/productCategory'),
+      );
+    default:
+      // Any module the app doesn't have a screen for yet — shown, but
+      // inert, rather than silently dropped or crashing on an unknown key.
+      return (context) {};
+  }
+}
+
 class _DrawerTile extends StatelessWidget {
-  final _DrawerItem item;
-  const _DrawerTile({required this.item});
+  final NavModule module;
+  const _DrawerTile({required this.module});
 
   @override
   Widget build(BuildContext context) {
+    final visual = moduleVisualFor(module.name);
+    final destination = _destinationFor(module);
     return GestureDetector(
       onTap: () {
         Navigator.of(context).pop();
-        item.onTap(context);
+        destination(context);
       },
       behavior: HitTestBehavior.opaque,
       child: Container(
@@ -271,7 +239,7 @@ class _DrawerTile extends StatelessWidget {
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: AppColors.accentGradient(item.color),
+                      colors: AppColors.accentGradient(visual.color),
                     ),
                   ),
                 ),
@@ -292,19 +260,19 @@ class _DrawerTile extends StatelessWidget {
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: AppColors.accentGradient(item.color),
+                              colors: AppColors.accentGradient(visual.color),
                             ),
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: AppColors.shadows([
                               BoxShadow(
-                                color: item.color.withValues(alpha: 0.3),
+                                color: visual.color.withValues(alpha: 0.3),
                                 blurRadius: 10,
                                 offset: const Offset(0, 5),
                               ),
                             ]),
                           ),
                           child: Icon(
-                            item.icon,
+                            visual.icon,
                             size: 20,
                             color: AppColors.white,
                           ),
@@ -316,7 +284,7 @@ class _DrawerTile extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                item.label,
+                                module.name,
                                 style: TextStyle(
                                   color: AppColors.ink,
                                   fontSize: 14.5,
@@ -325,7 +293,7 @@ class _DrawerTile extends StatelessWidget {
                               ),
                               const SizedBox(height: 1),
                               Text(
-                                item.subtitle,
+                                module.description ?? '',
                                 style: TextStyle(
                                   color: AppColors.textHint,
                                   fontSize: 11.5,
@@ -353,19 +321,81 @@ class _DrawerTile extends StatelessWidget {
   }
 }
 
+/// A module that carries children (e.g. "Masters") — rendered as a section
+/// header followed by its children as [_MasterRowTile]s.
+class _GroupSection extends StatelessWidget {
+  final NavModule module;
+  const _GroupSection({required this.module});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.ink.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.dashboard_customize_rounded,
+                size: 14,
+                color: AppColors.ink,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              module.name,
+              style: TextStyle(
+                color: AppColors.ink,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.1,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Container(height: 1, color: AppColors.border)),
+          ],
+        ),
+        if (module.description != null && module.description!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: 38, top: 3),
+            child: Text(
+              module.description!,
+              style: TextStyle(color: AppColors.textHint, fontSize: 11.5),
+            ),
+          ),
+        const SizedBox(height: 14),
+        for (final child in module.children)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 9),
+            child: _MasterRowTile(module: child),
+          ),
+      ],
+    );
+  }
+}
+
 class _MasterRowTile extends StatelessWidget {
-  final _DrawerItem item;
-  const _MasterRowTile({required this.item});
+  final NavModule module;
+  const _MasterRowTile({required this.module});
 
   @override
   Widget build(BuildContext context) {
     // Same white-card + left-accent language as the modules above, kept
     // deliberately quieter (smaller icon, thinner accent, indented) so the
     // hierarchy — nested under "Masters" — still reads at a glance.
+    final visual = moduleVisualFor(module.name);
+    final destination = _destinationFor(module);
     return GestureDetector(
       onTap: () {
         Navigator.of(context).pop();
-        item.onTap(context);
+        destination(context);
       },
       behavior: HitTestBehavior.opaque,
       child: Container(
@@ -398,7 +428,7 @@ class _MasterRowTile extends StatelessWidget {
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: AppColors.accentGradient(item.color),
+                      colors: AppColors.accentGradient(visual.color),
                     ),
                   ),
                 ),
@@ -418,19 +448,19 @@ class _MasterRowTile extends StatelessWidget {
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: AppColors.accentGradient(item.color),
+                              colors: AppColors.accentGradient(visual.color),
                             ),
                             shape: BoxShape.circle,
                             boxShadow: AppColors.shadows([
                               BoxShadow(
-                                color: item.color.withValues(alpha: 0.28),
+                                color: visual.color.withValues(alpha: 0.28),
                                 blurRadius: 7,
                                 offset: const Offset(0, 3),
                               ),
                             ]),
                           ),
                           child: Icon(
-                            item.icon,
+                            visual.icon,
                             size: 15,
                             color: AppColors.white,
                           ),
@@ -441,7 +471,7 @@ class _MasterRowTile extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                item.label,
+                                module.name,
                                 style: TextStyle(
                                   color: AppColors.ink,
                                   fontSize: 13.5,
@@ -450,7 +480,7 @@ class _MasterRowTile extends StatelessWidget {
                               ),
                               const SizedBox(height: 1),
                               Text(
-                                item.subtitle,
+                                module.description ?? '',
                                 style: TextStyle(
                                   color: AppColors.textHint,
                                   fontSize: 11,
@@ -475,19 +505,4 @@ class _MasterRowTile extends StatelessWidget {
       ),
     );
   }
-}
-
-class _DrawerItem {
-  final IconData icon;
-  final String label;
-  final String subtitle;
-  final Color color;
-  final void Function(BuildContext context) onTap;
-  const _DrawerItem({
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-  });
 }
