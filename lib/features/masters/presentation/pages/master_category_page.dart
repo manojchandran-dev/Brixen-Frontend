@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../core/network/api_endpoints.dart';
@@ -6,6 +7,7 @@ import '../../../../shared/widgets/deleted_items_button.dart';
 import '../../domain/entities/master_type.dart';
 import '../cubit/master_cubit.dart';
 import '../widgets/master_type_body.dart';
+import '../../../permissions/presentation/providers/module_access_provider.dart';
 
 enum _Mode { list, create, edit }
 
@@ -21,15 +23,15 @@ String? _deletedListPath(String typeKey) => switch (typeKey) {
 /// A directly-linkable route for one master type (`/masters/...`), additive
 /// alongside the existing Companies → Menu → Masters in-page drill-down —
 /// both reach the same [MasterCubit] state, neither replaces the other.
-class MasterCategoryPage extends StatefulWidget {
+class MasterCategoryPage extends ConsumerStatefulWidget {
   final String typeKey;
   const MasterCategoryPage({super.key, required this.typeKey});
 
   @override
-  State<MasterCategoryPage> createState() => _MasterCategoryPageState();
+  ConsumerState<MasterCategoryPage> createState() => _MasterCategoryPageState();
 }
 
-class _MasterCategoryPageState extends State<MasterCategoryPage> {
+class _MasterCategoryPageState extends ConsumerState<MasterCategoryPage> {
   _Mode _mode = _Mode.list;
   String? _editId;
 
@@ -49,6 +51,7 @@ class _MasterCategoryPageState extends State<MasterCategoryPage> {
   @override
   Widget build(BuildContext context) {
     final typeCfg = masterTypeFor(widget.typeKey);
+    final access = ref.watch(moduleAccessProvider(masterModuleName(widget.typeKey)));
     final isForm = _mode != _Mode.list;
     final formTitle = switch (_mode) {
       _Mode.create => 'Add ${typeCfg?.name ?? 'Item'}',
@@ -96,7 +99,7 @@ class _MasterCategoryPageState extends State<MasterCategoryPage> {
                 ),
               ),
         actions: [
-          if (!isForm && _deletedListPath(widget.typeKey) != null)
+          if (!isForm && access.delete && _deletedListPath(widget.typeKey) != null)
             DeletedItemsButton(
               title: 'Deleted ${typeCfg?.name.toLowerCase() ?? 'items'}',
               listPath: _deletedListPath(widget.typeKey)!,
@@ -106,7 +109,7 @@ class _MasterCategoryPageState extends State<MasterCategoryPage> {
               subtitleOf: (m) => (m['full_form'] ?? m['description']) as String?,
               onRestored: () => masterCubit.load(widget.typeKey),
             ),
-          if (!isForm)
+          if (!isForm && access.create)
             GestureDetector(
               onTap: _goCreate,
               child: Container(

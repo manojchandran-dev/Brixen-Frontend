@@ -7,6 +7,7 @@ import '../services/session_service.dart';
 import '../services/token_service.dart';
 import 'api_endpoints.dart';
 import 'api_exception.dart';
+import 'token_refresh_interceptor.dart';
 
 final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(BaseOptions(
@@ -16,6 +17,7 @@ final dioProvider = Provider<Dio>((ref) {
     headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
   ));
   dio.interceptors.add(_AuthInterceptor());
+  dio.interceptors.add(TokenRefreshInterceptor());
   dio.interceptors.add(CompanyScopeInterceptor(ref));
   dio.interceptors.add(LogInterceptor(
     requestBody: true,

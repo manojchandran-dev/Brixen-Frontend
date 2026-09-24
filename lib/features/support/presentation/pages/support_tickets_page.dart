@@ -16,6 +16,7 @@ import '../../../../shared/widgets/search_field.dart';
 import '../../../../shared/widgets/skeleton.dart';
 import '../../domain/entities/support_ticket.dart';
 import '../providers/support_tickets_provider.dart';
+import '../../../permissions/presentation/providers/module_access_provider.dart';
 import '../widgets/ticket_labels.dart';
 import '../widgets/ticket_status_badge.dart';
 
@@ -85,7 +86,8 @@ class _SupportTicketsPageState extends ConsumerState<SupportTicketsPage> {
               subtitleOf: (t) => t['company_name'] as String?,
               onRestored: () => ref.invalidate(supportTicketsProvider),
             ),
-          if (!isSuperAdmin)
+          if (!isSuperAdmin &&
+              ref.watch(moduleAccessProvider('Support Ticket')).create)
             GestureDetector(
               onTap: () => context.push(AppRouter.createTicket),
               child: Container(

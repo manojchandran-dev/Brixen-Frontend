@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/network/token_refresh_interceptor.dart';
 import '../../../core/services/token_service.dart';
 
 final _dio = Dio(BaseOptions(
@@ -9,7 +10,9 @@ final _dio = Dio(BaseOptions(
   connectTimeout: const Duration(seconds: 30),
   receiveTimeout: const Duration(seconds: 30),
   headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-))..interceptors.add(LogInterceptor(
+))
+  ..interceptors.add(TokenRefreshInterceptor())
+  ..interceptors.add(LogInterceptor(
     requestBody: true,
     responseBody: true,
     logPrint: (o) => debugPrint(o.toString()),

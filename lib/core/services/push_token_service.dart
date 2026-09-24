@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../network/api_client.dart' show mapDioError, CompanyScopeInterceptor;
 import '../network/api_endpoints.dart';
+import '../network/token_refresh_interceptor.dart';
 import '../router/app_router.dart';
 import '../router/route_names.dart';
 import 'token_service.dart';
@@ -18,6 +19,7 @@ final _dio =
         ),
       )
       ..interceptors.add(_AuthInterceptor())
+      ..interceptors.add(TokenRefreshInterceptor())
       ..interceptors.add(CompanyScopeInterceptor())
       ..interceptors.add(LogInterceptor(
         requestBody: true,

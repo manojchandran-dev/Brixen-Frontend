@@ -14,6 +14,7 @@ import '../../../../shared/widgets/detail_sheet.dart';
 import '../../../../shared/widgets/error_state.dart';
 import '../../../../shared/widgets/super_admin_company_filter_bar.dart';
 import 'package:intl/intl.dart';
+import '../../../permissions/presentation/providers/module_access_provider.dart';
 import '../../domain/entities/customer.dart';
 import '../providers/customers_provider.dart';
 
@@ -126,7 +127,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                 ],
               ),
         actions: [
-          DeletedItemsButton(
+          if (ref.watch(moduleAccessProvider('Customers')).delete) DeletedItemsButton(
             title: 'Deleted customers',
             listPath: ApiEndpoints.customers,
             restorePath: (c) => '${ApiEndpoints.customers}/${c['id']}/restore',
@@ -134,7 +135,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
             subtitleOf: (c) => (c['shop_name'] ?? c['phone']) as String?,
             onRestored: () => ref.invalidate(customersProvider),
           ),
-          GestureDetector(
+          if (ref.watch(moduleAccessProvider('Customers')).create) GestureDetector(
             onTap: () => context.push(AppRouter.createCustomer,
                 extra: widget.fromMasters ? 'masters' : null),
             child: Container(
@@ -281,13 +282,13 @@ class _CustomerCard extends ConsumerWidget {
     return SwipeActions(
       onTap: () => _showCustomerDetail(context, ref, customer, accent),
       actions: [
-        SwipeAction(
+        if (ref.watch(moduleAccessProvider('Customers')).edit) SwipeAction(
           icon: Icons.edit_outlined,
           label: 'Edit',
           color: AppColors.accentIndigo,
           onTap: () => context.push(AppRouter.createCustomer, extra: customer),
         ),
-        SwipeAction(
+        if (ref.watch(moduleAccessProvider('Customers')).delete) SwipeAction(
           icon: Icons.delete_outline,
           label: 'Delete',
           color: AppColors.brandBlack,
@@ -389,11 +390,11 @@ void _showCustomerDetail(BuildContext context, WidgetRef ref, Customer customer,
     avatarGradient: AppColors.accentGradient(accent),
     title: customer.name,
     subtitle: customer.shopName,
-    onEdit: () {
+    onEdit: !ref.read(moduleAccessProvider('Customers')).edit ? null : () {
       Navigator.of(ctx).pop();
       ctx.push(AppRouter.createCustomer, extra: customer);
     },
-    onDelete: () async {
+    onDelete: !ref.read(moduleAccessProvider('Customers')).delete ? null : () async {
       final confirmed = await showDialog<bool>(
         context: ctx,
         builder: (dCtx) => AlertDialog(

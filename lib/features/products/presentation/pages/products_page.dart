@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../shared/widgets/deleted_items_button.dart';
 import 'package:go_router/go_router.dart';
+import '../../../permissions/presentation/providers/module_access_provider.dart';
 import '../../../../core/services/session_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
@@ -198,7 +199,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                 ],
               ),
         actions: [
-          DeletedItemsButton(
+          if (ref.watch(moduleAccessProvider('Products')).delete) DeletedItemsButton(
             title: 'Deleted products',
             listPath: ApiEndpoints.products,
             restorePath: (p) => '${ApiEndpoints.products}/${p['id']}/restore',
@@ -206,7 +207,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
             subtitleOf: (p) => p['color'] as String?,
             onRestored: () => ref.invalidate(productsProvider),
           ),
-          GestureDetector(
+          if (ref.watch(moduleAccessProvider('Products')).create) GestureDetector(
             onTap: () => context.push(
               AppRouter.createProduct,
               extra: widget.fromMasters ? 'masters' : null,
@@ -387,19 +388,19 @@ class _ProductCard extends ConsumerWidget {
     return SwipeActions(
       onTap: () => _showProductDetail(context, ref, product, accent),
       actions: [
-        SwipeAction(
+        if (ref.watch(moduleAccessProvider('Products')).edit) SwipeAction(
           icon: Icons.sync_alt_rounded,
           label: 'Status',
           color: AppColors.accentGold,
           onTap: () => _openStatusPicker(context, ref),
         ),
-        SwipeAction(
+        if (ref.watch(moduleAccessProvider('Products')).edit) SwipeAction(
           icon: Icons.edit_outlined,
           label: 'Edit',
           color: AppColors.accentIndigo,
           onTap: () => context.push(AppRouter.createProduct, extra: product),
         ),
-        SwipeAction(
+        if (ref.watch(moduleAccessProvider('Products')).delete) SwipeAction(
           icon: Icons.delete_outline,
           label: 'Delete',
           color: AppColors.brandBlack,
@@ -823,11 +824,11 @@ void _showProductDetail(
       avatarGradient: AppColors.accentGradient(accent),
       title: product.productName,
       subtitle: product.productCode,
-      onEdit: () {
+      onEdit: !ref.read(moduleAccessProvider('Products')).edit ? null : () {
         Navigator.of(ctx).pop();
         ctx.push(AppRouter.createProduct, extra: product);
       },
-      onDelete: () async {
+      onDelete: !ref.read(moduleAccessProvider('Products')).delete ? null : () async {
         final confirmed = await showDialog<bool>(
           context: ctx,
           builder: (dCtx) => AlertDialog(
@@ -887,7 +888,9 @@ void _showProductDetail(
         }
       },
       statusRow: GestureDetector(
-        onTap: () => _openProductStatusPicker(ctx, ref, product),
+        onTap: !ref.read(moduleAccessProvider('Products')).edit
+            ? null
+            : () => _openProductStatusPicker(ctx, ref, product),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           decoration: BoxDecoration(

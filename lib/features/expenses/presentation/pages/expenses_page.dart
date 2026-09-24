@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../../permissions/presentation/providers/module_access_provider.dart';
 import '../../../../core/services/session_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
@@ -206,7 +207,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
                 ],
               ),
         actions: [
-          GestureDetector(
+          if (ref.watch(moduleAccessProvider('Expenses')).create) GestureDetector(
             onTap: () => context.push(
               AppRouter.createExpense,
               extra: widget.fromMasters ? 'masters' : null,
@@ -384,13 +385,13 @@ class _ExpenseCard extends ConsumerWidget {
     return SwipeActions(
       onTap: () => _showExpenseDetail(context, ref, expense, categoryColor),
       actions: [
-        SwipeAction(
+        if (ref.watch(moduleAccessProvider('Expenses')).edit) SwipeAction(
           icon: Icons.edit_outlined,
           label: 'Edit',
           color: AppColors.accentIndigo,
           onTap: () => context.push(AppRouter.createExpense, extra: expense),
         ),
-        SwipeAction(
+        if (ref.watch(moduleAccessProvider('Expenses')).delete) SwipeAction(
           icon: Icons.delete_outline,
           label: 'Delete',
           color: AppColors.brandBlack,
@@ -546,11 +547,11 @@ void _showExpenseDetail(
       showAvatar: false,
       title: expense.title,
       subtitle: expense.category,
-      onEdit: () {
+      onEdit: !ref.read(moduleAccessProvider('Expenses')).edit ? null : () {
         Navigator.of(ctx).pop();
         ctx.push(AppRouter.createExpense, extra: expense);
       },
-      onDelete: () async {
+      onDelete: !ref.read(moduleAccessProvider('Expenses')).delete ? null : () async {
         final confirmed = await showDialog<bool>(
           context: ctx,
           builder: (dCtx) => AlertDialog(

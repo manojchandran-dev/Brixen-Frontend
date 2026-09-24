@@ -14,6 +14,7 @@ import '../../../../shared/widgets/chat_bubble.dart';
 import '../../../../shared/widgets/picked_image.dart';
 import '../../domain/entities/chat_conversation.dart';
 import '../providers/chat_provider.dart';
+import '../../../permissions/presentation/providers/module_access_provider.dart';
 import '../widgets/voice_bubble.dart';
 
 /// One company's conversation with support. [isRoot] = reached straight from
@@ -396,7 +397,21 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                     },
                   ),
           ),
-          _buildInputBar(),
+          // Sending needs create on the Chatbot module; without it the
+          // conversation is read-only.
+          if (ref.watch(moduleAccessProvider('Chatbot')).create)
+            _buildInputBar()
+          else
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Text(
+                  'You have view-only access to chat',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.textHint, fontSize: 12.5),
+                ),
+              ),
+            ),
         ],
       ),
     );

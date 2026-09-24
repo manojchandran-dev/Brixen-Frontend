@@ -33,8 +33,8 @@ extension AccessLevelX on AccessLevel {
 /// company owner. Backed by `/api/v1/permissions` — [remoteId] is the
 /// saved row's id once one exists (`POST` first time, `PUT` after), or
 /// null when no row has been created yet, in which case the module is
-/// implicitly Full Access (the server default until a super-admin saves
-/// an explicit restriction).
+/// denied — No Access, except Support Ticket / Chatbot (the server default
+/// until a super-admin grants access).
 class ModulePermission {
   final String key;
   final String name;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../../permissions/presentation/providers/module_access_provider.dart';
 import '../../../../core/services/session_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
@@ -198,7 +199,7 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                 ],
               ),
         actions: [
-          GestureDetector(
+          if (ref.watch(moduleAccessProvider('Sales')).create) GestureDetector(
             onTap: () => context.push(
               AppRouter.createSale,
               extra: widget.fromMasters ? 'masters' : null,
@@ -388,7 +389,7 @@ class _SaleCard extends ConsumerWidget {
     return SwipeActions(
       onTap: () => _showSaleDetail(context, ref, sale, accent),
       actions: [
-        SwipeAction(
+        if (ref.watch(moduleAccessProvider('Sales')).edit) SwipeAction(
           icon: Icons.edit_outlined,
           label: 'Edit',
           color: AppColors.accentIndigo,
@@ -397,7 +398,7 @@ class _SaleCard extends ConsumerWidget {
             extra: {'sale': sale, 'fromMasters': false, 'fromMenu': false},
           ),
         ),
-        SwipeAction(
+        if (ref.watch(moduleAccessProvider('Sales')).delete) SwipeAction(
           icon: Icons.delete_outline,
           label: 'Delete',
           color: AppColors.brandBlack,
@@ -706,14 +707,14 @@ void _showSaleDetail(
       avatarGradient: AppColors.accentGradient(accent),
       title: title,
       subtitle: sale.invoiceType,
-      onEdit: () {
+      onEdit: !ref.read(moduleAccessProvider('Sales')).edit ? null : () {
         Navigator.of(ctx).pop();
         ctx.push(
           AppRouter.createSale,
           extra: {'sale': sale, 'fromMasters': false, 'fromMenu': false},
         );
       },
-      onDelete: () async {
+      onDelete: !ref.read(moduleAccessProvider('Sales')).delete ? null : () async {
         final confirmed = await showDialog<bool>(
           context: ctx,
           builder: (dCtx) => AlertDialog(

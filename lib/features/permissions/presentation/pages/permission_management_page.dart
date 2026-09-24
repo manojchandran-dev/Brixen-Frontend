@@ -254,7 +254,7 @@ class _CompanyPermissionCard extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Reset Permissions', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700)),
         content: Text(
-          'Reset "${company.name}" back to full access on every module? This clears any custom restrictions.',
+          'Clear every saved permission for "${company.name}"? The company will lose access to all modules except Support Ticket and Chatbot until you grant them again.',
           style: TextStyle(color: AppColors.textHint, fontSize: 13.5),
         ),
         actions: [

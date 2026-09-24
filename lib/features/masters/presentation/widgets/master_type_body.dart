@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/session_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/brixen_button.dart';
@@ -13,6 +14,7 @@ import '../../domain/entities/master_item.dart';
 import '../../domain/entities/master_type.dart';
 import '../cubit/master_cubit.dart';
 import '../cubit/master_state.dart';
+import '../../../permissions/presentation/providers/module_access_provider.dart';
 
 /// Public **duplicate** of `companies_page.dart`'s private master-type list/
 /// create/edit widgets — kept as a copy (not an extraction) so the original,
@@ -32,7 +34,7 @@ List<Color> get masterCardAccentColors => [
   AppColors.brandBlack,
 ];
 
-class MasterItemsBody extends StatefulWidget {
+class MasterItemsBody extends ConsumerStatefulWidget {
   final String typeKey;
   final void Function(String id) onEdit;
   final String? filterCategoryId; // null = show all
@@ -43,10 +45,10 @@ class MasterItemsBody extends StatefulWidget {
     this.filterCategoryId,
   });
   @override
-  State<MasterItemsBody> createState() => _MasterItemsBodyState();
+  ConsumerState<MasterItemsBody> createState() => _MasterItemsBodyState();
 }
 
-class _MasterItemsBodyState extends State<MasterItemsBody> {
+class _MasterItemsBodyState extends ConsumerState<MasterItemsBody> {
   final _searchCtrl = TextEditingController();
   String? _selectedCategory; // null = All
 
@@ -79,6 +81,7 @@ class _MasterItemsBodyState extends State<MasterItemsBody> {
 
   @override
   Widget build(BuildContext context) {
+    final access = ref.watch(moduleAccessProvider(masterModuleName(widget.typeKey)));
     final cs = Theme.of(context).colorScheme;
     final typeCfg = masterTypeFor(widget.typeKey);
     return BlocBuilder<MasterCubit, MasterState>(
@@ -224,8 +227,10 @@ class _MasterItemsBodyState extends State<MasterItemsBody> {
                             typeCfg?.icon ?? Icons.list_alt_outlined,
                             itemColor,
                           ),
-                          onEdit: () => widget.onEdit(items[i].id),
-                          onDelete: () async {
+                          onEdit: !access.edit
+                              ? null
+                              : () => widget.onEdit(items[i].id),
+                          onDelete: !access.delete ? null : () async {
                             final confirmed = await showDialog<bool>(
                               context: context,
                               builder: (ctx) => AlertDialog(
@@ -511,15 +516,17 @@ class MasterCard extends StatelessWidget {
   final MasterItem item;
   final IconData icon;
   final Color color;
-  final VoidCallback onView, onEdit, onDelete;
+  final VoidCallback onView;
+  // null hides that swipe action (no access).
+  final VoidCallback? onEdit, onDelete;
   const MasterCard({
     super.key,
     required this.item,
     required this.icon,
     required this.color,
     required this.onView,
-    required this.onEdit,
-    required this.onDelete,
+    this.onEdit,
+    this.onDelete,
   });
 
   @override
@@ -536,18 +543,20 @@ class MasterCard extends StatelessWidget {
       child: SwipeActions(
         onTap: onView,
         actions: [
-          SwipeAction(
-            icon: Icons.edit_outlined,
-            label: 'Edit',
-            color: AppColors.brand,
-            onTap: onEdit,
-          ),
-          SwipeAction(
-            icon: Icons.delete_outline,
-            label: 'Delete',
-            color: AppColors.brandBlack,
-            onTap: onDelete,
-          ),
+          if (onEdit != null)
+            SwipeAction(
+              icon: Icons.edit_outlined,
+              label: 'Edit',
+              color: AppColors.brand,
+              onTap: onEdit!,
+            ),
+          if (onDelete != null)
+            SwipeAction(
+              icon: Icons.delete_outline,
+              label: 'Delete',
+              color: AppColors.brandBlack,
+              onTap: onDelete!,
+            ),
         ],
         child: RichCardShell(
           accentColor: color,

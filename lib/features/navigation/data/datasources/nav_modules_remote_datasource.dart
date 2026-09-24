@@ -46,4 +46,23 @@ class NavModulesRemoteDatasource {
       throw mapDioError(e);
     }
   }
+
+  /// The modules a superadmin can give a company — the Permissions screen's
+  /// list. Unlike [getModules] (the caller's own menu), this excludes the
+  /// superadmin-only modules and includes every company module.
+  Future<List<NavModule>> getGrantableModules() async {
+    try {
+      final resp = await _dio.get(
+        ApiEndpoints.modules,
+        queryParameters: {'for': 'permissions', 'user_type': Session.role.apiValue},
+      );
+      final data = resp.data['data'] ?? resp.data;
+      final list = (data is List) ? data : (data['items'] ?? data['modules'] ?? []);
+      return (list as List)
+          .map((e) => NavModule.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
 }

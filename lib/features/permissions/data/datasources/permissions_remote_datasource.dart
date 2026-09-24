@@ -21,7 +21,11 @@ class PermissionsRemoteDatasource {
     try {
       final resp = await _dio.get(
         ApiEndpoints.permissions,
-        queryParameters: {'company_id': companyId, 'module_id': ?moduleId},
+        queryParameters: {
+          'company_id': companyId,
+          'module_id': ?moduleId,
+          'limit': 100, // one row per module — never page them
+        },
       );
       final data = resp.data['data'] ?? resp.data;
       final list = (data is List) ? data : (data['items'] ?? []);

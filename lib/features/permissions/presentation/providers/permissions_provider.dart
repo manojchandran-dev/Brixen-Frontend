@@ -7,10 +7,11 @@ import '../../data/repositories/permissions_repository_impl.dart';
 import '../../domain/entities/module_permission.dart';
 
 /// Per-company module permissions for the company owner, keyed by company
-/// id. The module list itself comes from `GET /api/v1/modules` (same
-/// source the drawer uses); saved access grants come from
+/// id. The module list comes from `GET /api/v1/modules?for=permissions`
+/// (everything a company can be given); saved access grants come from
 /// `GET /api/v1/permissions?company_id=...`. A module with no saved row
-/// yet is implicitly Full Access — matches the server's own default.
+/// yet is denied (No Access), except Support Ticket / Chatbot — matches
+/// the server.
 final permissionsProvider =
     AsyncNotifierProvider.family<PermissionsNotifier, List<ModulePermission>, String>(
   PermissionsNotifier.new,
@@ -20,7 +21,7 @@ class PermissionsNotifier
     extends FamilyAsyncNotifier<List<ModulePermission>, String> {
   @override
   Future<List<ModulePermission>> build(String arg) async {
-    final tree = await ref.watch(navModulesProvider.future);
+    final tree = await ref.watch(grantableModulesProvider.future);
     final saved = await ref
         .read(permissionsRepositoryProvider)
         .getPermissions(companyId: arg);
@@ -55,7 +56,8 @@ class PermissionsNotifier
   }) {
     final visual = moduleVisualFor(m.name);
     if (saved == null) {
-      return ModulePermission.full(
+      // Backend: no saved row = denied, except Support Ticket / Chatbot.
+      final row = ModulePermission.full(
         key: m.id,
         name: m.name,
         description: m.description ?? '',
@@ -63,6 +65,10 @@ class PermissionsNotifier
         color: visual.color,
         group: group,
       );
+      const allowedWithoutRow = {'support ticket', 'chatbot'};
+      return allowedWithoutRow.contains(m.name.toLowerCase())
+          ? row
+          : row.withAccessLevel(AccessLevel.none);
     }
     return ModulePermission(
       key: m.id,
@@ -72,7 +78,7 @@ class PermissionsNotifier
       color: visual.color,
       group: group,
       remoteId: saved.id,
-      accessLevel: AccessLevelX.fromLabel(saved.accessLevel),
+      accessLevel: _levelOf(saved),
       canView: saved.view,
       canCreate: saved.create,
       canEdit: saved.edit,
@@ -103,7 +109,7 @@ class PermissionsNotifier
           );
     final merged = updated.copyWith(
       remoteId: saved.id,
-      accessLevel: AccessLevelX.fromLabel(saved.accessLevel),
+      accessLevel: _levelOf(saved),
     );
     final current = state.valueOrNull;
     if (current == null) return;
@@ -139,7 +145,7 @@ class PermissionsNotifier
         if (byModuleId[m.key] case final saved?)
           m.copyWith(
             remoteId: saved.id,
-            accessLevel: AccessLevelX.fromLabel(saved.accessLevel),
+            accessLevel: _levelOf(saved),
           )
         else
           m,
@@ -147,7 +153,8 @@ class PermissionsNotifier
   }
 
   /// "Delete" — removes every saved override for this company, so every
-  /// module falls back to the implicit Full-Access default.
+  /// module falls back to the server default: No Access (Support Ticket and
+  /// Chatbot stay allowed).
   Future<void> reset() async {
     final current = state.valueOrNull;
     if (current == null) return;
@@ -160,4 +167,13 @@ class PermissionsNotifier
     ref.invalidateSelf();
     await future;
   }
+}
+
+/// Derived from the four flags rather than the server's `access_level`
+/// text, so a wording change there can't mislabel a module.
+AccessLevel _levelOf(PermissionModel p) {
+  final flags = [p.view, p.create, p.edit, p.delete];
+  if (flags.every((f) => f)) return AccessLevel.full;
+  if (flags.every((f) => !f)) return AccessLevel.none;
+  return AccessLevel.custom;
 }

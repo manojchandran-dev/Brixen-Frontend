@@ -36,6 +36,11 @@ const kMasterTypes = <MasterTypeConfig>[
   MasterTypeConfig('unit', 'Unit', Icons.straighten_outlined),
 ];
 
+/// This type's module name in the modules API, for access checks — only
+/// "Unit" differs (the module is "Units").
+String masterModuleName(String key) =>
+    key == 'unit' ? 'Units' : (masterTypeFor(key)?.name ?? key);
+
 MasterTypeConfig? masterTypeFor(String key) {
   try {
     return kMasterTypes.firstWhere((t) => t.key == key);

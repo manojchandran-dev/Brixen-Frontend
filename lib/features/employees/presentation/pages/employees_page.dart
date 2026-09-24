@@ -15,6 +15,7 @@ import '../../../../shared/widgets/detail_sheet.dart';
 import '../../../../shared/widgets/error_state.dart';
 import '../../../../shared/widgets/super_admin_company_filter_bar.dart';
 import 'package:intl/intl.dart';
+import '../../../permissions/presentation/providers/module_access_provider.dart';
 import '../../domain/entities/employee.dart';
 import '../providers/employees_provider.dart';
 
@@ -197,7 +198,7 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
                 ],
               ),
         actions: [
-          DeletedItemsButton(
+          if (ref.watch(moduleAccessProvider('Employees')).delete) DeletedItemsButton(
             title: 'Deleted employees',
             listPath: ApiEndpoints.employees,
             restorePath: (e) => '${ApiEndpoints.employees}/${e['id']}/restore',
@@ -205,7 +206,7 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
             subtitleOf: (e) => e['employee_code'] as String?,
             onRestored: () => ref.invalidate(employeesProvider),
           ),
-          GestureDetector(
+          if (ref.watch(moduleAccessProvider('Employees')).create) GestureDetector(
             onTap: () => context.push(
               AppRouter.createEmployee,
               extra: widget.fromMasters ? 'masters' : null,
@@ -464,19 +465,19 @@ class _EmployeeCard extends ConsumerWidget {
     return SwipeActions(
       onTap: () => _showEmployeeDetail(context, ref, employee, accent),
       actions: [
-        SwipeAction(
+        if (ref.watch(moduleAccessProvider('Employees')).edit) SwipeAction(
           icon: Icons.sync_alt_rounded,
           label: 'Status',
           color: AppColors.accentGold,
           onTap: () => _openStatusPicker(context, ref),
         ),
-        SwipeAction(
+        if (ref.watch(moduleAccessProvider('Employees')).edit) SwipeAction(
           icon: Icons.edit_outlined,
           label: 'Edit',
           color: AppColors.accentIndigo,
           onTap: () => context.push(AppRouter.createEmployee, extra: employee),
         ),
-        SwipeAction(
+        if (ref.watch(moduleAccessProvider('Employees')).delete) SwipeAction(
           icon: Icons.delete_outline,
           label: 'Delete',
           color: AppColors.brandBlack,
@@ -693,11 +694,11 @@ void _showEmployeeDetail(
       avatarGradient: AppColors.accentGradient(accent),
       title: employee.fullName,
       subtitle: employee.designation ?? employee.department,
-      onEdit: () {
+      onEdit: !ref.read(moduleAccessProvider('Employees')).edit ? null : () {
         Navigator.of(ctx).pop();
         ctx.push(AppRouter.createEmployee, extra: employee);
       },
-      onDelete: () async {
+      onDelete: !ref.read(moduleAccessProvider('Employees')).delete ? null : () async {
         final confirmed = await showDialog<bool>(
           context: ctx,
           builder: (dCtx) => AlertDialog(
@@ -759,7 +760,9 @@ void _showEmployeeDetail(
         }
       },
       statusRow: GestureDetector(
-        onTap: () => _openEmployeeStatusPicker(ctx, ref, employee),
+        onTap: !ref.read(moduleAccessProvider('Employees')).edit
+            ? null
+            : () => _openEmployeeStatusPicker(ctx, ref, employee),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           decoration: BoxDecoration(

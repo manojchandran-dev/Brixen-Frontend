@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../auth/presentation/cubit/auth_state.dart';
+import '../../data/datasources/nav_modules_remote_datasource.dart';
 import '../../data/repositories/nav_modules_repository_impl.dart';
 import '../../domain/entities/nav_module.dart';
 
@@ -21,4 +22,11 @@ final authStateProvider = StreamProvider<AuthState>((ref) => authCubit.stream);
 final navModulesProvider = FutureProvider<List<NavModule>>((ref) {
   ref.watch(authStateProvider);
   return ref.read(navModulesRepositoryProvider).getModules();
+});
+
+/// Modules a superadmin can grant a company (Permissions screen) — not the
+/// superadmin's own menu, which [navModulesProvider] returns.
+final grantableModulesProvider = FutureProvider<List<NavModule>>((ref) {
+  ref.watch(authStateProvider);
+  return ref.read(navModulesRemoteDatasourceProvider).getGrantableModules();
 });

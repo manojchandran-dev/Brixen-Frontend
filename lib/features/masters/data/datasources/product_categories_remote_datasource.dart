@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../../../../core/network/api_client.dart' show mapDioError, CompanyScopeInterceptor;
 import '../../../../core/network/api_endpoints.dart';
+import '../../../../core/network/token_refresh_interceptor.dart';
 import '../../../../core/services/token_service.dart';
 import '../../domain/entities/master_item.dart';
 import 'remote_master_datasource.dart';
@@ -19,6 +20,7 @@ final _dio =
         ),
       )
       ..interceptors.add(_AuthInterceptor())
+      ..interceptors.add(TokenRefreshInterceptor())
       ..interceptors.add(CompanyScopeInterceptor())
       ..interceptors.add(
         LogInterceptor(
