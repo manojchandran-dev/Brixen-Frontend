@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/theme_cubit.dart';
 import '../../features/auth/domain/entities/user_role.dart';
 import '../../features/auth/presentation/cubit/auth_cubit.dart';
+import 'account_switcher_sheet.dart';
 
 String _profileDisplayName() {
   switch (Session.role) {
@@ -31,10 +32,16 @@ String _profileRoleLabel() {
 }
 
 String _profileInitials(String name) {
-  final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+  final parts = name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((p) => p.isNotEmpty)
+      .toList();
   if (parts.isEmpty) return '?';
   if (parts.length == 1) {
-    return parts.first.substring(0, parts.first.length >= 2 ? 2 : 1).toUpperCase();
+    return parts.first
+        .substring(0, parts.first.length >= 2 ? 2 : 1)
+        .toUpperCase();
   }
   return (parts.first[0] + parts[1][0]).toUpperCase();
 }
@@ -73,81 +80,85 @@ class _AppMenuBodyState extends State<AppMenuBody> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       children: [
         // ── Premium profile card ──────────────────────────────────
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [AppColors.brand, AppColors.positive],
-            ),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: AppColors.shadows([
-              BoxShadow(
-                color: AppColors.shadowDark.withValues(alpha: 0.25),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
+        GestureDetector(
+          onTap: () => showAccountSwitcher(context),
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [AppColors.brand, AppColors.positive],
               ),
-            ]),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.16),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.35),
-                    width: 1.5,
-                  ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: AppColors.shadows([
+                BoxShadow(
+                  color: AppColors.shadowDark.withValues(alpha: 0.25),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
                 ),
-                child: Center(
-                  child: Text(
-                    _profileInitials(_profileDisplayName()),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 17,
-                      color: AppColors.white,
+              ]),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.16),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.35),
+                      width: 1.5,
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _profileDisplayName(),
-                      overflow: TextOverflow.ellipsis,
+                  child: Center(
+                    child: Text(
+                      _profileInitials(_profileDisplayName()),
                       style: const TextStyle(
-                        color: AppColors.white,
                         fontWeight: FontWeight.w800,
                         fontSize: 17,
+                        color: AppColors.white,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    _RoleBadge(label: _profileRoleLabel()),
-                  ],
+                  ),
                 ),
-              ),
-              Container(
-                width: 34,
-                height: 34,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.16),
-                  shape: BoxShape.circle,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _profileDisplayName(),
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      _RoleBadge(label: _profileRoleLabel()),
+                    ],
+                  ),
                 ),
-                child: const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.white,
-                  size: 18,
+                Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.16),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.white,
+                    size: 18,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 26),
@@ -158,6 +169,18 @@ class _AppMenuBodyState extends State<AppMenuBody> {
         _MenuSection(
           items: [
             _MenuItem(
+              icon: Icons.person_outline_rounded,
+              label: 'Profile',
+              color: AppColors.brand,
+              onTap: () => context.push(AppRouter.profile),
+            ),
+            _MenuItem(
+              icon: Icons.key_outlined,
+              label: 'Change Password',
+              color: AppColors.brandDeep,
+              onTap: () => context.push(AppRouter.changePassword),
+            ),
+            _MenuItem(
               icon: Icons.lock_outline_rounded,
               label: 'App Lock',
               color: AppColors.brand,
@@ -167,7 +190,7 @@ class _AppMenuBodyState extends State<AppMenuBody> {
               icon: Icons.help_rounded,
               label: 'Support',
               color: AppColors.positive,
-              onTap: () {},
+              onTap: () => context.push(AppRouter.support),
             ),
           ],
         ),

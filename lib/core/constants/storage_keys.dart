@@ -28,4 +28,7 @@ class StorageKeys {
   static const securityPin        = 'sec_pin';
   static const securityPinEnabled = 'sec_pin_enabled';
   static const securityBioEnabled = 'sec_bio_enabled';
+
+  // AccountStore
+  static const savedAccounts = 'saved_accounts';
 }

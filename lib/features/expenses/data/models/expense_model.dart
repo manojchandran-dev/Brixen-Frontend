@@ -34,6 +34,7 @@ class ExpenseModel extends Expense {
           ? DateTime.tryParse(json['expense_date'].toString()) ?? DateTime.now()
           : DateTime.now(),
       paymentMethod: json['payment_method'],
+      receiptImagePath: json['receipt_url'],
       notes: json['notes'],
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
@@ -44,8 +45,8 @@ class ExpenseModel extends Expense {
   /// Request body for create/update. `unit_id` is always included (as null
   /// when unset) since the caller always submits full current form state —
   /// this doubles as how the backend expects a unit to be cleared on PUT.
-  /// `receipt_url` is omitted — there's no upload endpoint yet, so a locally
-  /// picked receipt image stays local-only for now.
+  /// `receipt_url` must already be a hosted URL — the page uploads a picked
+  /// receipt via `POST /uploads` before submitting.
   static Map<String, dynamic> toBody(Expense e, {String? companyId}) => {
         if (companyId != null) 'company_id': int.parse(companyId),
         'category_id': e.categoryId,
@@ -55,5 +56,6 @@ class ExpenseModel extends Expense {
         'expense_date': e.expenseDate.toIso8601String(),
         if (e.paymentMethod != null && e.paymentMethod!.isNotEmpty) 'payment_method': e.paymentMethod,
         if (e.notes != null && e.notes!.isNotEmpty) 'notes': e.notes,
+        'receipt_url': e.receiptImagePath,
       };
 }

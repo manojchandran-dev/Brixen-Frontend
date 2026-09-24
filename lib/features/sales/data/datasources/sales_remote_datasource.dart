@@ -24,15 +24,20 @@ class SalesRemoteDatasource {
     DateTime? to,
   }) async {
     try {
-      final resp = await _dio.get(ApiEndpoints.sales, queryParameters: {
-        'page': page,
-        'limit': limit,
-        if (search != null && search.isNotEmpty) 'search': search,
-        if (customerId != null && customerId.isNotEmpty) 'customer_id': customerId,
-        if (paymentStatus != null && paymentStatus.isNotEmpty) 'payment_status': paymentStatus,
-        if (from != null) 'from': toIsoDateOnly(from),
-        if (to != null) 'to': toIsoDateOnly(to),
-      });
+      final resp = await _dio.get(
+        ApiEndpoints.sales,
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+          if (search != null && search.isNotEmpty) 'search': search,
+          if (customerId != null && customerId.isNotEmpty)
+            'customer_id': customerId,
+          if (paymentStatus != null && paymentStatus.isNotEmpty)
+            'payment_status': paymentStatus,
+          if (from != null) 'from': toIsoDateOnly(from),
+          if (to != null) 'to': toIsoDateOnly(to),
+        },
+      );
       final data = resp.data['data'] ?? resp.data;
       final list = (data is List) ? data : (data['items'] ?? []);
       return (list as List)
@@ -43,9 +48,12 @@ class SalesRemoteDatasource {
     }
   }
 
-  Future<SaleModel> getSaleById(String id) async {
+  Future<SaleModel> getSaleById(String id, {String? companyId}) async {
     try {
-      final resp = await _dio.get(ApiEndpoints.saleById(id));
+      final resp = await _dio.get(
+        ApiEndpoints.saleById(id),
+        queryParameters: companyId != null ? {'company_id': companyId} : null,
+      );
       final data = resp.data['data'] ?? resp.data;
       return SaleModel.fromJson(data as Map<String, dynamic>);
     } on DioException catch (e) {

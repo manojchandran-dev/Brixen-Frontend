@@ -21,29 +21,33 @@ class SalesRepositoryImpl implements SalesRepository {
     String? paymentStatus,
     DateTime? from,
     DateTime? to,
-  }) =>
-      _ds.getSales(
-        page: page,
-        limit: limit,
-        search: search,
-        customerId: customerId,
-        paymentStatus: paymentStatus,
-        from: from,
-        to: to,
-      );
+  }) => _ds.getSales(
+    page: page,
+    limit: limit,
+    search: search,
+    customerId: customerId,
+    paymentStatus: paymentStatus,
+    from: from,
+    to: to,
+  );
 
   @override
-  Future<Sale> getSaleById(String id) => _ds.getSaleById(id);
+  Future<Sale> getSaleById(String id, {String? companyId}) =>
+      _ds.getSaleById(id, companyId: companyId);
 
   @override
   Future<Sale> createSale(Map<String, dynamic> body) => _ds.createSale(body);
 
   @override
-  Future<Sale> updateSale(String id, Map<String, dynamic> body) => _ds.updateSale(id, body);
+  Future<Sale> updateSale(String id, Map<String, dynamic> body) =>
+      _ds.updateSale(id, body);
 
   @override
-  Future<Sale> updateSaleItems(String id, Map<String, dynamic> body, {String? companyId}) =>
-      _ds.updateSaleItems(id, body, companyId: companyId);
+  Future<Sale> updateSaleItems(
+    String id,
+    Map<String, dynamic> body, {
+    String? companyId,
+  }) => _ds.updateSaleItems(id, body, companyId: companyId);
 
   @override
   Future<List<SaleItem>> getSaleItems(String id, {String? companyId}) =>

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/network/api_endpoints.dart';
+import '../../../../shared/widgets/deleted_items_button.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/services/session_service.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -195,6 +197,14 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
                 ],
               ),
         actions: [
+          DeletedItemsButton(
+            title: 'Deleted employees',
+            listPath: ApiEndpoints.employees,
+            restorePath: (e) => '${ApiEndpoints.employees}/${e['id']}/restore',
+            labelOf: (e) => '${e['first_name'] ?? ''} ${e['last_name'] ?? ''}'.trim(),
+            subtitleOf: (e) => e['employee_code'] as String?,
+            onRestored: () => ref.invalidate(employeesProvider),
+          ),
           GestureDetector(
             onTap: () => context.push(
               AppRouter.createEmployee,

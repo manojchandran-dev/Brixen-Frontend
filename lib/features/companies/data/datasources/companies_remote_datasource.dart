@@ -16,12 +16,14 @@ class CompaniesRemoteDatasource {
     int page = 1,
     int limit = 50,
     String? search,
+    bool deleted = false,
   }) async {
     try {
       final resp = await _dio.get(ApiEndpoints.companies, queryParameters: {
         'page': page,
         'limit': limit,
         if (search != null && search.isNotEmpty) 'search': search,
+        if (deleted) 'deleted': 'true',
       });
       final data = resp.data['data'] ?? resp.data;
       final list = (data is List) ? data : (data['companies'] ?? data['items'] ?? []);
@@ -35,7 +37,7 @@ class CompaniesRemoteDatasource {
 
   Future<CompanyModel> getCompanyById(String id) async {
     try {
-      final resp = await _dio.get(ApiEndpoints.companyById(id));
+      final resp = await _dio.get(ApiEndpoints.companyById(id), queryParameters: {'company_id': id});
       final data = resp.data['data'] ?? resp.data;
       return CompanyModel.fromJson(data as Map<String, dynamic>);
     } on DioException catch (e) {
@@ -58,7 +60,7 @@ class CompaniesRemoteDatasource {
   Future<CompanyModel> updateCompanyStep2(
       String id, Map<String, dynamic> body) async {
     try {
-      final resp = await _dio.put(ApiEndpoints.companyStep2(id), data: body);
+      final resp = await _dio.put(ApiEndpoints.companyStep2(id), data: body, queryParameters: {'company_id': id});
       final data = resp.data['data'] ?? resp.data;
       return CompanyModel.fromJson(data as Map<String, dynamic>);
     } on DioException catch (e) {
@@ -70,7 +72,7 @@ class CompaniesRemoteDatasource {
   Future<CompanyModel> updateCompanyStep3(
       String id, Map<String, dynamic> body) async {
     try {
-      final resp = await _dio.put(ApiEndpoints.companyStep3(id), data: body);
+      final resp = await _dio.put(ApiEndpoints.companyStep3(id), data: body, queryParameters: {'company_id': id});
       final data = resp.data['data'] ?? resp.data;
       return CompanyModel.fromJson(data as Map<String, dynamic>);
     } on DioException catch (e) {
@@ -83,6 +85,7 @@ class CompaniesRemoteDatasource {
       final resp = await _dio.put(
         ApiEndpoints.companyStatus(id),
         data: {'status': status},
+        queryParameters: {'company_id': id},
       );
       final data = resp.data['data'] ?? resp.data;
       return CompanyModel.fromJson(data as Map<String, dynamic>);
@@ -93,7 +96,17 @@ class CompaniesRemoteDatasource {
 
   Future<CompanyModel> updateCompany(String id, Map<String, dynamic> body) async {
     try {
-      final resp = await _dio.put(ApiEndpoints.companyById(id), data: body);
+      final resp = await _dio.put(ApiEndpoints.companyById(id), data: body, queryParameters: {'company_id': id});
+      final data = resp.data['data'] ?? resp.data;
+      return CompanyModel.fromJson(data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  Future<CompanyModel> restoreCompany(String id) async {
+    try {
+      final resp = await _dio.post(ApiEndpoints.companyRestore(id), queryParameters: {'company_id': id});
       final data = resp.data['data'] ?? resp.data;
       return CompanyModel.fromJson(data as Map<String, dynamic>);
     } on DioException catch (e) {
@@ -103,7 +116,7 @@ class CompaniesRemoteDatasource {
 
   Future<void> deleteCompany(String id) async {
     try {
-      await _dio.delete(ApiEndpoints.companyById(id));
+      await _dio.delete(ApiEndpoints.companyById(id), queryParameters: {'company_id': id});
     } on DioException catch (e) {
       throw mapDioError(e);
     }

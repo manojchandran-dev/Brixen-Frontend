@@ -1,7 +1,8 @@
 import '../entities/company.dart';
 
 abstract class CompaniesRepository {
-  Future<List<Company>> getCompanies({int page = 1, int limit = 50, String? search});
+  /// [deleted] lists soft-deleted companies instead (for restore).
+  Future<List<Company>> getCompanies({int page = 1, int limit = 50, String? search, bool deleted = false});
   Future<Company> getCompanyById(String id);
 
   // Multi-step creation
@@ -14,5 +15,6 @@ abstract class CompaniesRepository {
 
   // Generic full update & delete
   Future<Company> updateCompany(String id, Company company);
-  Future<void> deleteCompany(String id);
+  Future<void> deleteCompany(String id); // soft delete
+  Future<Company> restoreCompany(String id);
 }

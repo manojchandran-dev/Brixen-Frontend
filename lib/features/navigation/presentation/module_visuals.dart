@@ -61,6 +61,18 @@ ModuleVisual moduleVisualFor(String name) {
         Icons.checkroom_outlined,
         AppColors.brandLight,
       );
+    case 'notifications':
+    case 'pushnotifications':
+      return const ModuleVisual(Icons.notifications_active_rounded, AppColors.brand);
+    case 'announcements':
+      return const ModuleVisual(Icons.campaign_rounded, AppColors.brandDeep);
+    case 'chat':
+    case 'chatbot':
+      return const ModuleVisual(Icons.chat_bubble_outline_rounded, AppColors.brandDeep);
+    case 'support':
+    case 'supportticket':
+    case 'supporttickets':
+      return const ModuleVisual(Icons.support_agent_rounded, AppColors.positive);
     default:
       return ModuleVisual(Icons.widgets_outlined, AppColors.textHint);
   }

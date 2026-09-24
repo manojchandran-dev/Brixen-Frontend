@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
+import '../../../../core/network/upload_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/session_service.dart';
 import '../../../../shared/widgets/brixen_button.dart';
+import '../../../../shared/widgets/brixen_date_field.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
 import '../../../../shared/widgets/picked_image.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
@@ -13,6 +14,7 @@ import '../../../../shared/widgets/company_selector_field.dart';
 import '../../../companies/domain/entities/company.dart';
 import '../../../masters/domain/entities/master_item.dart';
 import '../../../masters/presentation/cubit/master_cubit.dart';
+import '../../data/repositories/expenses_repository_impl.dart';
 import '../../domain/entities/expense.dart';
 import '../providers/expenses_provider.dart';
 
@@ -56,7 +58,8 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
   XFile? _receiptImage;
   final _picker = ImagePicker();
   bool _submitting = false;
-  Company? _selectedCompany; // superAdmin only — companyAdmin/employee use Session.companyId
+  Company?
+  _selectedCompany; // superAdmin only — companyAdmin/employee use Session.companyId
 
   // Sourced from Masters (Expense Category / Unit) — loaded independently
   // since MasterCubit only tracks one "active" master type's stream at a
@@ -87,7 +90,29 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
       _notesCtrl.text = e.notes ?? '';
       _selectedPaymentMethod = e.paymentMethod;
       _expenseDate = e.expenseDate;
+      if (e.receiptImagePath != null && e.receiptImagePath!.isNotEmpty) {
+        _receiptImage = XFile(e.receiptImagePath!);
+      } else {
+        // The passed-in expense (from the list page) doesn't always carry
+        // the receipt URL — only `GET /expenses/:id` reliably does — so
+        // fetch the full record rather than silently editing without it.
+        _loadReceiptImageFallback(e.id);
+      }
     }
+  }
+
+  Future<void> _loadReceiptImageFallback(String id) async {
+    try {
+      final full = await ref
+          .read(expensesRepositoryProvider)
+          .getExpenseById(id);
+      if (!mounted ||
+          full.receiptImagePath == null ||
+          full.receiptImagePath!.isEmpty) {
+        return;
+      }
+      setState(() => _receiptImage = XFile(full.receiptImagePath!));
+    } catch (_) {}
   }
 
   Future<void> _loadCategories() async {
@@ -177,16 +202,6 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
     );
   }
 
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _expenseDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) setState(() => _expenseDate = picked);
-  }
-
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCategory == null) {
@@ -200,7 +215,10 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
     }
     if (!_isEditing && Session.isSuperAdmin && _selectedCompany == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a company'), backgroundColor: AppColors.dangerFill),
+        const SnackBar(
+          content: Text('Please select a company'),
+          backgroundColor: AppColors.dangerFill,
+        ),
       );
       return;
     }
@@ -223,14 +241,30 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
     );
     setState(() => _submitting = true);
     try {
+      // A newly picked receipt is still a local path — host it first. One
+      // already showing as an existing hosted URL (via initState's direct
+      // assignment or its by-id fallback) needs no re-upload; only a real
+      // local pick does.
+      final receipt = _receiptImage;
+      final toSave = receipt == null || receipt.path.startsWith('http')
+          ? expense
+          : expense.copyWith(
+              receiptImagePath: await ref
+                  .read(uploadServiceProvider)
+                  .uploadImage(receipt, folder: 'expenses'),
+            );
       if (_isEditing) {
         await ref
             .read(expensesProvider.notifier)
-            .updateExpense(expense, companyId: _effectiveCompanyId);
+            .updateExpense(toSave, companyId: _effectiveCompanyId);
       } else {
-        await ref.read(expensesProvider.notifier).addExpense(
-              expense,
-              companyId: (Session.isSuperAdmin ? _selectedCompany!.id : Session.companyId)!,
+        await ref
+            .read(expensesProvider.notifier)
+            .addExpense(
+              toSave,
+              companyId: (Session.isSuperAdmin
+                  ? _selectedCompany!.id
+                  : Session.companyId)!,
             );
       }
       if (mounted) context.pop();
@@ -395,68 +429,10 @@ class _CreateExpensePageState extends ConsumerState<CreateExpensePage> {
             // Expense Date
             _SectionLabel('Expense Date'),
             const SizedBox(height: 8),
-            GestureDetector(
-              onTap: _pickDate,
-              child: Container(
-                height: 56,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: AppColors.shadows([
-                    BoxShadow(
-                      color: AppColors.shadowDark.withValues(alpha: 0.06),
-                      blurRadius: 14,
-                      offset: const Offset(0, 6),
-                    ),
-                    BoxShadow(
-                      color: AppColors.highlightShadow(0.85),
-                      blurRadius: 6,
-                      offset: const Offset(-3, -3),
-                    ),
-                  ]),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [AppColors.brandLight, AppColors.brand],
-                        ),
-                        boxShadow: AppColors.shadows([
-                          BoxShadow(
-                            color: AppColors.brandLight.withValues(alpha: 0.4),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ]),
-                      ),
-                      child: const Icon(
-                        Icons.calendar_today_rounded,
-                        size: 16,
-                        color: AppColors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      DateFormat('dd MMM yyyy').format(_expenseDate),
-                      style: TextStyle(fontSize: 15, color: AppColors.ink),
-                    ),
-                    const Spacer(),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      size: 20,
-                      color: AppColors.textHint,
-                    ),
-                  ],
-                ),
-              ),
+            BrixenDateField(
+              value: _expenseDate,
+              onChanged: (d) => setState(() => _expenseDate = d),
+              firstDate: DateTime(2020),
             ),
             const SizedBox(height: 18),
 

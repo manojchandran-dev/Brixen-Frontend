@@ -5,6 +5,8 @@ import '../../features/auth/presentation/pages/splash_page.dart';
 import '../../features/auth/presentation/pages/sign_in_page.dart';
 import '../../features/auth/presentation/pages/sign_up_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
+import '../../features/auth/presentation/pages/profile_page.dart';
+import '../../features/auth/presentation/pages/change_password_page.dart';
 import '../../features/auth/presentation/pages/dashboard_home_page.dart';
 import '../../features/auth/presentation/pages/report_home_page.dart';
 import '../../features/auth/presentation/pages/more_home_page.dart';
@@ -32,6 +34,20 @@ import '../../features/products/domain/entities/product.dart';
 import '../../features/permissions/presentation/pages/permission_management_page.dart';
 import '../../features/permissions/presentation/pages/create_permission_page.dart';
 import '../../features/permissions/presentation/pages/module_access_page.dart';
+import '../../features/notifications/domain/entities/push_notification.dart';
+import '../../features/notifications/domain/entities/announcement.dart';
+import '../../features/notifications/presentation/pages/push_notifications_page.dart';
+import '../../features/notifications/presentation/pages/create_push_notification_page.dart';
+import '../../features/notifications/presentation/pages/announcements_page.dart';
+import '../../features/notifications/presentation/pages/create_announcement_page.dart';
+import '../../features/support/domain/entities/support_ticket.dart';
+import '../../features/support/presentation/pages/support_tickets_page.dart';
+import '../../features/support/presentation/pages/create_ticket_page.dart';
+import '../../features/support/presentation/pages/ticket_detail_page.dart';
+import '../../features/support/presentation/pages/ticket_manage_page.dart';
+import '../services/session_service.dart';
+import '../../features/chat/presentation/pages/chat_page.dart';
+import '../../features/chat/presentation/pages/chat_room_page.dart';
 import '../../features/masters/presentation/pages/master_category_page.dart';
 import '../../features/security/presentation/cubit/security_cubit.dart';
 import '../../features/security/presentation/pages/lock_screen_page.dart';
@@ -57,11 +73,17 @@ class AppRouter {
   static const String signIn = RouteNames.signIn;
   static const String signUp = RouteNames.signUp;
   static const String forgotPassword = RouteNames.forgotPassword;
-  static const String companies = RouteNames.companies; // super admin's company-management hub, reached via the drawer
+  static const String profile = RouteNames.profile;
+  static const String changePassword = RouteNames.changePassword;
+  static const String companies = RouteNames
+      .companies; // super admin's company-management hub, reached via the drawer
   static const String createCompany = RouteNames.createCompany;
-  static const String dashboard = RouteNames.dashboard; // shared landing page for every role after PIN verification
-  static const String report = RouteNames.report; // shared Report tab, same for every role
-  static const String more = RouteNames.more; // shared More tab, same for every role
+  static const String dashboard = RouteNames
+      .dashboard; // shared landing page for every role after PIN verification
+  static const String report =
+      RouteNames.report; // shared Report tab, same for every role
+  static const String more =
+      RouteNames.more; // shared More tab, same for every role
   static const String sales = RouteNames.sales;
   static const String createSale = RouteNames.createSale;
   static const String customers = RouteNames.customers;
@@ -77,9 +99,22 @@ class AppRouter {
   static const String permissions = RouteNames.permissions;
   static const String createPermission = RouteNames.createPermission;
   static const String moduleAccess = RouteNames.moduleAccess;
-  static const String masterCompanyCategories = RouteNames.masterCompanyCategories;
-  static const String masterExpenseCategories = RouteNames.masterExpenseCategories;
-  static const String masterProductCategories = RouteNames.masterProductCategories;
+  static const String pushNotifications = RouteNames.pushNotifications;
+  static const String createPushNotification =
+      RouteNames.createPushNotification;
+  static const String announcements = RouteNames.announcements;
+  static const String createAnnouncement = RouteNames.createAnnouncement;
+  static const String support = RouteNames.support;
+  static const String createTicket = RouteNames.createTicket;
+  static const String ticketDetail = RouteNames.ticketDetail;
+  static const String chat = RouteNames.chat;
+  static const String chatRoom = RouteNames.chatRoom;
+  static const String masterCompanyCategories =
+      RouteNames.masterCompanyCategories;
+  static const String masterExpenseCategories =
+      RouteNames.masterExpenseCategories;
+  static const String masterProductCategories =
+      RouteNames.masterProductCategories;
   static const String masterUnits = RouteNames.masterUnits;
   static const String lockScreen = RouteNames.lockScreen;
   static const String security = RouteNames.security;
@@ -96,6 +131,11 @@ class AppRouter {
         path: forgotPassword,
         builder: (context, state) => const ForgotPasswordPage(),
       ),
+      GoRoute(path: profile, builder: (context, state) => const ProfilePage()),
+      GoRoute(
+        path: changePassword,
+        builder: (context, state) => const ChangePasswordPage(),
+      ),
       GoRoute(
         path: companies,
         builder: (context, state) =>
@@ -103,15 +143,18 @@ class AppRouter {
       ),
       GoRoute(
         path: dashboard,
-        builder: (context, state) => const DashboardHomePage(),
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: DashboardHomePage()),
       ),
       GoRoute(
         path: report,
-        builder: (context, state) => const ReportHomePage(),
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: ReportHomePage()),
       ),
       GoRoute(
         path: more,
-        builder: (context, state) => const MoreHomePage(),
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: MoreHomePage()),
       ),
       GoRoute(
         path: createCompany,
@@ -225,6 +268,54 @@ class AppRouter {
             CreatePermissionPage(company: state.extra as Company?),
       ),
       GoRoute(
+        path: pushNotifications,
+        builder: (context, state) => const PushNotificationsPage(),
+      ),
+      GoRoute(
+        path: createPushNotification,
+        builder: (context, state) => CreatePushNotificationPage(
+          editNotification: state.extra as PushNotification?,
+        ),
+      ),
+      GoRoute(
+        path: announcements,
+        builder: (context, state) => const AnnouncementsPage(),
+      ),
+      GoRoute(
+        path: createAnnouncement,
+        builder: (context, state) => CreateAnnouncementPage(
+          editAnnouncement: state.extra as Announcement?,
+        ),
+      ),
+      GoRoute(
+        path: support,
+        builder: (context, state) => const SupportTicketsPage(),
+      ),
+      GoRoute(
+        path: createTicket,
+        builder: (context, state) => const CreateTicketPage(),
+      ),
+      GoRoute(
+        path: ticketDetail,
+        builder: (context, state) {
+          final ticket = state.extra as SupportTicket;
+          return Session.isSuperAdmin
+              ? TicketManagePage(ticket: ticket)
+              : TicketDetailPage(ticket: ticket);
+        },
+      ),
+      GoRoute(path: chat, builder: (context, state) => const ChatPage()),
+      GoRoute(
+        path: chatRoom,
+        builder: (context, state) {
+          final extra = state.extra as Map;
+          return ChatRoomPage(
+            companyId: extra['companyId'] as String,
+            companyName: extra['companyName'] as String,
+          );
+        },
+      ),
+      GoRoute(
         path: moduleAccess,
         builder: (context, state) {
           final extra = state.extra as Map;
@@ -236,15 +327,18 @@ class AppRouter {
       ),
       GoRoute(
         path: masterCompanyCategories,
-        builder: (context, state) => const MasterCategoryPage(typeKey: 'companyCategory'),
+        builder: (context, state) =>
+            const MasterCategoryPage(typeKey: 'companyCategory'),
       ),
       GoRoute(
         path: masterExpenseCategories,
-        builder: (context, state) => const MasterCategoryPage(typeKey: 'expenseCategory'),
+        builder: (context, state) =>
+            const MasterCategoryPage(typeKey: 'expenseCategory'),
       ),
       GoRoute(
         path: masterProductCategories,
-        builder: (context, state) => const MasterCategoryPage(typeKey: 'productCategory'),
+        builder: (context, state) =>
+            const MasterCategoryPage(typeKey: 'productCategory'),
       ),
       GoRoute(
         path: masterUnits,

@@ -11,10 +11,14 @@ abstract class SalesRepository {
     DateTime? from,
     DateTime? to,
   });
-  Future<Sale> getSaleById(String id);
+  Future<Sale> getSaleById(String id, {String? companyId});
   Future<Sale> createSale(Map<String, dynamic> body);
   Future<Sale> updateSale(String id, Map<String, dynamic> body);
-  Future<Sale> updateSaleItems(String id, Map<String, dynamic> body, {String? companyId});
+  Future<Sale> updateSaleItems(
+    String id,
+    Map<String, dynamic> body, {
+    String? companyId,
+  });
   Future<List<SaleItem>> getSaleItems(String id, {String? companyId});
   Future<void> deleteSale(String id, {String? companyId});
 }

@@ -2,7 +2,11 @@ class DailyPoint {
   final DateTime date;
   final double sales;
   final double expenses;
-  const DailyPoint({required this.date, required this.sales, required this.expenses});
+  const DailyPoint({
+    required this.date,
+    required this.sales,
+    required this.expenses,
+  });
 }
 
 class CumulativePoint {
@@ -33,6 +37,7 @@ class ReportsSummary {
   final double profitMarginPct;
   final List<DailyPoint> salesVsExpenses;
   final List<CumulativePoint> cumulativeProfit;
+  final List<NamedAmount> topSellingCategories;
   final List<NamedAmount> topExpenseCategories;
   final List<StatusCount> salesByStatus;
   final List<NamedAmount> salesByPaymentMethod;
@@ -48,6 +53,7 @@ class ReportsSummary {
     required this.profitMarginPct,
     required this.salesVsExpenses,
     required this.cumulativeProfit,
+    required this.topSellingCategories,
     required this.topExpenseCategories,
     required this.salesByStatus,
     required this.salesByPaymentMethod,

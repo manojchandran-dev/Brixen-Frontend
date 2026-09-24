@@ -3,15 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/network/upload_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/picked_image.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/session_service.dart';
 import '../../../../shared/widgets/brixen_button.dart';
+import '../../../../shared/widgets/brixen_date_field.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
 import '../../../../shared/widgets/company_selector_field.dart';
 import '../../../companies/domain/entities/company.dart';
+import '../../data/repositories/sales_repository_impl.dart';
 import '../../domain/entities/sale.dart';
 import '../../domain/entities/sale_item.dart';
 import '../providers/sales_provider.dart';
@@ -29,8 +32,13 @@ class _SaleLineItem {
   final Product product;
   int quantity;
   String priceType; // one of _priceTypes
-  _SaleLineItem({required this.product, required this.quantity, required this.priceType});
-  double get unitPrice => priceType == 'Wholesale' ? product.wholesalePrice : product.retailPrice;
+  _SaleLineItem({
+    required this.product,
+    required this.quantity,
+    required this.priceType,
+  });
+  double get unitPrice =>
+      priceType == 'Wholesale' ? product.wholesalePrice : product.retailPrice;
   double get amount => unitPrice * quantity;
 }
 
@@ -62,7 +70,8 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
   String? _invoiceType;
   XFile? _billImage;
   Customer? _selectedCustomer;
-  Company? _selectedCompany; // superAdmin only — companyAdmin/employee use Session.companyId
+  Company?
+  _selectedCompany; // superAdmin only — companyAdmin/employee use Session.companyId
   final _picker = ImagePicker();
 
   // Step 2 — Amounts
@@ -96,7 +105,14 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
     if (s != null) {
       _billDate = s.billDate;
       _invoiceType = s.invoiceType;
-      if (s.billImagePath != null) _billImage = XFile(s.billImagePath!);
+      if (s.billImagePath != null && s.billImagePath!.isNotEmpty) {
+        _billImage = XFile(s.billImagePath!);
+      } else {
+        // The passed-in sale (from the list page) doesn't always carry the
+        // bill image URL — only `GET /sales/:id` reliably does — so fetch
+        // the full record rather than silently editing without it.
+        _loadBillImageFallback(s.id, Session.isSuperAdmin ? s.companyId : null);
+      }
       _subtotalCtrl.text = s.subtotal.toString();
       _taxAmountCtrl.text = s.taxAmount.toString();
       _totalAmountCtrl.text = s.totalAmount.toString();
@@ -131,7 +147,9 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
                 return _SaleLineItem(
                   product: product,
                   quantity: item.quantity,
-                  priceType: item.priceType == 'wholesale' ? 'Wholesale' : 'Retail',
+                  priceType: item.priceType == 'wholesale'
+                      ? 'Wholesale'
+                      : 'Retail',
                 );
               })
               .whereType<_SaleLineItem>()
@@ -144,20 +162,43 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
     }
   }
 
+  Future<void> _loadBillImageFallback(String id, String? companyId) async {
+    try {
+      final full = await ref
+          .read(salesRepositoryProvider)
+          .getSaleById(id, companyId: companyId);
+      if (!mounted ||
+          full.billImagePath == null ||
+          full.billImagePath!.isEmpty) {
+        return;
+      }
+      setState(() => _billImage = XFile(full.billImagePath!));
+    } catch (_) {}
+  }
+
   static const _invoiceTypes = [
-    'Tax Invoice', 'Proforma Invoice', 'Credit Note',
-    'Debit Note', 'Quotation', 'Delivery Challan',
+    'Tax Invoice',
+    'Proforma Invoice',
+    'Credit Note',
+    'Debit Note',
+    'Quotation',
+    'Delivery Challan',
   ];
   static const _paymentTypes = [
-    'Cash', 'Card', 'UPI', 'Bank Transfer', 'Cheque', 'Other',
+    'Cash',
+    'Card',
+    'UPI',
+    'Bank Transfer',
+    'Cheque',
+    'Other',
   ];
-  static const _paymentStatuses = [
-    'Pending', 'Paid', 'Partial',
-  ];
+  static const _paymentStatuses = ['Pending', 'Paid', 'Partial'];
 
   @override
   void dispose() {
-    _subtotalCtrl.dispose(); _taxAmountCtrl.dispose(); _taxPercentCtrl.dispose();
+    _subtotalCtrl.dispose();
+    _taxAmountCtrl.dispose();
+    _taxPercentCtrl.dispose();
     _totalAmountCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
@@ -175,7 +216,9 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
       if (i != -1) {
         _lineItems.removeAt(i);
       } else {
-        _lineItems.add(_SaleLineItem(product: product, quantity: 1, priceType: 'Retail'));
+        _lineItems.add(
+          _SaleLineItem(product: product, quantity: 1, priceType: 'Retail'),
+        );
       }
     });
     _recalcFromLineItems();
@@ -248,11 +291,14 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Attach Bill Image',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: Theme.of(context).colorScheme.onSurface)),
+              Text(
+                'Attach Bill Image',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -290,7 +336,10 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
     if (!_currentFormKey.currentState!.validate()) return;
     if (!_isEditing && Session.isSuperAdmin && _selectedCompany == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a company'), backgroundColor: AppColors.dangerFill),
+        const SnackBar(
+          content: Text('Please select a company'),
+          backgroundColor: AppColors.dangerFill,
+        ),
       );
       return;
     }
@@ -312,22 +361,36 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
       createdAt: _isEditing ? widget.editSale!.createdAt : DateTime.now(),
     );
     try {
+      // A newly picked bill image is still a local path — host it first.
+      // When editing, _billImage wraps the already-hosted URL; send it as is.
+      final bill = _billImage;
+      final toSave = bill == null || bill.path.startsWith('http')
+          ? headerSale
+          : headerSale.copyWith(
+              billImagePath: await ref
+                  .read(uploadServiceProvider)
+                  .uploadImage(bill, folder: 'sales'),
+            );
       final notifier = ref.read(salesProvider.notifier);
       final saved = _isEditing
-          ? await notifier.updateSale(headerSale, companyId: _effectiveCompanyId)
+          ? await notifier.updateSale(toSave, companyId: _effectiveCompanyId)
           : await notifier.addSale(
-              headerSale,
-              companyId: (Session.isSuperAdmin ? _selectedCompany!.id : Session.companyId)!,
+              toSave,
+              companyId: (Session.isSuperAdmin
+                  ? _selectedCompany!.id
+                  : Session.companyId)!,
             );
       if (_lineItems.isNotEmpty) {
         final items = _lineItems
-            .map((l) => SaleItem(
-                  productId: l.product.id,
-                  productName: l.product.productName,
-                  priceType: l.priceType.toLowerCase(),
-                  price: l.unitPrice,
-                  quantity: l.quantity,
-                ))
+            .map(
+              (l) => SaleItem(
+                productId: l.product.id,
+                productName: l.product.productName,
+                priceType: l.priceType.toLowerCase(),
+                price: l.unitPrice,
+                quantity: l.quantity,
+              ),
+            )
             .toList();
         final taxPct = double.tryParse(_taxPercentCtrl.text) ?? 0;
         await notifier.updateSaleItems(
@@ -346,7 +409,10 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.dangerFill),
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: AppColors.dangerFill,
+          ),
         );
       }
     } finally {
@@ -372,7 +438,9 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
         leading: GestureDetector(
           onTap: () {
             if (_currentStep == 0) {
-              (widget.fromMenu || widget.fromMasters) ? context.pop() : context.go(AppRouter.sales);
+              (widget.fromMenu || widget.fromMasters)
+                  ? context.pop()
+                  : context.go(AppRouter.sales);
             } else {
               _back();
             }
@@ -391,8 +459,11 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
                 ),
               ]),
             ),
-            child: Icon(Icons.arrow_back_ios_new_rounded, size: 16,
-                color: isDark ? AppColors.black : AppColors.white),
+            child: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 16,
+              color: isDark ? AppColors.black : AppColors.white,
+            ),
           ),
         ),
         title: Column(
@@ -404,13 +475,68 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    GestureDetector(onTap: () => context.pop(), child: Text('Menu', style: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.6), fontSize: 11))),
-                    Padding(padding: const EdgeInsets.symmetric(horizontal: 3), child: Icon(Icons.chevron_right_rounded, size: 13, color: cs.onSurfaceVariant.withValues(alpha: 0.4))),
-                    GestureDetector(onTap: () => context.pop(), child: Text('Masters', style: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.6), fontSize: 11))),
-                    Padding(padding: const EdgeInsets.symmetric(horizontal: 3), child: Icon(Icons.chevron_right_rounded, size: 13, color: cs.onSurfaceVariant.withValues(alpha: 0.4))),
-                    GestureDetector(onTap: () => context.pop(), child: Text('Sales', style: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.6), fontSize: 11))),
-                    Padding(padding: const EdgeInsets.symmetric(horizontal: 3), child: Icon(Icons.chevron_right_rounded, size: 13, color: cs.onSurfaceVariant.withValues(alpha: 0.4))),
-                    Text('Create', style: TextStyle(color: cs.onSurface, fontSize: 11, fontWeight: FontWeight.w600)),
+                    GestureDetector(
+                      onTap: () => context.pop(),
+                      child: Text(
+                        'Menu',
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        size: 13,
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => context.pop(),
+                      child: Text(
+                        'Masters',
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        size: 13,
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => context.pop(),
+                      child: Text(
+                        'Sales',
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        size: 13,
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    Text(
+                      'Create',
+                      style: TextStyle(
+                        color: cs.onSurface,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               )
@@ -420,38 +546,73 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
                 children: [
                   GestureDetector(
                     onTap: () => context.pop(),
-                    child: Text('Menu', style: TextStyle(
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.6), fontSize: 11)),
+                    child: Text(
+                      'Menu',
+                      style: TextStyle(
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                        fontSize: 11,
+                      ),
+                    ),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 3),
-                    child: Icon(Icons.chevron_right_rounded, size: 13,
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      size: 13,
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                    ),
                   ),
                   GestureDetector(
                     onTap: () => context.pop(),
-                    child: Text('Sales', style: TextStyle(
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.6), fontSize: 11)),
+                    child: Text(
+                      'Sales',
+                      style: TextStyle(
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                        fontSize: 11,
+                      ),
+                    ),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 3),
-                    child: Icon(Icons.chevron_right_rounded, size: 13,
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      size: 13,
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                    ),
                   ),
-                  Text('Create', style: TextStyle(
-                      color: cs.onSurface, fontSize: 11, fontWeight: FontWeight.w600)),
+                  Text(
+                    'Create',
+                    style: TextStyle(
+                      color: cs.onSurface,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               )
             else
-              Text(_isEditing ? 'Edit Sale' : 'Create Sale', style: TextStyle(
-                  color: cs.onSurface, fontSize: 17, fontWeight: FontWeight.w700)),
+              Text(
+                _isEditing ? 'Edit Sale' : 'Create Sale',
+                style: TextStyle(
+                  color: cs.onSurface,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             if (!widget.fromMenu)
-              Text('Step ${_currentStep + 1} of 3 — ${_stepTitle(_currentStep)}',
-                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11))
+              Text(
+                'Step ${_currentStep + 1} of 3 — ${_stepTitle(_currentStep)}',
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
+              )
             else
-              Text('${_isEditing ? 'Edit' : 'Create'} Sale — Step ${_currentStep + 1} of 3',
-                  style: TextStyle(
-                      color: cs.onSurface, fontSize: 15, fontWeight: FontWeight.w700)),
+              Text(
+                '${_isEditing ? 'Edit' : 'Create'} Sale — Step ${_currentStep + 1} of 3',
+                style: TextStyle(
+                  color: cs.onSurface,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
           ],
         ),
       ),
@@ -465,8 +626,9 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
                 opacity: anim,
                 child: SlideTransition(
                   position: Tween<Offset>(
-                      begin: const Offset(0.04, 0), end: Offset.zero)
-                      .animate(anim),
+                    begin: const Offset(0.04, 0),
+                    end: Offset.zero,
+                  ).animate(anim),
                   child: child,
                 ),
               ),
@@ -482,8 +644,7 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
     );
   }
 
-  String _stepTitle(int step) =>
-      ['Bill Info', 'Amounts', 'Notes'][step];
+  String _stepTitle(int step) => ['Bill Info', 'Amounts', 'Notes'][step];
 
   Widget _buildStep(BuildContext context) {
     switch (_currentStep) {
@@ -542,11 +703,14 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
     'Date': DateFormat('dd MMM yyyy').format(_billDate),
     'Invoice Type': _invoiceType ?? '—',
     if (_lineItems.isNotEmpty)
-      'Items': _lineItems.map((l) => '${l.product.productName} ×${l.quantity}').join(', '),
+      'Items': _lineItems
+          .map((l) => '${l.product.productName} ×${l.quantity}')
+          .join(', '),
     'Subtotal': '₹${_subtotalCtrl.text.isEmpty ? '0.00' : _subtotalCtrl.text}',
     if (_taxPercentCtrl.text.isNotEmpty) 'Tax %': _taxPercentCtrl.text,
     'Tax': '₹${_taxAmountCtrl.text.isEmpty ? '0.00' : _taxAmountCtrl.text}',
-    'Total': '₹${_totalAmountCtrl.text.isEmpty ? '0.00' : _totalAmountCtrl.text}',
+    'Total':
+        '₹${_totalAmountCtrl.text.isEmpty ? '0.00' : _totalAmountCtrl.text}',
     'Payment Type': _paymentType ?? '—',
     'Status': _paymentStatus ?? 'Pending',
   };
@@ -562,16 +726,24 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
         children: [
           if (_currentStep > 0) ...[
             Expanded(
-              child: BrixenButton(label: 'Back', isOutlined: true, onPressed: _back),
+              child: BrixenButton(
+                label: 'Back',
+                isOutlined: true,
+                onPressed: _back,
+              ),
             ),
             const SizedBox(width: 12),
           ],
           Expanded(
             flex: 2,
             child: BrixenButton(
-              label: _currentStep == 2 ? (_isEditing ? 'Save Changes' : 'Create Sale') : 'Continue',
+              label: _currentStep == 2
+                  ? (_isEditing ? 'Save Changes' : 'Create Sale')
+                  : 'Continue',
               isLoading: _submitting,
-              onPressed: _submitting ? null : (_currentStep == 2 ? _submit : _next),
+              onPressed: _submitting
+                  ? null
+                  : (_currentStep == 2 ? _submit : _next),
             ),
           ),
         ],
@@ -626,8 +798,12 @@ class _SaleStepIndicator extends StatelessWidget {
                             height: 28,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              gradient: (done || active) ? activeCircleGradient : null,
-                              color: (done || active) ? activeCircleColor : cs.surfaceContainerHighest,
+                              gradient: (done || active)
+                                  ? activeCircleGradient
+                                  : null,
+                              color: (done || active)
+                                  ? activeCircleColor
+                                  : cs.surfaceContainerHighest,
                               border: Border.all(
                                 color: (done || active)
                                     ? activeLineColor
@@ -637,13 +813,21 @@ class _SaleStepIndicator extends StatelessWidget {
                             ),
                             child: Center(
                               child: done
-                                  ? Icon(Icons.check_rounded, size: 14, color: activeContentColor)
-                                  : Text('${i + 1}',
+                                  ? Icon(
+                                      Icons.check_rounded,
+                                      size: 14,
+                                      color: activeContentColor,
+                                    )
+                                  : Text(
+                                      '${i + 1}',
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w700,
-                                        color: active ? activeContentColor : cs.onSurfaceVariant,
-                                      )),
+                                        color: active
+                                            ? activeContentColor
+                                            : cs.onSurfaceVariant,
+                                      ),
+                                    ),
                             ),
                           ),
                           if (i < 2)
@@ -662,7 +846,9 @@ class _SaleStepIndicator extends StatelessWidget {
                         labels[i],
                         style: TextStyle(
                           fontSize: 10,
-                          fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+                          fontWeight: active
+                              ? FontWeight.w600
+                              : FontWeight.normal,
                           color: active ? cs.onSurface : cs.onSurfaceVariant,
                         ),
                       ),
@@ -723,10 +909,13 @@ class _Step1 extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
         children: [
           if (showCompanyField) ...[
-            CompanySelectorField(value: selectedCompany, onChanged: onCompanyChanged),
+            CompanySelectorField(
+              value: selectedCompany,
+              onChanged: onCompanyChanged,
+            ),
             const SizedBox(height: 22),
           ],
-          _DatePickerField(
+          BrixenDateField(
             label: 'Bill Date *',
             value: billDate,
             onChanged: onDateChanged,
@@ -775,7 +964,10 @@ class _Step2 extends StatelessWidget {
   final void Function(int index) onRemoveLineItem;
   final void Function(int index, int qty) onLineItemQtyChanged;
   final void Function(int index, String priceType) onLineItemPriceTypeChanged;
-  final TextEditingController subtotalCtrl, taxPercentCtrl, taxAmountCtrl, totalAmountCtrl;
+  final TextEditingController subtotalCtrl,
+      taxPercentCtrl,
+      taxAmountCtrl,
+      totalAmountCtrl;
   final String? paymentType, paymentStatus;
   final List<String> paymentTypes, paymentStatuses;
   final void Function(String?) onPaymentTypeChanged;
@@ -813,11 +1005,22 @@ class _Step2 extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
         children: [
-          Text('Add Products',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface)),
+          Text(
+            'Add Products',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface,
+            ),
+          ),
           const SizedBox(height: 3),
-          Text('Optional — pick products to auto-fill the subtotal below',
-              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant.withValues(alpha: 0.7))),
+          Text(
+            'Optional — pick products to auto-fill the subtotal below',
+            style: TextStyle(
+              fontSize: 11,
+              color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+            ),
+          ),
           const SizedBox(height: 12),
 
           _ProductMultiSelectField(
@@ -843,10 +1046,15 @@ class _Step2 extends StatelessWidget {
                       _LineItemRow(
                         item: item,
                         onQtyChanged: (q) => onLineItemQtyChanged(i, q),
-                        onPriceTypeChanged: (t) => onLineItemPriceTypeChanged(i, t),
+                        onPriceTypeChanged: (t) =>
+                            onLineItemPriceTypeChanged(i, t),
                         onRemove: () => onRemoveLineItem(i),
                       ),
-                      if (!isLast) Divider(height: 1, color: Theme.of(context).dividerColor),
+                      if (!isLast)
+                        Divider(
+                          height: 1,
+                          color: Theme.of(context).dividerColor,
+                        ),
                     ],
                   );
                 }),
@@ -864,7 +1072,8 @@ class _Step2 extends StatelessWidget {
             textInputAction: TextInputAction.next,
             prefixIcon: const Icon(Icons.currency_rupee_rounded),
             onChanged: hasLineItems ? null : (_) => onRecalc(),
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'Required' : null,
           ),
           const SizedBox(height: 22),
 
@@ -950,16 +1159,21 @@ class _Step3 extends StatelessWidget {
           _NotesField(controller: notesCtrl),
           const SizedBox(height: 28),
 
-          Text('Review',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurface)),
+          Text(
+            'Review',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface,
+            ),
+          ),
           const SizedBox(height: 12),
 
           Container(
             decoration: BoxDecoration(
-              color: isDark ? cs.surfaceContainerHighest : AppColors.lightSurface,
+              color: isDark
+                  ? cs.surfaceContainerHighest
+                  : AppColors.lightSurface,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: Theme.of(context).dividerColor),
             ),
@@ -970,20 +1184,29 @@ class _Step3 extends StatelessWidget {
                   children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 13),
+                        horizontal: 16,
+                        vertical: 13,
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(e.key,
-                              style: TextStyle(
-                                  fontSize: 13, color: cs.onSurfaceVariant)),
-                          Text(e.value,
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: e.key == 'Total'
-                                      ? AppColors.accentEmerald
-                                      : cs.onSurface)),
+                          Text(
+                            e.key,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                          Text(
+                            e.value,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: e.key == 'Total'
+                                  ? AppColors.accentEmerald
+                                  : cs.onSurface,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -1002,57 +1225,7 @@ class _Step3 extends StatelessWidget {
 }
 
 // ── Shared Widgets ─────────────────────────────────────────────────────────
-
-class _DatePickerField extends StatelessWidget {
-  final String label;
-  final DateTime value;
-  final void Function(DateTime) onChanged;
-
-  const _DatePickerField({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: () async {
-        final picked = await showDatePicker(
-          context: context,
-          initialDate: value,
-          firstDate: DateTime(2000),
-          lastDate: DateTime(2100),
-        );
-        if (picked != null) onChanged(picked);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Theme.of(context).dividerColor),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.calendar_today_outlined,
-                size: 20, color: cs.onSurfaceVariant),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                DateFormat('dd MMM yyyy').format(value),
-                style: TextStyle(fontSize: 15, color: cs.onSurface),
-              ),
-            ),
-            Icon(Icons.chevron_right_rounded,
-                size: 18, color: cs.onSurfaceVariant),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// (date picker moved to shared/widgets/brixen_date_field.dart)
 
 // ── Line-item picker (Sales — Amounts step) ────────────────────────────────
 
@@ -1082,10 +1255,17 @@ class _QtyStepper extends StatelessWidget {
             child: Text(
               '$value',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: cs.onSurface),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+              ),
             ),
           ),
-          _QtyButton(icon: Icons.add_rounded, onTap: () => onChanged(value + 1)),
+          _QtyButton(
+            icon: Icons.add_rounded,
+            onTap: () => onChanged(value + 1),
+          ),
         ],
       ),
     );
@@ -1108,7 +1288,9 @@ class _QtyButton extends StatelessWidget {
         child: Icon(
           icon,
           size: 16,
-          color: onTap == null ? cs.onSurfaceVariant.withValues(alpha: 0.3) : cs.onSurfaceVariant,
+          color: onTap == null
+              ? cs.onSurfaceVariant.withValues(alpha: 0.3)
+              : cs.onSurfaceVariant,
         ),
       ),
     );
@@ -1132,7 +1314,9 @@ class _ProductMultiSelectField extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final label = lineItems.isEmpty ? null : '${lineItems.length} product(s) selected';
+    final label = lineItems.isEmpty
+        ? null
+        : '${lineItems.length} product(s) selected';
 
     return GestureDetector(
       onTap: () => showModalBottomSheet(
@@ -1151,7 +1335,9 @@ class _ProductMultiSelectField extends StatelessWidget {
         decoration: BoxDecoration(
           color: isDark ? cs.surfaceContainerHighest : AppColors.surface,
           borderRadius: BorderRadius.circular(16),
-          border: isDark ? Border.all(color: Theme.of(context).dividerColor) : null,
+          border: isDark
+              ? Border.all(color: Theme.of(context).dividerColor)
+              : null,
           boxShadow: isDark
               ? null
               : [
@@ -1195,7 +1381,8 @@ class _ProductMultiSelectSheet extends StatefulWidget {
   });
 
   @override
-  State<_ProductMultiSelectSheet> createState() => _ProductMultiSelectSheetState();
+  State<_ProductMultiSelectSheet> createState() =>
+      _ProductMultiSelectSheetState();
 }
 
 class _ProductMultiSelectSheetState extends State<_ProductMultiSelectSheet> {
@@ -1230,10 +1417,18 @@ class _ProductMultiSelectSheetState extends State<_ProductMultiSelectSheet> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Select Products',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: cs.onSurface)),
-                  Text('${_selectedIds.length} selected',
-                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                  Text(
+                    'Select Products',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  Text(
+                    '${_selectedIds.length} selected',
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  ),
                 ],
               ),
             ),
@@ -1241,14 +1436,22 @@ class _ProductMultiSelectSheetState extends State<_ProductMultiSelectSheet> {
             Expanded(
               child: widget.products.isEmpty
                   ? Center(
-                      child: Text('No products available',
-                          style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13)),
+                      child: Text(
+                        'No products available',
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant,
+                          fontSize: 13,
+                        ),
+                      ),
                     )
                   : ListView.separated(
                       controller: scrollController,
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       itemCount: widget.products.length,
-                      separatorBuilder: (_, _) => Divider(height: 1, color: Theme.of(context).dividerColor),
+                      separatorBuilder: (_, _) => Divider(
+                        height: 1,
+                        color: Theme.of(context).dividerColor,
+                      ),
                       itemBuilder: (_, i) {
                         final product = widget.products[i];
                         final selected = _selectedIds.contains(product.id);
@@ -1256,17 +1459,28 @@ class _ProductMultiSelectSheetState extends State<_ProductMultiSelectSheet> {
                           value: selected,
                           onChanged: (_) {
                             setState(() {
-                              selected ? _selectedIds.remove(product.id) : _selectedIds.add(product.id);
+                              selected
+                                  ? _selectedIds.remove(product.id)
+                                  : _selectedIds.add(product.id);
                             });
                             widget.onToggle(product);
                           },
                           controlAffinity: ListTileControlAffinity.leading,
-                          title: Text(product.productName,
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
+                          title: Text(
+                            product.productName,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: cs.onSurface,
+                            ),
+                          ),
                           subtitle: Text(
                             'Retail ₹${product.retailPrice.toStringAsFixed(0)} · '
                             'Wholesale ₹${product.wholesalePrice.toStringAsFixed(0)}',
-                            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: cs.onSurfaceVariant,
+                            ),
                           ),
                         );
                       },
@@ -1305,15 +1519,21 @@ class _PriceTypeChips extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: selected ? AppColors.accentIndigo.withValues(alpha: 0.15) : null,
+                color: selected
+                    ? AppColors.accentIndigo.withValues(alpha: 0.15)
+                    : null,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(t,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    color: selected ? AppColors.accentIndigo : cs.onSurfaceVariant,
-                  )),
+              child: Text(
+                t,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected
+                      ? AppColors.accentIndigo
+                      : cs.onSurfaceVariant,
+                ),
+              ),
             ),
           );
         }).toList(),
@@ -1345,9 +1565,16 @@ class _LineItemRow extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(item.product.productName,
-                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: cs.onSurface),
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                child: Text(
+                  item.product.productName,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               IconButton(
                 onPressed: onRemove,
@@ -1362,21 +1589,32 @@ class _LineItemRow extends StatelessWidget {
           const SizedBox(height: 6),
           Row(
             children: [
-              _PriceTypeChips(value: item.priceType, onChanged: onPriceTypeChanged),
+              _PriceTypeChips(
+                value: item.priceType,
+                onChanged: onPriceTypeChanged,
+              ),
               const Spacer(),
               _QtyStepper(value: item.quantity, onChanged: onQtyChanged),
               const SizedBox(width: 12),
               SizedBox(
                 width: 60,
-                child: Text('₹${item.amount.toStringAsFixed(0)}',
-                    textAlign: TextAlign.right,
-                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: cs.onSurface)),
+                child: Text(
+                  '₹${item.amount.toStringAsFixed(0)}',
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
+                  ),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 2),
-          Text('₹${item.unitPrice.toStringAsFixed(0)} each (${item.priceType})',
-              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+          Text(
+            '₹${item.unitPrice.toStringAsFixed(0)} each (${item.priceType})',
+            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+          ),
         ],
       ),
     );
@@ -1426,7 +1664,9 @@ class _NotesFieldState extends State<_NotesField> {
             color: cs.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: _focused ? AppColors.silver : Theme.of(context).dividerColor,
+              color: _focused
+                  ? AppColors.silver
+                  : Theme.of(context).dividerColor,
               width: _focused ? 1.5 : 1,
             ),
           ),
@@ -1435,8 +1675,11 @@ class _NotesFieldState extends State<_NotesField> {
             children: [
               Padding(
                 padding: const EdgeInsets.only(left: 14, top: 14),
-                child: Icon(Icons.notes_rounded,
-                    color: cs.onSurfaceVariant, size: 20),
+                child: Icon(
+                  Icons.notes_rounded,
+                  color: cs.onSurfaceVariant,
+                  size: 20,
+                ),
               ),
               Expanded(
                 child: TextFormField(
@@ -1446,13 +1689,14 @@ class _NotesFieldState extends State<_NotesField> {
                   style: TextStyle(color: cs.onSurface, fontSize: 15),
                   decoration: InputDecoration(
                     hintText: showLabel ? 'Add any remarks or notes' : 'Notes',
-                    hintStyle:
-                        TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
+                    hintStyle: TextStyle(
+                      color: cs.onSurfaceVariant,
+                      fontSize: 14,
+                    ),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
-                    contentPadding:
-                        const EdgeInsets.fromLTRB(8, 14, 16, 14),
+                    contentPadding: const EdgeInsets.fromLTRB(8, 14, 16, 14),
                   ),
                 ),
               ),
@@ -1503,7 +1747,11 @@ class _BillImagePicker extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: pickedImage(image!.path, width: double.infinity, height: 180),
+            child: pickedImage(
+              image!.path,
+              width: double.infinity,
+              height: 180,
+            ),
           ),
           Positioned(
             top: 8,
@@ -1517,8 +1765,11 @@ class _BillImagePicker extends StatelessWidget {
                   color: Colors.black.withValues(alpha: 0.6),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.close_rounded,
-                    size: 16, color: Colors.white),
+                child: const Icon(
+                  Icons.close_rounded,
+                  size: 16,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
@@ -1534,10 +1785,16 @@ class _BillImagePicker extends StatelessWidget {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.check_circle_rounded, size: 12, color: Colors.white),
+                  Icon(
+                    Icons.check_circle_rounded,
+                    size: 12,
+                    color: Colors.white,
+                  ),
                   SizedBox(width: 4),
-                  Text('Bill attached',
-                      style: TextStyle(fontSize: 11, color: Colors.white)),
+                  Text(
+                    'Bill attached',
+                    style: TextStyle(fontSize: 11, color: Colors.white),
+                  ),
                 ],
               ),
             ),
@@ -1564,17 +1821,28 @@ class _BillImagePicker extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.upload_file_outlined,
-                size: 32, color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
+            Icon(
+              Icons.upload_file_outlined,
+              size: 32,
+              color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
             const SizedBox(height: 8),
-            Text('Attach Bill Image',
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: cs.onSurfaceVariant)),
+            Text(
+              'Attach Bill Image',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: 3),
-            Text('Optional — tap to pick from camera or gallery',
-                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant.withValues(alpha: 0.6))),
+            Text(
+              'Optional — tap to pick from camera or gallery',
+              style: TextStyle(
+                fontSize: 11,
+                color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+              ),
+            ),
           ],
         ),
       ),
@@ -1611,15 +1879,20 @@ class _SourceTile extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Icon(icon,
-                size: 28,
-                color: isDark ? AppColors.silver : AppColors.lightPrimary),
+            Icon(
+              icon,
+              size: 28,
+              color: isDark ? AppColors.silver : AppColors.lightPrimary,
+            ),
             const SizedBox(height: 8),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: cs.onSurface)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
+              ),
+            ),
           ],
         ),
       ),

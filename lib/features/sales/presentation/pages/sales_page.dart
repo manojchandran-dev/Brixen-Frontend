@@ -11,6 +11,7 @@ import '../../../../shared/widgets/rich_card_shell.dart';
 import '../../../../shared/widgets/skeleton.dart';
 import '../../../../shared/widgets/detail_sheet.dart';
 import '../../../../shared/widgets/error_state.dart';
+import '../../../../shared/widgets/picked_image.dart';
 import '../../../../shared/widgets/super_admin_company_filter_bar.dart';
 import '../../data/repositories/sales_repository_impl.dart';
 import '../../domain/entities/sale.dart';
@@ -640,7 +641,9 @@ class _SaleCard extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(context);
               try {
-                await ref.read(salesProvider.notifier).deleteSale(
+                await ref
+                    .read(salesProvider.notifier)
+                    .deleteSale(
                       sale.id,
                       companyId: Session.isSuperAdmin ? sale.companyId : null,
                     );
@@ -753,10 +756,12 @@ void _showSaleDetail(
         );
         if (confirmed != true) return;
         try {
-          await ref.read(salesProvider.notifier).deleteSale(
-                      sale.id,
-                      companyId: Session.isSuperAdmin ? sale.companyId : null,
-                    );
+          await ref
+              .read(salesProvider.notifier)
+              .deleteSale(
+                sale.id,
+                companyId: Session.isSuperAdmin ? sale.companyId : null,
+              );
           if (ctx.mounted) Navigator.of(ctx).pop();
         } catch (e) {
           if (ctx.mounted) {
@@ -827,6 +832,7 @@ void _showSaleDetail(
               ),
           ],
         ),
+        _SaleBillImage(sale: sale),
         _SaleItemsSection(sale: sale),
         DetailSection(
           title: 'Amount',
@@ -865,6 +871,72 @@ void _showSaleDetail(
   );
 }
 
+/// The sale list response doesn't always carry `bill_image_path` (only the
+/// single-record `GET /sales/:id` reliably does) — shows it immediately if
+/// the list item already had it, otherwise fetches the full record by id
+/// on open, same pattern as [_SaleItemsSection] below.
+class _SaleBillImage extends ConsumerStatefulWidget {
+  final Sale sale;
+  const _SaleBillImage({required this.sale});
+
+  @override
+  ConsumerState<_SaleBillImage> createState() => _SaleBillImageState();
+}
+
+class _SaleBillImageState extends ConsumerState<_SaleBillImage> {
+  String? _url;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _url = widget.sale.billImagePath;
+    if (_url == null || _url!.isEmpty) _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final full = await ref
+          .read(salesRepositoryProvider)
+          .getSaleById(
+            widget.sale.id,
+            companyId: Session.isSuperAdmin ? widget.sale.companyId : null,
+          );
+      if (!mounted) return;
+      setState(() {
+        _url = full.billImagePath;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    final url = _url;
+    if (url == null || url.isEmpty) return const SizedBox.shrink();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: pickedImage(url, width: double.infinity, height: 180),
+    );
+  }
+}
+
 /// Fetches `GET /sales/:id/items` on open and renders the line items as
 /// their own detail section — the sale list/detail payload doesn't carry
 /// them, so this is a dedicated on-demand call each time the sheet opens.
@@ -889,7 +961,9 @@ class _SaleItemsSectionState extends ConsumerState<_SaleItemsSection> {
 
   Future<void> _load() async {
     try {
-      final items = await ref.read(salesRepositoryProvider).getSaleItems(
+      final items = await ref
+          .read(salesRepositoryProvider)
+          .getSaleItems(
             widget.sale.id,
             companyId: Session.isSuperAdmin ? widget.sale.companyId : null,
           );
@@ -912,10 +986,13 @@ class _SaleItemsSectionState extends ConsumerState<_SaleItemsSection> {
     if (_loading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
-        child: Center(child: SizedBox(
-          width: 20, height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        )),
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
       );
     }
     if (_error != null) return const SizedBox.shrink();
@@ -925,13 +1002,16 @@ class _SaleItemsSectionState extends ConsumerState<_SaleItemsSection> {
     return DetailSection(
       title: 'Products',
       items: _items
-          .map((it) => DetailRow(
-                icon: Icons.checkroom_rounded,
-                label:
-                    '${it.productName} (${it.priceType == 'wholesale' ? 'Wholesale' : 'Retail'})',
-                value: '${it.quantity} × ₹${fmt.format(it.price)} = ₹${fmt.format(it.amount)}',
-                iconColor: AppColors.accentIndigo,
-              ))
+          .map(
+            (it) => DetailRow(
+              icon: Icons.checkroom_rounded,
+              label:
+                  '${it.productName} (${it.priceType == 'wholesale' ? 'Wholesale' : 'Retail'})',
+              value:
+                  '${it.quantity} × ₹${fmt.format(it.price)} = ₹${fmt.format(it.amount)}',
+              iconColor: AppColors.accentIndigo,
+            ),
+          )
           .toList(),
     );
   }

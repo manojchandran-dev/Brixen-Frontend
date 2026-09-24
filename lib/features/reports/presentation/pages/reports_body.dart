@@ -243,6 +243,9 @@ class _ReportsBodyState extends ConsumerState<ReportsBody> {
       cumulativeProfit[i] = lastCumValue;
     }
 
+    final topSellingCategories = summary.topSellingCategories
+        .map((c) => MapEntry(c.label, c.amount))
+        .toList();
     final topCategories = summary.topExpenseCategories
         .map((c) => MapEntry(c.label, c.amount))
         .toList();
@@ -527,6 +530,61 @@ class _ReportsBodyState extends ConsumerState<ReportsBody> {
           ),
         ),
         const SizedBox(height: 18),
+
+        // ── Top selling category breakdown ────────────────────────
+        if (topSellingCategories.isNotEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: AppColors.shadows([
+                BoxShadow(
+                  color: AppColors.shadowDark.withValues(alpha: 0.07),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+                BoxShadow(
+                  color: AppColors.highlightShadow(0.85),
+                  blurRadius: 8,
+                  offset: const Offset(-3, -3),
+                ),
+              ]),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Top Selling Categories',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ...topSellingCategories.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final cat = entry.value;
+                  final color = _reportPalette[i % _reportPalette.length];
+                  final frac = totalSales > 0 ? cat.value / totalSales : 0.0;
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      bottom: i == topSellingCategories.length - 1 ? 0 : 14,
+                    ),
+                    child: _CategoryBar(
+                      label: cat.key,
+                      amount: cat.value,
+                      fraction: frac,
+                      color: color,
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        if (topSellingCategories.isNotEmpty) const SizedBox(height: 18),
 
         // ── Expense category breakdown ────────────────────────────
         if (topCategories.isNotEmpty)

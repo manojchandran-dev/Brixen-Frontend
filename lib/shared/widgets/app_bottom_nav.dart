@@ -15,11 +15,11 @@ class AppBottomNav extends StatelessWidget {
   const AppBottomNav({super.key, required this.activeIndex, this.onTap});
 
   void _onTap(BuildContext context, int index) {
-    if (index == activeIndex) return;
     if (onTap != null) {
       onTap!(index);
       return;
     }
+    if (index == activeIndex) return;
     switch (index) {
       case 2:
         context.go(AppRouter.report);

@@ -8,69 +8,8 @@ import '../../features/customers/presentation/providers/customers_provider.dart'
 import '../../features/dashboard/domain/entities/dashboard_summary.dart';
 import '../../features/dashboard/presentation/providers/dashboard_provider.dart';
 import 'error_state.dart';
+import 'session_icon.dart';
 import 'skeleton.dart';
-
-enum _DaySession { morning, afternoon, evening, night }
-
-_DaySession _currentSession() {
-  final h = DateTime.now().hour;
-  if (h < 12) return _DaySession.morning;
-  if (h < 17) return _DaySession.afternoon;
-  if (h < 21) return _DaySession.evening;
-  return _DaySession.night;
-}
-
-/// A simple sunrise/sun/sunset icon, or a moon with a small star for night —
-/// sitting in the top-right corner of the greeting header as a plain time-
-/// of-day marker, rather than a hand-drawn scene.
-class _SessionIcon extends StatelessWidget {
-  final _DaySession session;
-  const _SessionIcon({required this.session});
-
-  @override
-  Widget build(BuildContext context) {
-    switch (session) {
-      case _DaySession.morning:
-        return const Icon(
-          Icons.wb_twilight_rounded,
-          size: 46,
-          color: Color(0xFFFFD54F),
-        );
-      case _DaySession.afternoon:
-        return const Icon(
-          Icons.wb_sunny_rounded,
-          size: 42,
-          color: Color(0xFFFFF59D),
-        );
-      case _DaySession.evening:
-        return const Icon(
-          Icons.wb_twilight_rounded,
-          size: 46,
-          color: Color(0xFFFF8A65),
-        );
-      case _DaySession.night:
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            const Icon(
-              Icons.nightlight_round,
-              size: 38,
-              color: Color(0xFFE8EAF6),
-            ),
-            Positioned(
-              top: -4,
-              left: -6,
-              child: Icon(
-                Icons.star_rounded,
-                size: 16,
-                color: Colors.white.withValues(alpha: 0.85),
-              ),
-            ),
-          ],
-        );
-    }
-  }
-}
 
 /// The main "Dashboard" tab — backed by a single aggregate call,
 /// `GET /api/v1/dashboard/summary`, instead of pulling the full
@@ -112,7 +51,8 @@ class WelcomeDashboardView extends ConsumerWidget {
         error: e,
         onRetry: () => ref.invalidate(dashboardSummaryProvider),
       ),
-      data: (summary) => _DashboardContent(summary: summary, showMenuButton: showMenuButton),
+      data: (summary) =>
+          _DashboardContent(summary: summary, showMenuButton: showMenuButton),
     );
   }
 }
@@ -120,7 +60,10 @@ class WelcomeDashboardView extends ConsumerWidget {
 class _DashboardContent extends ConsumerWidget {
   final DashboardSummary summary;
   final bool showMenuButton;
-  const _DashboardContent({required this.summary, required this.showMenuButton});
+  const _DashboardContent({
+    required this.summary,
+    required this.showMenuButton,
+  });
 
   // Placeholder figures shown only until real records exist, so the
   // dashboard doesn't render as an empty/broken screen on a fresh
@@ -195,14 +138,22 @@ class _DashboardContent extends ConsumerWidget {
                         ),
                       ]),
                     ),
-                    child: Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
+                    child: Icon(
+                      Icons.menu_rounded,
+                      size: 18,
+                      color: AppColors.ink,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               Text(
                 'Dashboard',
-                style: TextStyle(color: AppColors.ink, fontSize: 17, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  color: AppColors.ink,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
@@ -259,9 +210,7 @@ class _DashboardContent extends ConsumerWidget {
                                 width: 40,
                                 height: 40,
                                 child: FittedBox(
-                                  child: _SessionIcon(
-                                    session: _currentSession(),
-                                  ),
+                                  child: SessionIcon(session: currentSession()),
                                 ),
                               ),
                             ],
@@ -279,6 +228,42 @@ class _DashboardContent extends ConsumerWidget {
               ),
             );
           },
+        ),
+        const SizedBox(height: 20),
+
+        // ── Quick Actions — Notifications & Communication ───────────
+        // The only entry point into this module today: the drawer is
+        // entirely server-driven (GET /api/v1/modules) and there's no
+        // backend row for it yet — see app_drawer.dart's _destinationFor.
+        Text(
+          'Quick Actions',
+          style: TextStyle(
+            color: AppColors.ink,
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _QuickActionTile(
+                icon: Icons.notifications_active_rounded,
+                label: 'Push Notifications',
+                color: AppColors.brand,
+                onTap: () => context.push(AppRouter.pushNotifications),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _QuickActionTile(
+                icon: Icons.campaign_rounded,
+                label: 'Announcements',
+                color: AppColors.brandDeep,
+                onTap: () => context.push(AppRouter.announcements),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 20),
 
@@ -719,6 +704,67 @@ class _DashboardContent extends ConsumerWidget {
   }
 }
 
+class _QuickActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _QuickActionTile({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: AppColors.shadows([
+            BoxShadow(
+              color: AppColors.shadowDark.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ]),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: AppColors.accentGradient(color),
+                ),
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Icon(icon, color: AppColors.white, size: 17),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              style: TextStyle(
+                color: AppColors.ink,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _KpiHalf extends StatelessWidget {
   final bool filled;
   final IconData icon;
@@ -985,14 +1031,22 @@ class _DashboardSkeleton extends StatelessWidget {
                         color: AppColors.surface,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
+                      child: Icon(
+                        Icons.menu_rounded,
+                        size: 18,
+                        color: AppColors.ink,
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Text(
                   'Dashboard',
-                  style: TextStyle(color: AppColors.ink, fontSize: 17, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/services/push_token_service.dart';
 import '../../../../shared/widgets/brand_illustration.dart';
 import '../../../../shared/widgets/pin_pad.dart';
 import '../cubit/security_cubit.dart';
@@ -36,7 +37,13 @@ class _PinSetupPageState extends State<PinSetupPage> {
     });
   }
 
-  void _goToDashboard() => context.go(AppRouter.dashboard);
+  // Dashboard first, then a tapped push's target on top (if the app was
+  // launched by one), so back from it returns to the dashboard.
+  void _goToDashboard() {
+    context.go(AppRouter.dashboard);
+    final pushRoute = PushTokenService.takePendingRoute();
+    if (pushRoute != null) context.push(pushRoute);
+  }
 
   Future<void> _onPinEntered() async {
     setState(() {

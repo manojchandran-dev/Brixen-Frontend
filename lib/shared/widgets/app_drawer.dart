@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/router/app_router.dart';
+import '../../core/services/session_service.dart';
 import '../../features/navigation/domain/entities/nav_module.dart';
 import '../../features/navigation/presentation/module_visuals.dart';
 import '../../features/navigation/presentation/providers/nav_modules_provider.dart';
@@ -120,7 +121,11 @@ class AppDrawer extends ConsumerWidget {
                 data: (modules) => ListView(
                   padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
                   children: [
-                    for (final m in modules)
+                    // Groups (Masters) always last, whatever order the API returns.
+                    for (final m in [
+                      ...modules.where((m) => m.children.isEmpty),
+                      ...modules.where((m) => m.children.isNotEmpty),
+                    ])
                       if (m.children.isEmpty)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 10),
@@ -189,6 +194,24 @@ void Function(BuildContext context) _destinationFor(NavModule module) {
         AppRouter.companies,
         extra: AppRouter.companiesSection('masters/productCategory'),
       );
+    // No backend module row exists for these yet — the module only reaches
+    // superAdmin today via the Dashboard's Quick Actions tiles
+    // (welcome_dashboard_view.dart). These cases are additive/forward-
+    // compat: the moment backend registers a "Notifications"/"Push
+    // Notifications"/"Announcements" module, this drawer entry works with
+    // no further client changes.
+    case 'notifications':
+    case 'pushnotifications':
+      return (context) => context.go(AppRouter.pushNotifications);
+    case 'announcements':
+      return (context) => context.go(AppRouter.announcements);
+    case 'chat':
+    case 'chatbot':
+      return (context) => context.go(AppRouter.chat);
+    case 'support':
+    case 'supportticket':
+    case 'supporttickets':
+      return (context) => context.go(AppRouter.support);
     default:
       // Any module the app doesn't have a screen for yet — shown, but
       // inert, rather than silently dropped or crashing on an unknown key.

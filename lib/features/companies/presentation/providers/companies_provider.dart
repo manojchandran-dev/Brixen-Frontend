@@ -72,6 +72,24 @@ class CompaniesNotifier extends AsyncNotifier<List<Company>> {
     await ref.read(companiesRepositoryProvider).deleteCompany(id);
     _all = _all.where((c) => c.id != id).toList();
     state = AsyncData(List.from(_all));
+    // Re-sync with the server so the list reflects the delete authoritatively.
+    // A failed refresh keeps the locally-pruned list — the delete itself succeeded.
+    try {
+      _all = await ref.read(companiesRepositoryProvider).getCompanies();
+      state = AsyncData(List.from(_all));
+    } catch (_) {}
+  }
+
+  /// Soft-deleted companies, for the "Deleted companies" restore sheet.
+  Future<List<Company>> fetchDeleted() =>
+      ref.read(companiesRepositoryProvider).getCompanies(limit: 100, deleted: true);
+
+  /// Undo of a (soft) delete — brings back the company and everything that
+  /// was deleted with it, then re-syncs the list.
+  Future<void> restoreCompany(String id) async {
+    await ref.read(companiesRepositoryProvider).restoreCompany(id);
+    _all = await ref.read(companiesRepositoryProvider).getCompanies();
+    state = AsyncData(List.from(_all));
   }
 
   /// Returns null on success, or an error message string on failure.

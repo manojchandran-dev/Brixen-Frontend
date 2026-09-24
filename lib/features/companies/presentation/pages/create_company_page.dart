@@ -25,6 +25,8 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
   int _currentStep = 0;
   bool _submitting = false;
   String? _createdId; // set after Step 1 API call succeeds
+  Company? _edit; // full record fetched by id when editing
+  bool _loading = false;
 
   // Step 1 — Company Identity
   final _nameCtrl = TextEditingController();
@@ -52,32 +54,88 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
   bool _isActive = true;
 
   static const List<String> _countries = [
-    'India', 'United States', 'United Kingdom', 'Canada',
-    'Australia', 'Germany', 'France', 'Singapore', 'UAE', 'Other',
+    'India',
+    'United States',
+    'United Kingdom',
+    'Canada',
+    'Australia',
+    'Germany',
+    'France',
+    'Singapore',
+    'UAE',
+    'Other',
   ];
   static const List<String> _industries = [
-    'Technology', 'Healthcare', 'Finance', 'Retail',
-    'Manufacturing', 'Education', 'Real Estate', 'Hospitality',
-    'Transportation', 'Other',
+    'Technology',
+    'Healthcare',
+    'Finance',
+    'Retail',
+    'Manufacturing',
+    'Education',
+    'Real Estate',
+    'Hospitality',
+    'Transportation',
+    'Other',
   ];
   static const List<String> _entityTypes = [
-    'Sole Proprietorship', 'Partnership', 'LLP',
-    'Private Limited', 'Public Limited', 'One Person Company',
-    'Trust / NGO', 'Other',
+    'Sole Proprietorship',
+    'Partnership',
+    'LLP',
+    'Private Limited',
+    'Public Limited',
+    'One Person Company',
+    'Trust / NGO',
+    'Other',
   ];
   static const List<String> _plans = [
-    'Basic', 'Standard', 'Professional', 'Enterprise',
+    'Basic',
+    'Standard',
+    'Professional',
+    'Enterprise',
   ];
   static const List<String> _sizes = [
-    '1–10', '11–50', '51–200', '201–500', '500+',
+    '1–10',
+    '11–50',
+    '51–200',
+    '201–500',
+    '500+',
   ];
 
   @override
   void initState() {
     super.initState();
-    final e = widget.editCompany;
-    if (e == null) return;
-    _createdId = e.id;
+    _edit = widget.editCompany;
+    if (_edit == null) return;
+    _createdId = _edit!.id;
+    _loading = true;
+    _loadEdit();
+  }
+
+  /// Edit opens from list data, which may be partial — fetch the full record
+  /// by id. On failure, fall back to the list copy.
+  Future<void> _loadEdit() async {
+    try {
+      _edit = await ref
+          .read(companiesProvider.notifier)
+          .fetchCompanyDetail(_edit!.id);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: AppColors.dangerFill,
+          ),
+        );
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _fill(_edit!);
+      _loading = false;
+    });
+  }
+
+  void _fill(Company e) {
     // Step 1 — Identity
     _nameCtrl.text = e.name;
     if (e.gstNumber != null) _gstCtrl.text = e.gstNumber!;
@@ -102,15 +160,24 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
 
   @override
   void dispose() {
-    _nameCtrl.dispose(); _gstCtrl.dispose(); _panCtrl.dispose();
-    _foundedCtrl.dispose(); _ownerCtrl.dispose(); _emailCtrl.dispose();
-    _phoneCtrl.dispose(); _secondaryEmailCtrl.dispose(); _websiteCtrl.dispose();
-    _addressCtrl.dispose(); _cityCtrl.dispose(); _stateCtrl.dispose();
+    _nameCtrl.dispose();
+    _gstCtrl.dispose();
+    _panCtrl.dispose();
+    _foundedCtrl.dispose();
+    _ownerCtrl.dispose();
+    _emailCtrl.dispose();
+    _phoneCtrl.dispose();
+    _secondaryEmailCtrl.dispose();
+    _websiteCtrl.dispose();
+    _addressCtrl.dispose();
+    _cityCtrl.dispose();
+    _stateCtrl.dispose();
     _pincodeCtrl.dispose();
     super.dispose();
   }
 
-  GlobalKey<FormState> get _currentFormKey => [_step1Key, _step2Key, _step3Key][_currentStep];
+  GlobalKey<FormState> get _currentFormKey =>
+      [_step1Key, _step2Key, _step3Key][_currentStep];
 
   void _back() {
     if (_currentStep > 0) setState(() => _currentStep--);
@@ -122,69 +189,114 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
     try {
       switch (_currentStep) {
         case 0:
-          if (widget.editCompany != null) {
-            await ref.read(companiesProvider.notifier).updateCompany(
-              widget.editCompany!.copyWith(
-                name: _nameCtrl.text.trim(),
-                gstNumber: _gstCtrl.text.trim().isEmpty ? null : _gstCtrl.text.trim(),
-                panNumber: _panCtrl.text.trim().isEmpty ? null : _panCtrl.text.trim().toUpperCase(),
-                industryType: _industry,
-                entityType: _entityType,
-              ),
-            );
+          if (_edit != null) {
+            await ref
+                .read(companiesProvider.notifier)
+                .updateCompany(
+                  _edit!.copyWith(
+                    name: _nameCtrl.text.trim(),
+                    gstNumber: _gstCtrl.text.trim().isEmpty
+                        ? null
+                        : _gstCtrl.text.trim(),
+                    panNumber: _panCtrl.text.trim().isEmpty
+                        ? null
+                        : _panCtrl.text.trim().toUpperCase(),
+                    industryType: _industry,
+                    entityType: _entityType,
+                  ),
+                );
             setState(() => _currentStep = 1);
           } else {
-            final created = await ref.read(companiesProvider.notifier).createStep1(
-              Company(
-                id: '',
-                name: _nameCtrl.text.trim(),
-                ownerName: '',
-                gstNumber: _gstCtrl.text.trim().isEmpty ? null : _gstCtrl.text.trim(),
-                panNumber: _panCtrl.text.trim().isEmpty ? null : _panCtrl.text.trim().toUpperCase(),
-                industryType: _industry,
-                entityType: _entityType,
-                createdAt: DateTime.now(),
-              ),
-            );
+            final created = await ref
+                .read(companiesProvider.notifier)
+                .createStep1(
+                  Company(
+                    id: '',
+                    name: _nameCtrl.text.trim(),
+                    ownerName: '',
+                    gstNumber: _gstCtrl.text.trim().isEmpty
+                        ? null
+                        : _gstCtrl.text.trim(),
+                    panNumber: _panCtrl.text.trim().isEmpty
+                        ? null
+                        : _panCtrl.text.trim().toUpperCase(),
+                    industryType: _industry,
+                    entityType: _entityType,
+                    createdAt: DateTime.now(),
+                  ),
+                );
             _createdId = created.id;
             setState(() => _currentStep = 1);
           }
         case 1:
-          await ref.read(companiesProvider.notifier).updateStep2(
-            _createdId!,
-            Company(
-              id: _createdId!,
-              name: '',
-              ownerName: _ownerCtrl.text.trim(),
-              email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
-              phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
-              secondaryEmail: _secondaryEmailCtrl.text.trim().isEmpty ? null : _secondaryEmailCtrl.text.trim(),
-              website: _websiteCtrl.text.trim().isEmpty ? null : _websiteCtrl.text.trim(),
-              createdAt: DateTime.now(),
-            ),
-          );
+          await ref
+              .read(companiesProvider.notifier)
+              .updateStep2(
+                _createdId!,
+                Company(
+                  id: _createdId!,
+                  name: '',
+                  ownerName: _ownerCtrl.text.trim(),
+                  email: _emailCtrl.text.trim().isEmpty
+                      ? null
+                      : _emailCtrl.text.trim(),
+                  phone: _phoneCtrl.text.trim().isEmpty
+                      ? null
+                      : _phoneCtrl.text.trim(),
+                  secondaryEmail: _secondaryEmailCtrl.text.trim().isEmpty
+                      ? null
+                      : _secondaryEmailCtrl.text.trim(),
+                  website: _websiteCtrl.text.trim().isEmpty
+                      ? null
+                      : _websiteCtrl.text.trim(),
+                  createdAt: DateTime.now(),
+                ),
+              );
           setState(() => _currentStep = 2);
         case 2:
-          await ref.read(companiesProvider.notifier).updateStep3(
+          final notifier = ref.read(companiesProvider.notifier);
+          final saved = await notifier.updateStep3(
             _createdId!,
             Company(
               id: _createdId!,
               name: '',
               ownerName: '',
-              address: _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
-              city: _cityCtrl.text.trim().isEmpty ? null : _cityCtrl.text.trim(),
-              state: _stateCtrl.text.trim().isEmpty ? null : _stateCtrl.text.trim(),
-              pincode: _pincodeCtrl.text.trim().isEmpty ? null : _pincodeCtrl.text.trim(),
+              address: _addressCtrl.text.trim().isEmpty
+                  ? null
+                  : _addressCtrl.text.trim(),
+              city: _cityCtrl.text.trim().isEmpty
+                  ? null
+                  : _cityCtrl.text.trim(),
+              state: _stateCtrl.text.trim().isEmpty
+                  ? null
+                  : _stateCtrl.text.trim(),
+              pincode: _pincodeCtrl.text.trim().isEmpty
+                  ? null
+                  : _pincodeCtrl.text.trim(),
               createdAt: DateTime.now(),
             ),
           );
+          // /step3 only takes address fields — country & plan go via PUT /:id,
+          // status via its own endpoint.
+          if (_country != saved.country || _plan != saved.subscriptionPlan) {
+            await notifier.updateCompany(
+              saved.copyWith(country: _country, subscriptionPlan: _plan),
+            );
+          }
+          if (_isActive != saved.isActive) {
+            final err = await notifier.toggleStatus(saved.id);
+            if (err != null) throw err;
+          }
           if (!mounted) return;
           context.pop();
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString()), backgroundColor: AppColors.dangerFill),
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: AppColors.dangerFill,
+        ),
       );
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -227,8 +339,11 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
                 ),
               ]),
             ),
-            child: Icon(Icons.arrow_back_ios_new_rounded, size: 16,
-                color: isDark ? AppColors.black : AppColors.white),
+            child: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 16,
+              color: isDark ? AppColors.black : AppColors.white,
+            ),
           ),
         ),
         title: Column(
@@ -240,72 +355,154 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
                 children: [
                   GestureDetector(
                     onTap: () => context.pop(),
-                    child: Text('Menu',
-                        style: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.6), fontSize: 11)),
+                    child: Text(
+                      'Menu',
+                      style: TextStyle(
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                        fontSize: 11,
+                      ),
+                    ),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 3),
-                    child: Icon(Icons.chevron_right_rounded, size: 13,
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      size: 13,
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                    ),
                   ),
                   GestureDetector(
                     onTap: () => context.pop(),
-                    child: Text('Companies',
-                        style: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.6), fontSize: 11)),
+                    child: Text(
+                      'Companies',
+                      style: TextStyle(
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                        fontSize: 11,
+                      ),
+                    ),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 3),
-                    child: Icon(Icons.chevron_right_rounded, size: 13,
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      size: 13,
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                    ),
                   ),
-                  Text('Create',
-                      style: TextStyle(color: cs.onSurface, fontSize: 11, fontWeight: FontWeight.w600)),
+                  Text(
+                    'Create',
+                    style: TextStyle(
+                      color: cs.onSurface,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               )
             else
-              Text('Create Company',
-                  style: TextStyle(color: cs.onSurface, fontSize: 17, fontWeight: FontWeight.w700)),
+              Text(
+                'Create Company',
+                style: TextStyle(
+                  color: cs.onSurface,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             if (!widget.fromMenu)
-              Text('Step ${_currentStep + 1} of 3 — ${_stepTitle(_currentStep)}',
-                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11))
+              Text(
+                'Step ${_currentStep + 1} of 3 — ${_stepTitle(_currentStep)}',
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
+              )
             else
-              Text('Create Company — Step ${_currentStep + 1} of 3',
-                  style: TextStyle(color: cs.onSurface, fontSize: 15, fontWeight: FontWeight.w700)),
+              Text(
+                'Create Company — Step ${_currentStep + 1} of 3',
+                style: TextStyle(
+                  color: cs.onSurface,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
           ],
         ),
       ),
-      body: Column(
-        children: [
-          _StepIndicator(currentStep: _currentStep),
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 280),
-              transitionBuilder: (child, anim) => FadeTransition(
-                opacity: anim,
-                child: SlideTransition(
-                  position: Tween<Offset>(begin: const Offset(0.04, 0), end: Offset.zero).animate(anim),
-                  child: child,
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                _StepIndicator(currentStep: _currentStep),
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 280),
+                    transitionBuilder: (child, anim) => FadeTransition(
+                      opacity: anim,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0.04, 0),
+                          end: Offset.zero,
+                        ).animate(anim),
+                        child: child,
+                      ),
+                    ),
+                    child: KeyedSubtree(
+                      key: ValueKey(_currentStep),
+                      child: _buildStep(context),
+                    ),
+                  ),
                 ),
-              ),
-              child: KeyedSubtree(
-                key: ValueKey(_currentStep),
-                child: _buildStep(context),
-              ),
+                _buildNavBar(context),
+              ],
             ),
-          ),
-          _buildNavBar(context),
-        ],
-      ),
     );
   }
 
-  String _stepTitle(int step) => ['Company Identity', 'Contact & Owner', 'Location & Setup'][step];
+  String _stepTitle(int step) =>
+      ['Company Identity', 'Contact & Owner', 'Location & Setup'][step];
 
   Widget _buildStep(BuildContext context) {
     switch (_currentStep) {
-      case 0: return _Step1(formKey: _step1Key, nameCtrl: _nameCtrl, gstCtrl: _gstCtrl, panCtrl: _panCtrl, foundedCtrl: _foundedCtrl, industry: _industry, entityType: _entityType, size: _size, industries: _industries, entityTypes: _entityTypes, sizes: _sizes, onIndustryChanged: (v) => setState(() => _industry = v), onEntityTypeChanged: (v) => setState(() => _entityType = v), onSizeChanged: (v) => setState(() => _size = v));
-      case 1: return _Step2(formKey: _step2Key, ownerCtrl: _ownerCtrl, emailCtrl: _emailCtrl, phoneCtrl: _phoneCtrl, secondaryEmailCtrl: _secondaryEmailCtrl, websiteCtrl: _websiteCtrl);
-      default: return _Step3(formKey: _step3Key, addressCtrl: _addressCtrl, cityCtrl: _cityCtrl, stateCtrl: _stateCtrl, pincodeCtrl: _pincodeCtrl, country: _country, plan: _plan, countries: _countries, plans: _plans, isActive: _isActive, onCountryChanged: (v) => setState(() => _country = v), onPlanChanged: (v) => setState(() => _plan = v), onStatusChanged: (v) => setState(() => _isActive = v));
+      case 0:
+        return _Step1(
+          formKey: _step1Key,
+          nameCtrl: _nameCtrl,
+          gstCtrl: _gstCtrl,
+          panCtrl: _panCtrl,
+          foundedCtrl: _foundedCtrl,
+          industry: _industry,
+          entityType: _entityType,
+          size: _size,
+          industries: _industries,
+          entityTypes: _entityTypes,
+          sizes: _sizes,
+          onIndustryChanged: (v) => setState(() => _industry = v),
+          onEntityTypeChanged: (v) => setState(() => _entityType = v),
+          onSizeChanged: (v) => setState(() => _size = v),
+          isCreate: _edit == null,
+        );
+      case 1:
+        return _Step2(
+          formKey: _step2Key,
+          ownerCtrl: _ownerCtrl,
+          emailCtrl: _emailCtrl,
+          phoneCtrl: _phoneCtrl,
+          secondaryEmailCtrl: _secondaryEmailCtrl,
+          websiteCtrl: _websiteCtrl,
+        );
+      default:
+        return _Step3(
+          formKey: _step3Key,
+          addressCtrl: _addressCtrl,
+          cityCtrl: _cityCtrl,
+          stateCtrl: _stateCtrl,
+          pincodeCtrl: _pincodeCtrl,
+          country: _country,
+          plan: _plan,
+          countries: _countries,
+          plans: _plans,
+          isActive: _isActive,
+          onCountryChanged: (v) => setState(() => _country = v),
+          onPlanChanged: (v) => setState(() => _plan = v),
+          onStatusChanged: (v) => setState(() => _isActive = v),
+        );
     }
   }
 
@@ -378,7 +575,9 @@ class _StepIndicator extends StatelessWidget {
                             Expanded(
                               child: Container(
                                 height: 2,
-                                color: i <= currentStep ? activeLineColor : Theme.of(context).dividerColor,
+                                color: i <= currentStep
+                                    ? activeLineColor
+                                    : Theme.of(context).dividerColor,
                               ),
                             ),
                           AnimatedContainer(
@@ -387,29 +586,45 @@ class _StepIndicator extends StatelessWidget {
                             height: 28,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              gradient: (done || active) ? activeCircleGradient : null,
-                              color: (done || active) ? activeCircleColor : cs.surfaceContainerHighest,
+                              gradient: (done || active)
+                                  ? activeCircleGradient
+                                  : null,
+                              color: (done || active)
+                                  ? activeCircleColor
+                                  : cs.surfaceContainerHighest,
                               border: Border.all(
-                                color: (done || active) ? activeLineColor : Theme.of(context).dividerColor,
+                                color: (done || active)
+                                    ? activeLineColor
+                                    : Theme.of(context).dividerColor,
                                 width: active ? 2 : 1,
                               ),
                             ),
                             child: Center(
                               child: done
-                                  ? Icon(Icons.check_rounded, size: 14, color: activeContentColor)
-                                  : Text('${i + 1}',
+                                  ? Icon(
+                                      Icons.check_rounded,
+                                      size: 14,
+                                      color: activeContentColor,
+                                    )
+                                  : Text(
+                                      '${i + 1}',
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w700,
-                                        color: active ? activeContentColor : cs.onSurfaceVariant,
-                                      )),
+                                        color: active
+                                            ? activeContentColor
+                                            : cs.onSurfaceVariant,
+                                      ),
+                                    ),
                             ),
                           ),
                           if (i < 2)
                             Expanded(
                               child: Container(
                                 height: 2,
-                                color: i < currentStep ? activeLineColor : Theme.of(context).dividerColor,
+                                color: i < currentStep
+                                    ? activeLineColor
+                                    : Theme.of(context).dividerColor,
                               ),
                             ),
                         ],
@@ -419,7 +634,9 @@ class _StepIndicator extends StatelessWidget {
                         labels[i],
                         style: TextStyle(
                           fontSize: 10,
-                          fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+                          fontWeight: active
+                              ? FontWeight.w600
+                              : FontWeight.normal,
                           color: active ? cs.onSurface : cs.onSurfaceVariant,
                         ),
                       ),
@@ -445,8 +662,10 @@ class _Step1 extends StatelessWidget {
   final void Function(String?) onIndustryChanged;
   final void Function(String?) onEntityTypeChanged;
   final void Function(String?) onSizeChanged;
+  final bool isCreate;
 
   const _Step1({
+    required this.isCreate,
     required this.formKey,
     required this.nameCtrl,
     required this.gstCtrl,
@@ -485,30 +704,36 @@ class _Step1 extends StatelessWidget {
             controller: nameCtrl,
             textInputAction: TextInputAction.next,
             prefixIcon: const Icon(Icons.business_outlined),
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'Required' : null,
           ),
           const SizedBox(height: 22),
 
-          BrixenDropdown<String>(
-            hint: 'Entity type',
+          _RequiredSelect(
             value: entityType,
-            items: entityTypes,
-            labelOf: (s) => s,
-            icon: Icons.account_balance_outlined,
-            onChanged: onEntityTypeChanged,
+            child: BrixenDropdown<String>(
+              hint: 'Entity type',
+              value: entityType,
+              items: entityTypes,
+              labelOf: (s) => s,
+              icon: Icons.account_balance_outlined,
+              onChanged: onEntityTypeChanged,
+            ),
           ),
           const SizedBox(height: 22),
 
           BrixenTextField(
-            label: 'PAN Card',
+            label: 'PAN Card *',
             hint: 'e.g. ABCDE1234F',
             controller: panCtrl,
             textCapitalization: TextCapitalization.characters,
             textInputAction: TextInputAction.next,
             prefixIcon: const Icon(Icons.credit_card_outlined),
             validator: (v) {
-              if (v == null || v.trim().isEmpty) return null;
-              if (!RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]$').hasMatch(v.trim().toUpperCase())) {
+              if (v == null || v.trim().isEmpty) return 'Required';
+              if (!RegExp(
+                r'^[A-Z]{5}[0-9]{4}[A-Z]$',
+              ).hasMatch(v.trim().toUpperCase())) {
                 return 'Invalid PAN — format: ABCDE1234F';
               }
               return null;
@@ -516,33 +741,41 @@ class _Step1 extends StatelessWidget {
           ),
           const SizedBox(height: 22),
 
-          BrixenDropdown<String>(
-            hint: 'Select industry type',
+          _RequiredSelect(
             value: industry,
-            items: industries,
-            labelOf: (s) => s,
-            icon: Icons.work_outline,
-            onChanged: onIndustryChanged,
+            child: BrixenDropdown<String>(
+              hint: 'Select industry type',
+              value: industry,
+              items: industries,
+              labelOf: (s) => s,
+              icon: Icons.work_outline,
+              onChanged: onIndustryChanged,
+            ),
           ),
           const SizedBox(height: 22),
 
-          BrixenDropdown<String>(
-            hint: 'Company size',
+          _RequiredSelect(
             value: size,
-            items: sizes,
-            labelOf: (s) => s,
-            icon: Icons.groups_outlined,
-            onChanged: onSizeChanged,
+            enabled: isCreate,
+            child: BrixenDropdown<String>(
+              hint: 'Company size',
+              value: size,
+              items: sizes,
+              labelOf: (s) => s,
+              icon: Icons.groups_outlined,
+              onChanged: onSizeChanged,
+            ),
           ),
           const SizedBox(height: 22),
 
           BrixenTextField(
-            label: 'Founded Year',
+            label: isCreate ? 'Founded Year *' : 'Founded Year',
             hint: 'e.g. 2015',
             controller: foundedCtrl,
             keyboardType: TextInputType.number,
             textInputAction: TextInputAction.done,
             prefixIcon: const Icon(Icons.calendar_today_outlined),
+            validator: isCreate ? _required : null,
           ),
           const SizedBox(height: 22),
         ],
@@ -555,12 +788,19 @@ class _Step1 extends StatelessWidget {
 
 class _Step2 extends StatelessWidget {
   final GlobalKey<FormState> formKey;
-  final TextEditingController ownerCtrl, emailCtrl, phoneCtrl,
-      secondaryEmailCtrl, websiteCtrl;
+  final TextEditingController ownerCtrl,
+      emailCtrl,
+      phoneCtrl,
+      secondaryEmailCtrl,
+      websiteCtrl;
 
   const _Step2({
-    required this.formKey, required this.ownerCtrl, required this.emailCtrl,
-    required this.phoneCtrl, required this.secondaryEmailCtrl, required this.websiteCtrl,
+    required this.formKey,
+    required this.ownerCtrl,
+    required this.emailCtrl,
+    required this.phoneCtrl,
+    required this.secondaryEmailCtrl,
+    required this.websiteCtrl,
   });
 
   @override
@@ -576,7 +816,8 @@ class _Step2 extends StatelessWidget {
             controller: ownerCtrl,
             textInputAction: TextInputAction.next,
             prefixIcon: const Icon(Icons.person_outline),
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'Required' : null,
           ),
           const SizedBox(height: 22),
 
@@ -589,19 +830,22 @@ class _Step2 extends StatelessWidget {
             prefixIcon: const Icon(Icons.mail_outline_rounded),
             validator: (v) {
               if (v == null || v.isEmpty) return 'Required';
-              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v)) return 'Invalid email';
+              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v)) {
+                return 'Invalid email';
+              }
               return null;
             },
           ),
           const SizedBox(height: 22),
 
           BrixenTextField(
-            label: 'Phone Number',
+            label: 'Phone Number *',
             hint: 'e.g. +91 98765 43210',
             controller: phoneCtrl,
             keyboardType: TextInputType.phone,
             textInputAction: TextInputAction.next,
             prefixIcon: const Icon(Icons.phone_outlined),
+            validator: _required,
           ),
           const SizedBox(height: 22),
 
@@ -614,7 +858,9 @@ class _Step2 extends StatelessWidget {
             prefixIcon: const Icon(Icons.alternate_email_rounded),
             validator: (v) {
               if (v == null || v.trim().isEmpty) return null;
-              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v)) return 'Invalid email';
+              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v)) {
+                return 'Invalid email';
+              }
               return null;
             },
           ),
@@ -648,11 +894,19 @@ class _Step3 extends StatelessWidget {
   final void Function(bool) onStatusChanged;
 
   const _Step3({
-    required this.formKey, required this.addressCtrl, required this.cityCtrl,
-    required this.stateCtrl, required this.pincodeCtrl, required this.country,
-    required this.plan, required this.countries, required this.plans,
-    required this.isActive, required this.onCountryChanged,
-    required this.onPlanChanged, required this.onStatusChanged,
+    required this.formKey,
+    required this.addressCtrl,
+    required this.cityCtrl,
+    required this.stateCtrl,
+    required this.pincodeCtrl,
+    required this.country,
+    required this.plan,
+    required this.countries,
+    required this.plans,
+    required this.isActive,
+    required this.onCountryChanged,
+    required this.onPlanChanged,
+    required this.onStatusChanged,
   });
 
   @override
@@ -667,61 +921,92 @@ class _Step3 extends StatelessWidget {
           const SizedBox(height: 22),
 
           BrixenTextField(
-            label: 'City',
+            label: 'City *',
             hint: 'Enter city',
             controller: cityCtrl,
             textInputAction: TextInputAction.next,
             prefixIcon: const Icon(Icons.location_city_outlined),
+            validator: _required,
           ),
           const SizedBox(height: 22),
 
           BrixenTextField(
-            label: 'State / Province',
+            label: 'State / Province *',
             hint: 'Enter state',
             controller: stateCtrl,
             textInputAction: TextInputAction.next,
             prefixIcon: const Icon(Icons.map_outlined),
+            validator: _required,
           ),
           const SizedBox(height: 22),
 
-          BrixenDropdown<String>(
-            hint: 'Select country',
+          _RequiredSelect(
             value: country,
-            items: countries,
-            labelOf: (s) => s,
-            icon: Icons.language_outlined,
-            onChanged: onCountryChanged,
+            child: BrixenDropdown<String>(
+              hint: 'Select country',
+              value: country,
+              items: countries,
+              labelOf: (s) => s,
+              icon: Icons.language_outlined,
+              onChanged: onCountryChanged,
+            ),
           ),
           const SizedBox(height: 22),
 
           BrixenTextField(
-            label: 'Pincode / ZIP',
+            label: 'Pincode / ZIP *',
             hint: 'Enter pincode',
             controller: pincodeCtrl,
             keyboardType: TextInputType.number,
             textInputAction: TextInputAction.next,
             prefixIcon: const Icon(Icons.pin_outlined),
+            validator: _required,
           ),
           const SizedBox(height: 22),
 
-          BrixenDropdown<String>(
-            hint: 'Select subscription plan',
+          _RequiredSelect(
             value: plan,
-            items: plans,
-            labelOf: (s) => s,
-            icon: Icons.card_membership_outlined,
-            onChanged: onPlanChanged,
+            child: BrixenDropdown<String>(
+              hint: 'Select subscription plan',
+              value: plan,
+              items: plans,
+              labelOf: (s) => s,
+              icon: Icons.card_membership_outlined,
+              onChanged: onPlanChanged,
+            ),
           ),
           const SizedBox(height: 20),
 
-          Text('Company Status',
-              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w500)),
+          Text(
+            'Company Status',
+            style: TextStyle(
+              color: cs.onSurfaceVariant,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
           const SizedBox(height: 8),
-          Row(children: [
-            Expanded(child: _StatusBtn(label: 'Active', selected: isActive, isActive: true, onTap: () => onStatusChanged(true))),
-            const SizedBox(width: 12),
-            Expanded(child: _StatusBtn(label: 'Inactive', selected: !isActive, isActive: false, onTap: () => onStatusChanged(false))),
-          ]),
+          Row(
+            children: [
+              Expanded(
+                child: _StatusBtn(
+                  label: 'Active',
+                  selected: isActive,
+                  isActive: true,
+                  onTap: () => onStatusChanged(true),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatusBtn(
+                  label: 'Inactive',
+                  selected: !isActive,
+                  isActive: false,
+                  onTap: () => onStatusChanged(false),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 22),
         ],
       ),
@@ -731,6 +1016,44 @@ class _Step3 extends StatelessWidget {
 
 // ── Shared Widgets ───────────────────────────────────────────────────────────
 
+String? _required(String? v) =>
+    (v == null || v.trim().isEmpty) ? 'Required' : null;
+
+/// BrixenDropdown has no validator — this hooks it into the step's Form.
+class _RequiredSelect extends StatelessWidget {
+  final String? value;
+  final Widget child;
+  final bool enabled;
+  const _RequiredSelect({
+    required this.value,
+    required this.child,
+    this.enabled = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FormField<String>(
+      validator: (_) => enabled && value == null ? 'Required' : null,
+      builder: (state) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          child,
+          if (state.hasError)
+            Padding(
+              padding: const EdgeInsets.only(left: 14, top: 6),
+              child: Text(
+                state.errorText!,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
 
 class _StatusBtn extends StatelessWidget {
   final String label;
@@ -738,7 +1061,12 @@ class _StatusBtn extends StatelessWidget {
   final bool isActive;
   final VoidCallback onTap;
 
-  const _StatusBtn({required this.label, required this.selected, required this.isActive, required this.onTap});
+  const _StatusBtn({
+    required this.label,
+    required this.selected,
+    required this.isActive,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -747,20 +1075,35 @@ class _StatusBtn extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: selected ? Theme.of(context).colorScheme.surfaceContainerHighest : Colors.transparent,
+          color: selected
+              ? Theme.of(context).colorScheme.surfaceContainerHighest
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: selected ? AppColors.silver : Theme.of(context).dividerColor),
+          border: Border.all(
+            color: selected ? AppColors.silver : Theme.of(context).dividerColor,
+          ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.circle, size: 8, color: isActive ? AppColors.accentEmerald : Theme.of(context).colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.circle,
+              size: 8,
+              color: isActive
+                  ? AppColors.accentEmerald
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(width: 6),
-            Text(label, style: TextStyle(
-              color: selected ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurfaceVariant,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-              fontSize: 13,
-            )),
+            Text(
+              label,
+              style: TextStyle(
+                color: selected
+                    ? Theme.of(context).colorScheme.onSurface
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                fontSize: 13,
+              ),
+            ),
           ],
         ),
       ),
@@ -811,26 +1154,32 @@ class _AddressFieldState extends State<_AddressField> {
             color: cs.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: _focused ? AppColors.silver : Theme.of(context).dividerColor,
+              color: _focused
+                  ? AppColors.silver
+                  : Theme.of(context).dividerColor,
               width: _focused ? 1.5 : 1,
             ),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 14, top: 14),
-                child: Icon(Icons.location_on_outlined, color: cs.onSurfaceVariant, size: 20),
+              const Padding(
+                padding: EdgeInsets.only(top: 10),
+                child: BrixenPrefixIcon(icon: Icon(Icons.location_on_outlined)),
               ),
               Expanded(
                 child: TextFormField(
                   controller: widget.controller,
                   focusNode: _focus,
                   maxLines: 3,
+                  validator: _required,
                   style: TextStyle(color: cs.onSurface, fontSize: 15),
                   decoration: InputDecoration(
-                    hintText: showLabel ? 'Street address' : 'Address',
-                    hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
+                    hintText: showLabel ? 'Street address' : 'Address *',
+                    hintStyle: TextStyle(
+                      color: cs.onSurfaceVariant,
+                      fontSize: 14,
+                    ),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
@@ -849,7 +1198,7 @@ class _AddressFieldState extends State<_AddressField> {
               color: cs.surfaceContainerHighest,
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Text(
-                'Address',
+                'Address *',
                 style: TextStyle(
                   color: _focused ? AppColors.silver : cs.onSurfaceVariant,
                   fontSize: 12,

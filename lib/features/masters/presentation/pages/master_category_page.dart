@@ -1,10 +1,22 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/app_drawer.dart';
+import '../../../../core/network/api_endpoints.dart';
+import '../../../../shared/widgets/deleted_items_button.dart';
 import '../../domain/entities/master_type.dart';
+import '../cubit/master_cubit.dart';
 import '../widgets/master_type_body.dart';
 
 enum _Mode { list, create, edit }
+
+/// Backend list endpoint per master type, for the "Deleted …" restore sheet.
+String? _deletedListPath(String typeKey) => switch (typeKey) {
+      'companyCategory' => ApiEndpoints.companyCategories,
+      'expenseCategory' => ApiEndpoints.expenseCategories,
+      'productCategory' => ApiEndpoints.productCategories,
+      'unit' => ApiEndpoints.units,
+      _ => null,
+    };
 
 /// A directly-linkable route for one master type (`/masters/...`), additive
 /// alongside the existing Companies → Menu → Masters in-page drill-down —
@@ -84,6 +96,16 @@ class _MasterCategoryPageState extends State<MasterCategoryPage> {
                 ),
               ),
         actions: [
+          if (!isForm && _deletedListPath(widget.typeKey) != null)
+            DeletedItemsButton(
+              title: 'Deleted ${typeCfg?.name.toLowerCase() ?? 'items'}',
+              listPath: _deletedListPath(widget.typeKey)!,
+              restorePath: (m) => '${_deletedListPath(widget.typeKey)}/${m['id']}/restore',
+              // Units are named by `unit`; every other master type by `name`.
+              labelOf: (m) => (m['name'] ?? m['unit'] ?? '').toString(),
+              subtitleOf: (m) => (m['full_form'] ?? m['description']) as String?,
+              onRestored: () => masterCubit.load(widget.typeKey),
+            ),
           if (!isForm)
             GestureDetector(
               onTap: _goCreate,

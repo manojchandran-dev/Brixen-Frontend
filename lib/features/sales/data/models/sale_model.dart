@@ -65,6 +65,9 @@ class SaleModel extends Sale {
         if (s.paymentType != null && s.paymentType!.isNotEmpty) 'payment_type': s.paymentType,
         'payment_status': s.paymentStatus,
         if (s.notes != null && s.notes!.isNotEmpty) 'notes': s.notes,
+        // Always sent (null clears it on PUT). Must be a hosted URL — the
+        // page uploads a picked bill image via `POST /uploads` first.
+        'bill_image_url': s.billImagePath,
       };
 
   /// `PUT /sales/:id/step2` — replaces the sale's entire line-item list and

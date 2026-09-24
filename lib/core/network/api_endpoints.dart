@@ -12,6 +12,10 @@ class ApiEndpoints {
   static const String forgotPassword = '/api/v1/auth/forgot-password';
   static const String verifyOtp = '/api/v1/auth/verify-otp';
   static const String resetPassword = '/api/v1/auth/reset-password';
+  // Logged-in change-password — distinct from resetPassword (pre-login,
+  // OTP-verified). Sends the Bearer token instead of a reset token.
+  static const String changePassword = '/api/v1/auth/change-password';
+  static const String me = '/api/v1/auth/me';
   static const String companies = '/api/v1/companies';
   static const String expenseCategories = '/api/v1/expense-categories';
   static const String companyCategories = '/api/v1/company-categories';
@@ -26,11 +30,37 @@ class ApiEndpoints {
   static const String reportsSummary = '/api/v1/reports/summary';
   static const String modules = '/api/v1/modules';
   static const String uploads = '/api/v1/uploads';
+  static const String pushNotifications = '/api/v1/notifications/push';
+  static const String pushDevices = '/api/v1/notifications/push/devices';
+  static String pushNotificationById(String id) =>
+      '/api/v1/notifications/push/$id';
+  static String pushNotificationDuplicate(String id) =>
+      '/api/v1/notifications/push/$id/duplicate';
+  static String pushNotificationCancel(String id) =>
+      '/api/v1/notifications/push/$id/cancel';
+  static const String announcements = '/api/v1/announcements';
+  static String announcementById(String id) => '/api/v1/announcements/$id';
+  static String announcementDuplicate(String id) =>
+      '/api/v1/announcements/$id/duplicate';
+  static String announcementUnpublish(String id) =>
+      '/api/v1/announcements/$id/unpublish';
+  static const String supportTickets = '/api/v1/support/tickets';
+  static String supportTicketById(String id) => '/api/v1/support/tickets/$id';
+  static String supportTicketStatus(String id) =>
+      '/api/v1/support/tickets/$id/status';
+  static String supportTicketAssign(String id) =>
+      '/api/v1/support/tickets/$id/assign';
+  static String supportTicketMessages(String id) =>
+      '/api/v1/support/tickets/$id/messages';
+  static const String chatConversations = '/api/v1/chat/conversations';
+  static String chatMessages(String companyId) =>
+      '/api/v1/chat/conversations/$companyId/messages';
   static const String permissions = '/api/v1/permissions';
   static const String permissionsBulk = '/api/v1/permissions/bulk';
   static String permissionById(String id) => '/api/v1/permissions/$id';
 
   static String companyById(String id) => '/api/v1/companies/$id';
+  static String companyRestore(String id) => '/api/v1/companies/$id/restore';
   static String companyStatus(String id) => '/api/v1/companies/$id/status';
   static String companyStep2(String id) => '/api/v1/companies/$id/step2';
   static String companyStep3(String id) => '/api/v1/companies/$id/step3';

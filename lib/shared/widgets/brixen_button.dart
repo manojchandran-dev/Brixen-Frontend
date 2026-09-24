@@ -6,6 +6,7 @@ class BrixenButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool isLoading;
   final bool isOutlined;
+  final IconData? trailingIcon;
 
   const BrixenButton({
     super.key,
@@ -13,13 +14,19 @@ class BrixenButton extends StatelessWidget {
     this.onPressed,
     this.isLoading = false,
     this.isOutlined = false,
+    this.trailingIcon,
   });
 
   @override
   Widget build(BuildContext context) {
     return isOutlined
         ? _OutlinedBtn(label: label, onPressed: onPressed, isLoading: isLoading)
-        : _FilledBtn(label: label, onPressed: onPressed, isLoading: isLoading);
+        : _FilledBtn(
+            label: label,
+            onPressed: onPressed,
+            isLoading: isLoading,
+            trailingIcon: trailingIcon,
+          );
   }
 }
 
@@ -27,11 +34,13 @@ class _FilledBtn extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
   final bool isLoading;
+  final IconData? trailingIcon;
 
   const _FilledBtn({
     required this.label,
     required this.isLoading,
     this.onPressed,
+    this.trailingIcon,
   });
 
   @override
@@ -39,12 +48,18 @@ class _FilledBtn extends StatelessWidget {
     final bool disabled = onPressed == null || isLoading;
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final Color fillColor = disabled ? Theme.of(context).colorScheme.surfaceContainerHighest : Colors.transparent;
+    final Color fillColor = disabled
+        ? Theme.of(context).colorScheme.surfaceContainerHighest
+        : Colors.transparent;
     final Gradient? gradient = disabled
         ? null
         : isDark
-            ? AppColors.silverGradient
-            : const LinearGradient(colors: [AppColors.brand, AppColors.positive], begin: Alignment.centerLeft, end: Alignment.centerRight);
+        ? AppColors.silverGradient
+        : const LinearGradient(
+            colors: [AppColors.brand, AppColors.positive],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          );
 
     return GestureDetector(
       onTap: disabled ? null : onPressed,
@@ -76,15 +91,28 @@ class _FilledBtn extends StatelessWidget {
                     strokeWidth: 2.5,
                   ),
                 )
-              : Text(
-                  label,
-                  style: TextStyle(
-                    // dark mode: black text on silver | light mode: white text on the gradient
-                    color: isDark ? AppColors.black : AppColors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.3,
-                  ),
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        // dark mode: black text on silver | light mode: white text on the gradient
+                        color: isDark ? AppColors.black : AppColors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    if (trailingIcon != null) ...[
+                      const SizedBox(width: 8),
+                      Icon(
+                        trailingIcon,
+                        size: 18,
+                        color: isDark ? AppColors.black : AppColors.white,
+                      ),
+                    ],
+                  ],
                 ),
         ),
       ),
@@ -112,7 +140,10 @@ class _OutlinedBtn extends StatelessWidget {
         width: double.infinity,
         height: 56,
         decoration: BoxDecoration(
-          border: Border.all(color: primary.withValues(alpha: 0.45), width: 1.5),
+          border: Border.all(
+            color: primary.withValues(alpha: 0.45),
+            width: 1.5,
+          ),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Center(

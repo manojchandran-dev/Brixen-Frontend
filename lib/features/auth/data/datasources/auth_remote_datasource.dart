@@ -2,18 +2,28 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/services/token_service.dart';
 
 /// Standalone Dio for auth — no Bearer token needed for login itself.
-final _dio = Dio(BaseOptions(
-  baseUrl: ApiEndpoints.baseUrl,
-  connectTimeout: const Duration(seconds: 30),
-  receiveTimeout: const Duration(seconds: 30),
-  headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-))..interceptors.add(LogInterceptor(
-    requestBody: true,
-    responseBody: true,
-    logPrint: (o) => debugPrint(o.toString()),
-  ));
+final _dio =
+    Dio(
+        BaseOptions(
+          baseUrl: ApiEndpoints.baseUrl,
+          connectTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 30),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      )
+      ..interceptors.add(
+        LogInterceptor(
+          requestBody: true,
+          responseBody: true,
+          logPrint: (o) => debugPrint(o.toString()),
+        ),
+      );
 
 class AuthRemoteDatasource {
   const AuthRemoteDatasource();
@@ -32,7 +42,9 @@ class AuthRemoteDatasource {
       final body = resp.data;
       final data = body['data'] ?? body;
 
-      final token = (data['accessToken'] ?? data['access_token'] ?? data['token'] ?? '').toString();
+      final token =
+          (data['accessToken'] ?? data['access_token'] ?? data['token'] ?? '')
+              .toString();
       if (token.isEmpty) {
         throw const ApiException('Login succeeded but no token returned.');
       }
@@ -50,9 +62,11 @@ class AuthRemoteDatasource {
       // A companyAdmin/employee account belongs to exactly one company —
       // captured here so those roles never have to pick one manually.
       // superAdmin accounts don't carry this at all.
-      final rawCompanyId = user['company_id'] ?? user['companyId'] ?? company?['id'];
+      final rawCompanyId =
+          user['company_id'] ?? user['companyId'] ?? company?['id'];
       final companyId = rawCompanyId?.toString();
-      final companyName = (company?['company_name'] ?? company?['name'])?.toString();
+      final companyName = (company?['company_name'] ?? company?['name'])
+          ?.toString();
       final companyCode = company?['company_code']?.toString();
       final ownerName = company?['owner_name']?.toString();
       final subscriptionPlan = company?['subscription_plan']?.toString();
@@ -66,7 +80,8 @@ class AuthRemoteDatasource {
       final employee = user['employee'] is Map
           ? user['employee'] as Map<String, dynamic>
           : null;
-      final rawEmployeeId = user['employee_id'] ??
+      final rawEmployeeId =
+          user['employee_id'] ??
           user['employeeId'] ??
           employee?['id'] ??
           (userType == 'employee' ? user['id'] : null);
@@ -74,27 +89,61 @@ class AuthRemoteDatasource {
 
       return {
         'token': token,
-        'refreshToken': (data['refreshToken'] ?? data['refresh_token'] ?? '').toString(),
+        'refreshToken': (data['refreshToken'] ?? data['refresh_token'] ?? '')
+            .toString(),
         'role': role,
         'email': userEmail,
         'id': (user['id'] ?? '').toString(),
         'hasPin': hasPin,
         if (userType != null && userType.isNotEmpty) 'userType': userType,
-        if (employeeId != null && employeeId.isNotEmpty) 'employeeId': employeeId,
+        if (employeeId != null && employeeId.isNotEmpty)
+          'employeeId': employeeId,
         if (companyId != null && companyId.isNotEmpty) 'companyId': companyId,
-        if (companyName != null && companyName.isNotEmpty) 'companyName': companyName,
-        if (companyCode != null && companyCode.isNotEmpty) 'companyCode': companyCode,
+        if (companyName != null && companyName.isNotEmpty)
+          'companyName': companyName,
+        if (companyCode != null && companyCode.isNotEmpty)
+          'companyCode': companyCode,
         if (ownerName != null && ownerName.isNotEmpty) 'ownerName': ownerName,
-        if (subscriptionPlan != null && subscriptionPlan.isNotEmpty) 'subscriptionPlan': subscriptionPlan,
-        if (onboardingStatus != null && onboardingStatus.isNotEmpty) 'onboardingStatus': onboardingStatus,
-        if (companyStatus != null && companyStatus.isNotEmpty) 'companyStatus': companyStatus,
+        if (subscriptionPlan != null && subscriptionPlan.isNotEmpty)
+          'subscriptionPlan': subscriptionPlan,
+        if (onboardingStatus != null && onboardingStatus.isNotEmpty)
+          'onboardingStatus': onboardingStatus,
+        if (companyStatus != null && companyStatus.isNotEmpty)
+          'companyStatus': companyStatus,
       };
     } on DioException catch (e) {
       final status = e.response?.statusCode;
-      final msg = e.response?.data?['message'] ??
+      final msg =
+          e.response?.data?['message'] ??
           e.response?.data?['error'] ??
           e.message ??
           'Login failed';
+      throw ApiException(msg.toString(), statusCode: status);
+    }
+  }
+
+  /// Confirms the token currently held by [TokenService] (just restored
+  /// from a saved account snapshot) is still accepted by the server. A
+  /// saved snapshot's token can have expired since that account was last
+  /// active — switching to it should surface that as a clear "sign in
+  /// again" instead of silently landing on a dashboard where every request
+  /// then fails with a confusing 401. Throws [ApiException] (statusCode
+  /// 401) when the session is dead.
+  Future<void> validateSession() async {
+    try {
+      await _dio.get(
+        ApiEndpoints.me,
+        options: Options(
+          headers: {'Authorization': 'Bearer ${TokenService.token}'},
+        ),
+      );
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      final msg =
+          e.response?.data?['message'] ??
+          e.response?.data?['error'] ??
+          e.message ??
+          'Session check failed';
       throw ApiException(msg.toString(), statusCode: status);
     }
   }

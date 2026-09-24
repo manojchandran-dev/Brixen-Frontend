@@ -9,6 +9,7 @@ import '../../../../core/theme/theme_cubit.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/session_service.dart';
 import '../../../../shared/widgets/company_selector_field.dart';
+import '../../../../shared/widgets/deleted_items_button.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
 import '../../../../shared/widgets/brixen_button.dart';
@@ -520,30 +521,36 @@ class _CompaniesListBody extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Container(
-                    width: 46,
-                    height: 46,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: AppColors.shadows([
-                        BoxShadow(
-                          color: AppColors.shadowDark.withValues(alpha: 0.06),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
+                  Tooltip(
+                    message: 'Deleted companies',
+                    child: GestureDetector(
+                      onTap: () => _showDeletedCompanies(context, ref),
+                      child: Container(
+                        width: 46,
+                        height: 46,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: AppColors.shadows([
+                            BoxShadow(
+                              color: AppColors.shadowDark.withValues(alpha: 0.06),
+                              blurRadius: 14,
+                              offset: const Offset(0, 6),
+                            ),
+                            BoxShadow(
+                              color: AppColors.highlightShadow(0.85),
+                              blurRadius: 6,
+                              offset: const Offset(-3, -3),
+                            ),
+                          ]),
                         ),
-                        BoxShadow(
-                          color: AppColors.highlightShadow(0.85),
-                          blurRadius: 6,
-                          offset: const Offset(-3, -3),
+                        child: const Icon(
+                          Icons.restore_from_trash_rounded,
+                          color: AppColors.brand,
+                          size: 20,
                         ),
-                      ]),
-                    ),
-                    child: const Icon(
-                      Icons.tune_rounded,
-                      color: AppColors.brand,
-                      size: 19,
+                      ),
                     ),
                   ),
                 ],
@@ -612,9 +619,7 @@ class _CompaniesListBody extends ConsumerWidget {
                                   }
                                 });
                           },
-                          onDelete: () => ref
-                              .read(companiesProvider.notifier)
-                              .deleteCompany(c.id),
+                          onDelete: () => _confirmDeleteCompany(context, ref, c),
                           onView: () => _viewCompanyDetail(context, ref, c.id),
                           onEdit: () => context.push(
                             AppRouter.createCompany,
@@ -632,6 +637,176 @@ class _CompaniesListBody extends ConsumerWidget {
         );
       },
     );
+  }
+}
+
+/// Lists soft-deleted companies with a Restore button each. A restored
+/// company (with everything deleted along with it) goes back into the list.
+void _showDeletedCompanies(BuildContext context, WidgetRef ref) {
+  final notifier = ref.read(companiesProvider.notifier);
+  var future = notifier.fetchDeleted();
+  final restoring = <String>{};
+
+  Future<void> restore(
+    Company c,
+    StateSetter setSheet,
+    BuildContext sheetCtx,
+  ) async {
+    setSheet(() => restoring.add(c.id));
+    try {
+      await notifier.restoreCompany(c.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('"${c.name}" restored')),
+        );
+      }
+      setSheet(() => future = notifier.fetchDeleted());
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: AppColors.dangerFill,
+          ),
+        );
+      }
+    } finally {
+      restoring.remove(c.id);
+      if (sheetCtx.mounted) setSheet(() {});
+    }
+  }
+
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: AppColors.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (sheetCtx) => StatefulBuilder(
+      builder: (sheetCtx, setSheet) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(sheetCtx).size.height * 0.8,
+          ),
+          child: FutureBuilder<List<Company>>(
+            future: future,
+            builder: (_, snap) {
+              final deleted = snap.data;
+              final Widget body;
+              if (snap.connectionState != ConnectionState.done) {
+                body = const DeletedSheetMessage.loading();
+              } else if (snap.hasError) {
+                body = DeletedSheetMessage(
+                  icon: Icons.cloud_off_rounded,
+                  text: snap.error.toString(),
+                );
+              } else if (deleted!.isEmpty) {
+                body = const DeletedSheetMessage(
+                  icon: Icons.delete_outline_rounded,
+                  text: 'Trash is empty.\nDeleted companies will show up here.',
+                );
+              } else {
+                body = ListView.separated(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                  itemCount: deleted.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (_, i) {
+                    final c = deleted[i];
+                    return DeletedItemTile(
+                      title: c.name,
+                      subtitle: c.code ?? c.email,
+                      busy: restoring.contains(c.id),
+                      onRestore: () => restore(c, setSheet, sheetCtx),
+                    );
+                  },
+                );
+              }
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DeletedSheetHeader(
+                    title: 'Deleted companies',
+                    count: deleted?.length,
+                    subtitle:
+                        'Restoring brings back its users, employees and data',
+                  ),
+                  Flexible(child: body),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// Asks before deleting; returns true only if the company was deleted.
+Future<bool> _confirmDeleteCompany(
+  BuildContext context,
+  WidgetRef ref,
+  Company company,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dCtx) => AlertDialog(
+      title: const Text('Delete company?'),
+      content: Text(
+        'This will delete "${company.name}" along with its users, employees, customers and products. You can undo it right after.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dCtx).pop(false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(dCtx).pop(true),
+          child: Text(
+            'Delete',
+            style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return false;
+  try {
+    await ref.read(companiesProvider.notifier).deleteCompany(company.id);
+    if (context.mounted) {
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('"${company.name}" deleted'),
+          duration: const Duration(seconds: 6),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () => ref
+                .read(companiesProvider.notifier)
+                .restoreCompany(company.id)
+                .catchError((Object e) {
+              messenger.showSnackBar(SnackBar(
+                content: Text(e.toString()),
+                backgroundColor: AppColors.dangerFill,
+              ));
+            }),
+          ),
+        ),
+      );
+    }
+    return true;
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: AppColors.dangerFill,
+        ),
+      );
+    }
+    return false;
   }
 }
 
@@ -684,36 +859,8 @@ void _showCompanyDetail(BuildContext context, WidgetRef ref, Company company) {
           ctx.push(AppRouter.createCompany, extra: {'edit': company});
         },
         onDelete: () async {
-          final confirmed = await showDialog<bool>(
-            context: ctx,
-            builder: (dCtx) => AlertDialog(
-              title: const Text('Delete company?'),
-              content: Text(
-                'This will permanently remove "${company.name}". This can\'t be undone.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dCtx).pop(false),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(dCtx).pop(true),
-                  child: Text(
-                    'Delete',
-                    style: TextStyle(
-                      color: AppColors.ink,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-          if (confirmed == true) {
-            await ref
-                .read(companiesProvider.notifier)
-                .deleteCompany(company.id);
-            if (ctx.mounted) Navigator.of(ctx).pop();
+          if (await _confirmDeleteCompany(ctx, ref, company) && ctx.mounted) {
+            Navigator.of(ctx).pop();
           }
         },
         onToggleStatus: () async {
@@ -1323,7 +1470,7 @@ class _MenuBodyState extends State<_MenuBody> {
               icon: Icons.help_rounded,
               label: 'Support',
               color: AppColors.positive,
-              onTap: () {},
+              onTap: () => context.push(AppRouter.support),
             ),
           ],
         ),

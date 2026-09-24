@@ -7,7 +7,8 @@ import '../../core/theme/app_colors.dart';
 /// none), matching the header `WelcomeDashboardView` builds for Dashboard.
 class PageHeaderBar extends StatelessWidget {
   final String title;
-  const PageHeaderBar({super.key, required this.title});
+  final Widget? trailing;
+  const PageHeaderBar({super.key, required this.title, this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -40,10 +41,17 @@ class PageHeaderBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          Text(
-            title,
-            style: TextStyle(color: AppColors.ink, fontSize: 17, fontWeight: FontWeight.w700),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                color: AppColors.ink,
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
+          trailing ?? const SizedBox.shrink(),
         ],
       ),
     );

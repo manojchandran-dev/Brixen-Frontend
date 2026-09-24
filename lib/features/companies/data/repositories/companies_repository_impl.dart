@@ -12,8 +12,8 @@ class CompaniesRepositoryImpl implements CompaniesRepository {
   const CompaniesRepositoryImpl(this._ds);
 
   @override
-  Future<List<Company>> getCompanies({int page = 1, int limit = 50, String? search}) =>
-      _ds.getCompanies(page: page, limit: limit, search: search);
+  Future<List<Company>> getCompanies({int page = 1, int limit = 50, String? search, bool deleted = false}) =>
+      _ds.getCompanies(page: page, limit: limit, search: search, deleted: deleted);
 
   @override
   Future<Company> getCompanyById(String id) => _ds.getCompanyById(id);
@@ -59,7 +59,7 @@ class CompaniesRepositoryImpl implements CompaniesRepository {
 
   @override
   Future<Company> updateCompanyStatus(String id, bool isActive) =>
-      _ds.updateCompanyStatus(id, isActive ? 'active' : 'inactive');
+      _ds.updateCompanyStatus(id, isActive ? 'ACTIVE' : 'INACTIVE');
 
   @override
   Future<Company> updateCompany(String id, Company company) {
@@ -83,11 +83,13 @@ class CompaniesRepositoryImpl implements CompaniesRepository {
       if (company.industryType != null) 'industry_type': company.industryType,
       if (company.entityType != null) 'entity_type': company.entityType,
       if (company.subscriptionPlan != null) 'subscription_plan': company.subscriptionPlan,
-      'status': company.isActive ? 'active' : 'inactive',
     };
     return _ds.updateCompany(id, body);
   }
 
   @override
   Future<void> deleteCompany(String id) => _ds.deleteCompany(id);
+
+  @override
+  Future<Company> restoreCompany(String id) => _ds.restoreCompany(id);
 }

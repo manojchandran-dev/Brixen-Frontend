@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/network/api_endpoints.dart';
+import '../../../../shared/widgets/deleted_items_button.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/services/session_service.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -196,6 +198,14 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                 ],
               ),
         actions: [
+          DeletedItemsButton(
+            title: 'Deleted products',
+            listPath: ApiEndpoints.products,
+            restorePath: (p) => '${ApiEndpoints.products}/${p['id']}/restore',
+            labelOf: (p) => (p['product_name'] ?? '').toString(),
+            subtitleOf: (p) => p['color'] as String?,
+            onRestored: () => ref.invalidate(productsProvider),
+          ),
           GestureDetector(
             onTap: () => context.push(
               AppRouter.createProduct,

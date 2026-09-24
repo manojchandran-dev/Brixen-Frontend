@@ -2,7 +2,8 @@ import '../../domain/entities/reports_summary.dart';
 
 double _num(dynamic v) => double.tryParse(v?.toString() ?? '') ?? 0;
 int _int(dynamic v) => int.tryParse(v?.toString() ?? '') ?? 0;
-DateTime _date(dynamic v) => DateTime.tryParse(v?.toString() ?? '') ?? DateTime.now();
+DateTime _date(dynamic v) =>
+    DateTime.tryParse(v?.toString() ?? '') ?? DateTime.now();
 
 /// Tries each key in order and returns the first present value — used where
 /// the exact field name for a breakdown label wasn't pinned down precisely
@@ -27,6 +28,7 @@ class ReportsSummaryModel extends ReportsSummary {
     required super.profitMarginPct,
     required super.salesVsExpenses,
     required super.cumulativeProfit,
+    required super.topSellingCategories,
     required super.topExpenseCategories,
     required super.salesByStatus,
     required super.salesByPaymentMethod,
@@ -36,9 +38,13 @@ class ReportsSummaryModel extends ReportsSummary {
   factory ReportsSummaryModel.fromJson(Map<String, dynamic> json) {
     final salesVsExpenses = (json['sales_vs_expenses'] as List?) ?? const [];
     final cumulativeProfit = (json['cumulative_profit'] as List?) ?? const [];
-    final topExpenseCategories = (json['top_expense_categories'] as List?) ?? const [];
+    final topSellingCategories =
+        (json['top_selling_categories'] as List?) ?? const [];
+    final topExpenseCategories =
+        (json['top_expense_categories'] as List?) ?? const [];
     final salesByStatus = (json['sales_by_status'] as List?) ?? const [];
-    final salesByPaymentMethod = (json['sales_by_payment_method'] as List?) ?? const [];
+    final salesByPaymentMethod =
+        (json['sales_by_payment_method'] as List?) ?? const [];
     final topCustomers = (json['top_customers'] as List?) ?? const [];
 
     return ReportsSummaryModel(
@@ -50,41 +56,64 @@ class ReportsSummaryModel extends ReportsSummary {
       netProfit: _num(json['net_profit']),
       profitMarginPct: _num(json['profit_margin_pct']),
       salesVsExpenses: salesVsExpenses
-          .map((e) => DailyPoint(
-                date: _date((e as Map)['date']),
-                sales: _num(e['sales']),
-                expenses: _num(e['expenses']),
-              ))
+          .map(
+            (e) => DailyPoint(
+              date: _date((e as Map)['date']),
+              sales: _num(e['sales']),
+              expenses: _num(e['expenses']),
+            ),
+          )
           .toList(),
       cumulativeProfit: cumulativeProfit
-          .map((e) => CumulativePoint(
-                date: _date((e as Map)['date']),
-                value: _num(e['value'] ?? e['profit']),
-              ))
+          .map(
+            (e) => CumulativePoint(
+              date: _date((e as Map)['date']),
+              value: _num(e['value'] ?? e['profit']),
+            ),
+          )
+          .toList(),
+      topSellingCategories: topSellingCategories
+          .map(
+            (e) => NamedAmount(
+              label: _pick(e as Map, ['category'], 'Uncategorised'),
+              amount: _num(e['amount']),
+            ),
+          )
           .toList(),
       topExpenseCategories: topExpenseCategories
-          .map((e) => NamedAmount(
-                label: _pick(e as Map, ['category'], 'Uncategorised'),
-                amount: _num(e['amount']),
-              ))
+          .map(
+            (e) => NamedAmount(
+              label: _pick(e as Map, ['category'], 'Uncategorised'),
+              amount: _num(e['amount']),
+            ),
+          )
           .toList(),
       salesByStatus: salesByStatus
-          .map((e) => StatusCount(
-                status: _pick(e as Map, ['status'], 'Unknown'),
-                count: _int(e['count']),
-              ))
+          .map(
+            (e) => StatusCount(
+              status: _pick(e as Map, ['status'], 'Unknown'),
+              count: _int(e['count']),
+            ),
+          )
           .toList(),
       salesByPaymentMethod: salesByPaymentMethod
-          .map((e) => NamedAmount(
-                label: _pick(e as Map, ['method', 'payment_method'], 'Unspecified'),
-                amount: _num(e['amount']),
-              ))
+          .map(
+            (e) => NamedAmount(
+              label: _pick(e as Map, [
+                'method',
+                'payment_method',
+              ], 'Unspecified'),
+              amount: _num(e['amount']),
+            ),
+          )
           .toList(),
       topCustomers: topCustomers
-          .map((e) => NamedAmount(
-                label: _pick(e as Map, ['name', 'customer_name'], 'Walk-in'),
-                amount: _num(e['amount']),
-              ))
+          .map(
+            (e) => NamedAmount(
+              label: _pick(e as Map, ['name', 'customer_name'], 'Walk-in'),
+              amount: _num(e['amount']),
+            ),
+          )
           .toList(),
     );
   }

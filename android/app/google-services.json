@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "298557930088",
+    "project_id": "brixen-d7517",
+    "storage_bucket": "brixen-d7517.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:298557930088:android:3add29fc08af12fcba19dd",
+        "android_client_info": {
+          "package_name": "com.example.brixen"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJm8RZ-EmAympaBkiT4txxX3_R7laF_JU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

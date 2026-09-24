@@ -102,6 +102,34 @@ class RichCardShell extends StatelessWidget {
     required this.child,
   });
 
+  /// The tinted, rotating-accent look the Companies/Products cards use —
+  /// [index] picks the accent so consecutive cards alternate.
+  factory RichCardShell.tinted({
+    Key? key,
+    required int index,
+    VoidCallback? onTap,
+    required Widget child,
+  }) {
+    final accents = [
+      AppColors.brand,
+      AppColors.positive,
+      AppColors.brandDeep,
+      AppColors.brandLight,
+      AppColors.brandBlack,
+    ];
+    final accent = accents[index % accents.length];
+    return RichCardShell(
+      key: key,
+      accentColor: accent,
+      backgroundColor: Color.lerp(AppColors.surface, accent, AppColors.cardTintBlend(accent))!,
+      backgroundGradient: AppColors.cardTintGradient(accent),
+      edgeColor: accent,
+      showAccentBar: false,
+      onTap: onTap,
+      child: child,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
