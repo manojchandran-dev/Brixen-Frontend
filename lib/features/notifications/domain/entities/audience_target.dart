@@ -54,20 +54,22 @@ class AudienceTarget {
   /// Only the field relevant to [type] is sent, as the API expects. Company
   /// ids go out as numbers when they are numeric (the backend's ids are).
   Map<String, dynamic> toJson() => {
-        'type': type.name,
-        if (type == AudienceType.selectedCompanies)
-          'company_ids': companyIds.map((id) => int.tryParse(id) ?? id).toList(),
-        if (type == AudienceType.byPlan) 'plan': plan,
-        if (type == AudienceType.byStatus) 'active_only': activeOnly ?? true,
-      };
+    'type': type.name,
+    if (type == AudienceType.selectedCompanies)
+      'company_ids': companyIds.map((id) => int.tryParse(id) ?? id).toList(),
+    if (type == AudienceType.byPlan) 'plan': plan,
+    if (type == AudienceType.byStatus) 'active_only': activeOnly ?? true,
+  };
 
   factory AudienceTarget.fromJson(Map<String, dynamic> json) => AudienceTarget(
-        type: AudienceType.values.firstWhere(
-          (t) => t.name == json['type'],
-          orElse: () => AudienceType.allCompanies,
-        ),
-        companyIds: (json['company_ids'] as List?)?.map((e) => e.toString()).toList() ?? const [],
-        plan: json['plan'] as String?,
-        activeOnly: json['active_only'] as bool?,
-      );
+    type: AudienceType.values.firstWhere(
+      (t) => t.name == json['type'],
+      orElse: () => AudienceType.allCompanies,
+    ),
+    companyIds:
+        (json['company_ids'] as List?)?.map((e) => e.toString()).toList() ??
+        const [],
+    plan: json['plan'] as String?,
+    activeOnly: json['active_only'] as bool?,
+  );
 }

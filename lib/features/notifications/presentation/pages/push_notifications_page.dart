@@ -8,6 +8,7 @@ import '../../../../core/services/session_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/app_bottom_nav.dart';
 import '../../../../shared/widgets/app_drawer.dart';
+import '../../../../shared/widgets/chip_filter_sheet.dart';
 import '../../../../shared/widgets/confirm_dialog.dart';
 import '../../../../shared/widgets/detail_sheet.dart';
 import '../../../../shared/widgets/error_state.dart';
@@ -19,6 +20,8 @@ import '../../domain/entities/push_notification.dart';
 import '../providers/push_notifications_provider.dart';
 import '../widgets/notification_labels.dart';
 import '../widgets/notification_status_badge.dart';
+import '../../../../shared/widgets/list_count_bar.dart';
+import '../../../../shared/widgets/module_title.dart';
 
 class PushNotificationsPage extends ConsumerStatefulWidget {
   const PushNotificationsPage({super.key});
@@ -31,6 +34,8 @@ class PushNotificationsPage extends ConsumerStatefulWidget {
 class _PushNotificationsPageState extends ConsumerState<PushNotificationsPage> {
   final _searchCtrl = TextEditingController();
   CommunicationStatus? _statusFilter;
+  // Applied to the loaded list; status and search go to the API.
+  NotificationPriority? _priorityFilter;
   Timer? _searchDebounce;
 
   @override
@@ -55,9 +60,46 @@ class _PushNotificationsPageState extends ConsumerState<PushNotificationsPage> {
     _searchDebounce = Timer(const Duration(milliseconds: 350), _reload);
   }
 
-  void _onStatusSelected(CommunicationStatus? status) {
-    setState(() => _statusFilter = status);
-    _reload();
+  void _openFilter() {
+    showChipFilterSheet(
+      context,
+      title: 'Filter notifications',
+      sections: [
+        FilterSection(
+          key: 'status',
+          title: 'Status',
+          options: [
+            for (final s in CommunicationStatus.values)
+              if (s != CommunicationStatus.published)
+                (s, s.name[0].toUpperCase() + s.name.substring(1)),
+          ],
+        ),
+        FilterSection(
+          key: 'priority',
+          title: 'Priority',
+          options: [
+            for (final p in NotificationPriority.values) (p, priorityLabel(p)),
+          ],
+        ),
+      ],
+      selected: {'status': _statusFilter, 'priority': _priorityFilter},
+      onApply: (chosen) {
+        final status = chosen['status'] as CommunicationStatus?;
+        final statusChanged = status != _statusFilter;
+        setState(() {
+          _statusFilter = status;
+          _priorityFilter = chosen['priority'] as NotificationPriority?;
+        });
+        if (statusChanged) _reload();
+      },
+      onClear: () {
+        setState(() {
+          _statusFilter = null;
+          _priorityFilter = null;
+        });
+        _reload();
+      },
+    );
   }
 
   @override
@@ -99,13 +141,9 @@ class _PushNotificationsPageState extends ConsumerState<PushNotificationsPage> {
             ),
           ),
         ),
-        title: Text(
-          'Push Notifications',
-          style: TextStyle(
-            color: cs.onSurface,
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
-          ),
+        title: ModuleTitle(
+          title: 'Push Notifications',
+          subtitle: 'Alerts sent to company apps',
         ),
         actions: [
           GestureDetector(
@@ -133,48 +171,42 @@ class _PushNotificationsPageState extends ConsumerState<PushNotificationsPage> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: SearchField(
-              controller: _searchCtrl,
-              hintText: 'Search notifications...',
-              onChanged: _onSearchChanged,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: SizedBox(
-              height: 34,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  _FilterChip(
-                    label: 'All',
-                    selected: _statusFilter == null,
-                    onTap: () => _onStatusSelected(null),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SearchField(
+                    controller: _searchCtrl,
+                    hintText: 'Search notifications...',
+                    onChanged: _onSearchChanged,
                   ),
-                  for (final s in CommunicationStatus.values.where(
-                    (s) => s != CommunicationStatus.published,
-                  ))
-                    Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: _FilterChip(
-                        label: s.name[0].toUpperCase() + s.name.substring(1),
-                        selected: _statusFilter == s,
-                        onTap: () => _onStatusSelected(s),
-                      ),
-                    ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 10),
+                HeaderIconButton(
+                  tooltip: 'Filter notifications',
+                  icon: Icons.filter_list_rounded,
+                  active: _statusFilter != null || _priorityFilter != null,
+                  onTap: _openFilter,
+                ),
+              ],
             ),
           ),
           Expanded(
+            // reload() keeps the previous list in the loading state — show
+            // the skeleton anyway, so a search/filter visibly reloads.
             child: notificationsAsync.when(
+              skipLoadingOnRefresh: false,
+              skipLoadingOnReload: false,
               loading: () => const SkeletonListView(),
               error: (e, _) => ErrorCard(error: e, onRetry: _reload),
-              data: (list) {
+              data: (all) {
+                final list = _priorityFilter == null
+                    ? all
+                    : all.where((n) => n.priority == _priorityFilter).toList();
                 if (list.isEmpty) {
                   final filtered =
                       _statusFilter != null ||
+                      _priorityFilter != null ||
                       _searchCtrl.text.trim().isNotEmpty;
                   return Center(
                     child: Column(
@@ -187,7 +219,9 @@ class _PushNotificationsPageState extends ConsumerState<PushNotificationsPage> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          filtered ? 'No results' : 'No push notifications yet',
+                          filtered
+                              ? 'No notifications match'
+                              : 'No push notifications yet',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -199,52 +233,29 @@ class _PushNotificationsPageState extends ConsumerState<PushNotificationsPage> {
                   );
                 }
 
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                  itemCount: list.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) =>
-                      _PushNotificationCard(index: i, notification: list[i]),
+                return Column(
+                  children: [
+                    ListCountBar(
+                      label: 'Total Notifications',
+                      count: list.length,
+                    ),
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                        itemCount: list.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (_, i) => _PushNotificationCard(
+                          index: i,
+                          notification: list[i],
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? cs.primary : cs.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: selected ? AppColors.white : cs.onSurfaceVariant,
-          ),
-        ),
       ),
     );
   }
@@ -261,6 +272,9 @@ class _PushNotificationCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fmt = DateFormat('dd MMM yyyy, h:mm a');
+    // The card's own accent (its border and tint) — the status shows in
+    // the pill.
+    final color = RichCardShell.accentFor(index);
     return SwipeActions(
       onTap: () => showDetailSheet(
         context,
@@ -336,86 +350,131 @@ class _PushNotificationCard extends ConsumerWidget {
           },
         ),
       ],
+      // Background cycles the theme accents by position, like the Companies
+      // list; the status shows in the icon badge and pill.
       child: RichCardShell.tinted(
         index: index,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                notification.title,
-                style: const TextStyle(
-                  fontSize: 15.5,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.2,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (notification.message.trim().isNotEmpty) ...[
-                const SizedBox(height: 3),
-                // A fixed height, not just maxLines — `RichCardShell` wraps
-                // this card in `IntrinsicHeight`, whose dry-layout pass
-                // under-measures a `maxLines`+`ellipsis` Text vs. its real
-                // layout pass (a known Flutter interaction), which is what
-                // produced the "bottom overflowed" banner here. Pinning the
-                // height removes the ambiguity between those two passes.
-                SizedBox(
-                  height: 34,
-                  child: Text(
-                    notification.message.trim(),
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      color: AppColors.ink.withValues(alpha: 0.6),
-                      height: 1.35,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 14),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: _StatBox(
-                      label: 'Recipients',
-                      value: '${notification.recipients}',
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: AppColors.accentGradient(color),
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: AppColors.shadows([
+                        BoxShadow(
+                          color: color.withValues(alpha: 0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]),
+                    ),
+                    child: Icon(
+                      _statusIcon(notification.status),
+                      color: Colors.white,
+                      size: 19,
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: _StatBox(
-                      label: 'Delivered',
-                      value: '${notification.delivered}',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          notification.title,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                            color: AppColors.ink,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (notification.message.trim().isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          // Fixed height, not just maxLines: RichCardShell's
+                          // IntrinsicHeight under-measures a maxLines +
+                          // ellipsis Text (a known Flutter interaction), which
+                          // caused a "bottom overflowed" banner here.
+                          SizedBox(
+                            height: 34,
+                            child: Text(
+                              notification.message.trim(),
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: AppColors.ink.withValues(alpha: 0.6),
+                                height: 1.35,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: _StatBox(
-                      label: 'Opened',
-                      value: '${notification.opened}',
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: _StatBox(
-                      label: 'Failed',
-                      value: '${notification.failed}',
-                      alert: notification.failed > 0,
-                    ),
-                  ),
+                  const SizedBox(width: 8),
+                  NotificationStatusBadge(status: notification.status),
                 ],
               ),
               const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.surface.withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    _MiniStat(
+                      icon: Icons.groups_rounded,
+                      value: notification.recipients,
+                      label: 'Recipients',
+                      color: AppColors.brand,
+                    ),
+                    _MiniStat(
+                      icon: Icons.done_all_rounded,
+                      value: notification.delivered,
+                      label: 'Delivered',
+                      color: AppColors.positive,
+                    ),
+                    _MiniStat(
+                      icon: Icons.visibility_rounded,
+                      value: notification.opened,
+                      label: 'Opened',
+                      color: AppColors.accentIndigo,
+                    ),
+                    _MiniStat(
+                      icon: Icons.error_outline_rounded,
+                      value: notification.failed,
+                      label: 'Failed',
+                      color: notification.failed > 0
+                          ? AppColors.accentRose
+                          : AppColors.textHint,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   Icon(
                     notification.status == CommunicationStatus.scheduled
                         ? Icons.schedule_rounded
-                        : Icons.send_rounded,
-                    size: 12,
+                        : Icons.access_time_rounded,
+                    size: 13,
                     color: AppColors.textHint,
                   ),
                   const SizedBox(width: 5),
@@ -432,13 +491,110 @@ class _PushNotificationCard extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  NotificationStatusBadge(status: notification.status),
+                  if (notification.priority != NotificationPriority.normal) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color:
+                            (notification.priority ==
+                                        NotificationPriority.urgent
+                                    ? AppColors.accentRose
+                                    : AppColors.accentGold)
+                                .withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.priority_high_rounded,
+                            size: 11,
+                            color:
+                                notification.priority ==
+                                    NotificationPriority.urgent
+                                ? AppColors.accentRose
+                                : AppColors.accentGold,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            priorityLabel(notification.priority),
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color:
+                                  notification.priority ==
+                                      NotificationPriority.urgent
+                                  ? AppColors.accentRose
+                                  : AppColors.accentGold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  static IconData _statusIcon(CommunicationStatus s) => switch (s) {
+    CommunicationStatus.draft => Icons.edit_note_rounded,
+    CommunicationStatus.scheduled => Icons.schedule_send_rounded,
+    CommunicationStatus.sending => Icons.send_rounded,
+    CommunicationStatus.sent ||
+    CommunicationStatus.published => Icons.mark_email_read_rounded,
+    CommunicationStatus.failed => Icons.error_outline_rounded,
+    CommunicationStatus.cancelled => Icons.cancel_schedule_send_rounded,
+  };
+}
+
+/// One figure in a card's stats strip: icon, number, label.
+class _MiniStat extends StatelessWidget {
+  final IconData icon;
+  final int value;
+  final String label;
+  final Color color;
+  const _MiniStat({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 13, color: color),
+              const SizedBox(width: 4),
+              Text(
+                '$value',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.ink,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(fontSize: 10, color: AppColors.textHint),
+          ),
+        ],
       ),
     );
   }
@@ -449,6 +605,115 @@ class _PushNotificationCard extends ConsumerWidget {
 /// this shows the passed-in copy immediately so the sheet never opens
 /// blank, then re-fetches by id in the background and swaps in the fresh
 /// record once it lands.
+/// The message as recipients see it — laid out like a phone's push
+/// notification (app row, bold title, full message), under a "Message"
+/// heading matching the other sections.
+class _MessagePreview extends StatelessWidget {
+  final String title;
+  final String message;
+  const _MessagePreview({required this.title, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Message',
+          style: TextStyle(
+            color: AppColors.textHint,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Rounded corners + a one-sided border can't share a BoxDecoration
+        // (Flutter asserts) — so the accent border sits inside a clip.
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: AppColors.shadows([
+              BoxShadow(
+                color: AppColors.shadowDark.withValues(alpha: 0.06),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ]),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              decoration: const BoxDecoration(
+                border: Border(
+                  left: BorderSide(color: AppColors.brand, width: 3),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: AppColors.accentGradient(AppColors.brand),
+                          ),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(
+                          Icons.notifications_rounded,
+                          size: 12,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Brixen · Push notification',
+                        style: TextStyle(
+                          color: AppColors.textHint,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: AppColors.ink,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (message.trim().isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    // Selectable so the text can be copied.
+                    SelectableText(
+                      message.trim(),
+                      style: TextStyle(
+                        color: AppColors.ink.withValues(alpha: 0.8),
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _NotificationDetailBody extends ConsumerStatefulWidget {
   final PushNotification notification;
   const _NotificationDetailBody({required this.notification});
@@ -514,15 +779,10 @@ class _NotificationDetailBodyState
         ),
       ),
       sections: [
+        _MessagePreview(title: n.title, message: n.message),
         DetailSection(
           title: 'Details',
           items: [
-            DetailRow(
-              icon: Icons.message_outlined,
-              label: 'Message',
-              value: n.message,
-              stacked: true,
-            ),
             DetailRow(
               icon: Icons.touch_app_outlined,
               label: 'Open On Tap',
@@ -612,59 +872,6 @@ class _NotificationDetailBodyState
 /// A single Recipients/Delivered/Failed count — its own bordered, centered
 /// box instead of one continuous row split by divider lines, so each
 /// number reads as a distinct stat rather than three cells of a table.
-class _StatBox extends StatelessWidget {
-  final String label;
-  final String value;
-  // Every box shares the same app-brand tint — only a genuine problem
-  // (failed > 0) breaks from that, into the app's own existing danger
-  // color, not an arbitrary new one.
-  final bool alert;
-  const _StatBox({
-    required this.label,
-    required this.value,
-    this.alert = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final tint = alert ? AppColors.accentRose : AppColors.brand;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-      decoration: BoxDecoration(
-        color: tint.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            value,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: AppColors.ink,
-            ),
-          ),
-          const SizedBox(height: 1),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w500,
-              color: AppColors.ink.withValues(alpha: 0.55),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// One company's delivery outcome — company name, its status, and (if it
-/// was tapped) a small "Opened" badge, so the admin can see exactly who
-/// got the push and whether they engaged with it.
 class _CompanyDeliveryRow extends StatelessWidget {
   final CompanyDeliveryStatus delivery;
   const _CompanyDeliveryRow({required this.delivery});
@@ -706,7 +913,7 @@ class _CompanyDeliveryRow extends StatelessWidget {
                     delivery.error!.isNotEmpty)
                   Text(
                     delivery.error!,
-                    style: TextStyle(color: AppColors.accentRose, fontSize: 11),
+                    style: TextStyle(color: AppColors.ink, fontSize: 11),
                     overflow: TextOverflow.ellipsis,
                   ),
               ],

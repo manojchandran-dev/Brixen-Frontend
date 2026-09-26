@@ -18,19 +18,20 @@ class NotificationStatusBadge extends StatelessWidget {
     CommunicationStatus.cancelled: 'Cancelled',
   };
 
-  Color _colorFor(CommunicationStatus s) => switch (s) {
-        CommunicationStatus.draft => AppColors.brandLight,
-        CommunicationStatus.scheduled => AppColors.accentGold,
-        CommunicationStatus.sending => AppColors.brand,
-        CommunicationStatus.sent => AppColors.positive,
-        CommunicationStatus.published => AppColors.positive,
-        CommunicationStatus.failed => AppColors.accentRose,
-        CommunicationStatus.cancelled => AppColors.brandBlack,
-      };
+  /// The status colour — also used to tint the notification cards.
+  static Color colorFor(CommunicationStatus s) => switch (s) {
+    CommunicationStatus.draft => AppColors.brandLight,
+    CommunicationStatus.scheduled => AppColors.accentGold,
+    CommunicationStatus.sending => AppColors.brand,
+    CommunicationStatus.sent => AppColors.positive,
+    CommunicationStatus.published => AppColors.positive,
+    CommunicationStatus.failed => AppColors.accentRose,
+    CommunicationStatus.cancelled => AppColors.brandBlack,
+  };
 
   @override
   Widget build(BuildContext context) {
-    final color = _colorFor(status);
+    final color = colorFor(status);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -39,7 +40,11 @@ class NotificationStatusBadge extends StatelessWidget {
       ),
       child: Text(
         _labels[status] ?? status.name,
-        style: const TextStyle(color: AppColors.white, fontSize: 10.5, fontWeight: FontWeight.w700),
+        style: const TextStyle(
+          color: AppColors.white,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }

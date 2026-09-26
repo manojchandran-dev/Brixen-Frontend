@@ -8,18 +8,25 @@ class ReportsQuery extends Equatable {
   final String period;
   final DateTime from;
   final DateTime to;
-  const ReportsQuery({required this.period, required this.from, required this.to});
+  const ReportsQuery({
+    required this.period,
+    required this.from,
+    required this.to,
+  });
 
   @override
   List<Object?> get props => [period, from, to];
 }
 
 final reportsSummaryProvider =
-    AsyncNotifierProvider.family<ReportsSummaryNotifier, ReportsSummary, ReportsQuery>(
-  ReportsSummaryNotifier.new,
-);
+    AsyncNotifierProvider.family<
+      ReportsSummaryNotifier,
+      ReportsSummary,
+      ReportsQuery
+    >(ReportsSummaryNotifier.new);
 
-class ReportsSummaryNotifier extends FamilyAsyncNotifier<ReportsSummary, ReportsQuery> {
+class ReportsSummaryNotifier
+    extends FamilyAsyncNotifier<ReportsSummary, ReportsQuery> {
   @override
   Future<ReportsSummary> build(ReportsQuery arg) async {
     // Same fix as navModulesProvider/dashboardSummaryProvider: the cache
@@ -29,10 +36,8 @@ class ReportsSummaryNotifier extends FamilyAsyncNotifier<ReportsSummary, Reports
     // period in the same app session, instead of refetching for the new
     // company_id.
     ref.watch(authStateProvider);
-    return ref.read(reportsRepositoryProvider).getSummary(
-          period: arg.period,
-          from: arg.from,
-          to: arg.to,
-        );
+    return ref
+        .read(reportsRepositoryProvider)
+        .getSummary(period: arg.period, from: arg.from, to: arg.to);
   }
 }

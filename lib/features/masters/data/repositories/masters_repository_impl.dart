@@ -6,22 +6,32 @@ class MastersRepositoryImpl implements MastersRepository {
   final Map<String, RemoteMasterDatasource> _remoteDatasources;
   const MastersRepositoryImpl(this._remoteDatasources);
 
-  RemoteMasterDatasource? _remoteFor(String typeKey) => _remoteDatasources[typeKey];
+  RemoteMasterDatasource? _remoteFor(String typeKey) =>
+      _remoteDatasources[typeKey];
 
   @override
   bool isRemote(String typeKey) => _remoteFor(typeKey) != null;
 
   @override
-  Future<List<MasterItem>> getAll(String typeKey, {int page = 1, int limit = 100, String? search}) {
+  Future<List<MasterItem>> getAll(
+    String typeKey, {
+    int page = 1,
+    int limit = 100,
+    String? search,
+  }) {
     final remote = _remoteFor(typeKey);
-    if (remote == null) throw StateError('"$typeKey" is not a remote-backed master type');
+    if (remote == null) {
+      throw StateError('"$typeKey" is not a remote-backed master type');
+    }
     return remote.getAll(page: page, limit: limit, search: search);
   }
 
   @override
   Future<MasterItem> getById(String typeKey, String id) {
     final remote = _remoteFor(typeKey);
-    if (remote == null) throw StateError('"$typeKey" is not a remote-backed master type');
+    if (remote == null) {
+      throw StateError('"$typeKey" is not a remote-backed master type');
+    }
     return remote.getById(id);
   }
 
@@ -32,10 +42,12 @@ class MastersRepositoryImpl implements MastersRepository {
     String? description,
     String? fullForm,
     bool isActive = true,
-    required String companyId,
+    String? companyId,
   }) {
     final remote = _remoteFor(typeKey);
-    if (remote == null) throw StateError('"$typeKey" is not a remote-backed master type');
+    if (remote == null) {
+      throw StateError('"$typeKey" is not a remote-backed master type');
+    }
     return remote.create(
       name: name,
       description: description,
@@ -55,14 +67,24 @@ class MastersRepositoryImpl implements MastersRepository {
     bool? isActive,
   }) {
     final remote = _remoteFor(typeKey);
-    if (remote == null) throw StateError('"$typeKey" is not a remote-backed master type');
-    return remote.update(id, name: name, description: description, fullForm: fullForm, isActive: isActive);
+    if (remote == null) {
+      throw StateError('"$typeKey" is not a remote-backed master type');
+    }
+    return remote.update(
+      id,
+      name: name,
+      description: description,
+      fullForm: fullForm,
+      isActive: isActive,
+    );
   }
 
   @override
   Future<void> delete(String typeKey, String id) {
     final remote = _remoteFor(typeKey);
-    if (remote == null) throw StateError('"$typeKey" is not a remote-backed master type');
+    if (remote == null) {
+      throw StateError('"$typeKey" is not a remote-backed master type');
+    }
     return remote.delete(id);
   }
 }

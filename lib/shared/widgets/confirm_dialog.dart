@@ -35,7 +35,7 @@ Future<bool> showConfirmDialog(
           child: Text(
             confirmLabel,
             style: TextStyle(
-              color: isDestructive ? AppColors.accentRose : AppColors.ink,
+              color: AppColors.ink,
               fontWeight: FontWeight.w700,
             ),
           ),

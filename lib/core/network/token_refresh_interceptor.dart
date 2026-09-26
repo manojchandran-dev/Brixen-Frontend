@@ -22,11 +22,21 @@ class TokenRefreshInterceptor extends Interceptor {
   static Future<bool>? _inFlight;
 
   @override
-  Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
+  Future<void> onError(
+    DioException err,
+    ErrorInterceptorHandler handler,
+  ) async {
     final options = err.requestOptions;
     // Calls that use or hand out tokens themselves: a 401 there (wrong
     // password/PIN, dead refresh token) must not trigger a refresh.
-    final isAuthCall = ['/auth/refresh', '/auth/login', '/auth/pin/verify'].any(options.path.endsWith);
+    final isAuthCall = [
+      '/auth/refresh',
+      '/auth/login',
+      '/auth/pin/verify',
+      '/auth/pin/forgot',
+      '/auth/pin/forgot/verify',
+      '/auth/pin/reset',
+    ].any(options.path.endsWith);
     if (err.response?.statusCode != 401 ||
         options.extra['retried'] == true ||
         isAuthCall ||
@@ -34,7 +44,9 @@ class TokenRefreshInterceptor extends Interceptor {
       return handler.next(err);
     }
 
-    final refreshed = await (_inFlight ??= _refresh().whenComplete(() => _inFlight = null));
+    final refreshed = await (_inFlight ??= _refresh().whenComplete(
+      () => _inFlight = null,
+    ));
     if (!refreshed) return handler.next(err);
 
     options.extra['retried'] = true;

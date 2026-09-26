@@ -10,20 +10,27 @@ import 'api_exception.dart';
 import 'token_refresh_interceptor.dart';
 
 final dioProvider = Provider<Dio>((ref) {
-  final dio = Dio(BaseOptions(
-    baseUrl: ApiEndpoints.baseUrl,
-    connectTimeout: const Duration(seconds: 30),
-    receiveTimeout: const Duration(seconds: 30),
-    headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-  ));
+  final dio = Dio(
+    BaseOptions(
+      baseUrl: ApiEndpoints.baseUrl,
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 30),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+    ),
+  );
   dio.interceptors.add(_AuthInterceptor());
   dio.interceptors.add(TokenRefreshInterceptor());
   dio.interceptors.add(CompanyScopeInterceptor(ref));
-  dio.interceptors.add(LogInterceptor(
-    requestBody: true,
-    responseBody: true,
-    logPrint: (o) => debugPrint(o.toString()),
-  ));
+  dio.interceptors.add(
+    LogInterceptor(
+      requestBody: true,
+      responseBody: true,
+      logPrint: (o) => debugPrint(o.toString()),
+    ),
+  );
   return dio;
 });
 

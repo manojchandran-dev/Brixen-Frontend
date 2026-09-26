@@ -8,6 +8,7 @@ import '../../../../shared/widgets/brand_illustration.dart';
 import '../../../../shared/widgets/pin_pad.dart';
 import '../cubit/security_cubit.dart';
 import '../cubit/security_state.dart';
+import 'forgot_pin_sheet.dart';
 
 class LockScreenPage extends StatefulWidget {
   const LockScreenPage({super.key});
@@ -43,9 +44,9 @@ class _LockScreenPageState extends State<LockScreenPage> {
   }
 
   void _onPinChanged(String v) => setState(() {
-        _pin = v;
-        _error = null;
-      });
+    _pin = v;
+    _error = null;
+  });
 
   Future<void> _onPinComplete() async {
     setState(() => _submitting = true);
@@ -62,11 +63,18 @@ class _LockScreenPageState extends State<LockScreenPage> {
     }
   }
 
+  Future<void> _forgotPin() async {
+    final reset = await showForgotPinSheet(context);
+    if (reset && mounted) _goToDashboard();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: isDark ? AppColors.background : AppColors.lightBackground,
+      backgroundColor: isDark
+          ? AppColors.background
+          : AppColors.lightBackground,
       body: BlocBuilder<SecurityCubit, SecurityState>(
         builder: (context, state) {
           return SafeArea(
@@ -89,6 +97,7 @@ class _LockScreenPageState extends State<LockScreenPage> {
                           onPinChanged: _onPinChanged,
                           onPinComplete: _onPinComplete,
                           onBiometricTap: _tryBiometric,
+                          onForgotPin: _forgotPin,
                         ),
                       ),
                     ),
@@ -111,6 +120,7 @@ class _LockScreenContent extends StatelessWidget {
   final ValueChanged<String> onPinChanged;
   final VoidCallback onPinComplete;
   final VoidCallback onBiometricTap;
+  final VoidCallback onForgotPin;
 
   const _LockScreenContent({
     required this.pin,
@@ -120,6 +130,7 @@ class _LockScreenContent extends StatelessWidget {
     required this.onPinChanged,
     required this.onPinComplete,
     required this.onBiometricTap,
+    required this.onForgotPin,
   });
 
   @override
@@ -131,18 +142,40 @@ class _LockScreenContent extends StatelessWidget {
         const BrandIllustration(deviceIcon: Icons.pin_rounded),
         const SizedBox(height: 18),
         Text.rich(
-          TextSpan(children: [
-            const TextSpan(text: 'Brix', style: TextStyle(color: AppColors.brand)),
-            const TextSpan(text: 'en', style: TextStyle(color: AppColors.positive)),
-          ]),
-          style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+          TextSpan(
+            children: [
+              const TextSpan(
+                text: 'Brix',
+                style: TextStyle(color: AppColors.brand),
+              ),
+              const TextSpan(
+                text: 'en',
+                style: TextStyle(color: AppColors.positive),
+              ),
+            ],
+          ),
+          style: const TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.5,
+          ),
         ),
         const SizedBox(height: 4),
         Text.rich(
-          TextSpan(children: [
-            TextSpan(text: 'Work smart. ', style: TextStyle(color: AppColors.ink)),
-            TextSpan(text: 'Grow together.', style: TextStyle(color: AppColors.positive.withValues(alpha: 0.9))),
-          ]),
+          TextSpan(
+            children: [
+              TextSpan(
+                text: 'Work smart. ',
+                style: TextStyle(color: AppColors.ink),
+              ),
+              TextSpan(
+                text: 'Grow together.',
+                style: TextStyle(
+                  color: AppColors.positive.withValues(alpha: 0.9),
+                ),
+              ),
+            ],
+          ),
           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 14),
@@ -158,8 +191,16 @@ class _LockScreenContent extends StatelessWidget {
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(28),
             boxShadow: AppColors.shadows([
-              BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.10), blurRadius: 30, offset: const Offset(0, 16)),
-              BoxShadow(color: AppColors.highlightShadow(0.9), blurRadius: 14, offset: const Offset(-8, -8)),
+              BoxShadow(
+                color: AppColors.shadowDark.withValues(alpha: 0.10),
+                blurRadius: 30,
+                offset: const Offset(0, 16),
+              ),
+              BoxShadow(
+                color: AppColors.highlightShadow(0.9),
+                blurRadius: 14,
+                offset: const Offset(-8, -8),
+              ),
             ]),
           ),
           child: Column(
@@ -172,6 +213,17 @@ class _LockScreenContent extends StatelessWidget {
                 onSubmit: onPinComplete,
                 errorText: error,
                 isLoading: submitting,
+              ),
+              TextButton(
+                onPressed: submitting ? null : onForgotPin,
+                child: const Text(
+                  'Forgot PIN?',
+                  style: TextStyle(
+                    color: AppColors.brand,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
               if (isBiometricEnabled) ...[
                 const SizedBox(height: 20),
@@ -186,7 +238,10 @@ class _LockScreenContent extends StatelessWidget {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: AppColors.positive.withValues(alpha: 0.12),
-                          border: Border.all(color: AppColors.positive.withValues(alpha: 0.4), width: 1.5),
+                          border: Border.all(
+                            color: AppColors.positive.withValues(alpha: 0.4),
+                            width: 1.5,
+                          ),
                         ),
                         child: const Icon(
                           Icons.fingerprint,
@@ -197,7 +252,11 @@ class _LockScreenContent extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         'Use Fingerprint',
-                        style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),

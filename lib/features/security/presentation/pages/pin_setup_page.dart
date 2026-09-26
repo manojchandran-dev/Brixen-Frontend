@@ -97,8 +97,9 @@ class _PinSetupPageState extends State<PinSetupPage> {
     return PopScope(
       canPop: false,
       child: Scaffold(
-        backgroundColor:
-            isDark ? AppColors.background : AppColors.lightBackground,
+        backgroundColor: isDark
+            ? AppColors.background
+            : AppColors.lightBackground,
         body: Column(
           children: [
             if (_step != _SetupStep.biometric)
@@ -110,8 +111,11 @@ class _PinSetupPageState extends State<PinSetupPage> {
                       onPressed: _goToDashboard,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
-                      icon: Icon(Icons.arrow_back_ios_new_rounded,
-                          size: 18, color: Theme.of(context).colorScheme.onSurface),
+                      icon: Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                     ),
                   ],
                 ),
@@ -144,10 +148,10 @@ class _PinSetupPageState extends State<PinSetupPage> {
                         : _onConfirmEntered,
                     onBack: _step == _SetupStep.confirmPin
                         ? () => setState(() {
-                              _step = _SetupStep.enterPin;
-                              _confirmPin = '';
-                              _error = null;
-                            })
+                            _step = _SetupStep.enterPin;
+                            _confirmPin = '';
+                            _error = null;
+                          })
                         : null,
                   );
                 },
@@ -197,26 +201,57 @@ class _PinStep extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const SizedBox(height: 8),
-                      const BrandIllustration(deviceIcon: Icons.vpn_key_rounded),
+                      const BrandIllustration(
+                        deviceIcon: Icons.vpn_key_rounded,
+                      ),
                       const SizedBox(height: 14),
                       Text.rich(
-                        TextSpan(children: [
-                          const TextSpan(text: 'Brix', style: TextStyle(color: AppColors.brand)),
-                          const TextSpan(text: 'en', style: TextStyle(color: AppColors.positive)),
-                        ]),
-                        style: const TextStyle(fontFamily: 'SpaceGrotesk', fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+                        TextSpan(
+                          children: [
+                            const TextSpan(
+                              text: 'Brix',
+                              style: TextStyle(color: AppColors.brand),
+                            ),
+                            const TextSpan(
+                              text: 'en',
+                              style: TextStyle(color: AppColors.positive),
+                            ),
+                          ],
+                        ),
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.5,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text.rich(
-                        TextSpan(children: [
-                          TextSpan(text: 'Work smart. ', style: TextStyle(color: AppColors.ink)),
-                          TextSpan(text: 'Grow together.', style: TextStyle(color: AppColors.positive.withValues(alpha: 0.9))),
-                        ]),
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: 'Work smart. ',
+                              style: TextStyle(color: AppColors.ink),
+                            ),
+                            TextSpan(
+                              text: 'Grow together.',
+                              style: TextStyle(
+                                color: AppColors.positive.withValues(
+                                  alpha: 0.9,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                       const SizedBox(height: 28),
                       Text(
-                        isConfirming ? 'Confirm your PIN' : 'Create a 6-digit PIN',
+                        isConfirming
+                            ? 'Confirm your PIN'
+                            : 'Create a 6-digit PIN',
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 22,
@@ -238,13 +273,26 @@ class _PinStep extends StatelessWidget {
                       const SizedBox(height: 28),
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 28,
+                          horizontal: 20,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.surface,
                           borderRadius: BorderRadius.circular(28),
                           boxShadow: AppColors.shadows([
-                            BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.10), blurRadius: 30, offset: const Offset(0, 16)),
-                            BoxShadow(color: AppColors.highlightShadow(0.9), blurRadius: 14, offset: const Offset(-8, -8)),
+                            BoxShadow(
+                              color: AppColors.shadowDark.withValues(
+                                alpha: 0.10,
+                              ),
+                              blurRadius: 30,
+                              offset: const Offset(0, 16),
+                            ),
+                            BoxShadow(
+                              color: AppColors.highlightShadow(0.9),
+                              blurRadius: 14,
+                              offset: const Offset(-8, -8),
+                            ),
                           ]),
                         ),
                         child: Column(
@@ -265,7 +313,9 @@ class _PinStep extends StatelessWidget {
                                 child: Text(
                                   'Back',
                                   style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                                     fontSize: 14,
                                   ),
                                 ),

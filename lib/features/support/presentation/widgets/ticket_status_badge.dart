@@ -9,17 +9,18 @@ class TicketStatusBadge extends StatelessWidget {
   final TicketStatus status;
   const TicketStatusBadge({super.key, required this.status});
 
-  Color _colorFor(TicketStatus s) => switch (s) {
-        TicketStatus.open => AppColors.accentGold,
-        TicketStatus.pending => AppColors.brandDeep,
-        TicketStatus.inProgress => AppColors.brand,
-        TicketStatus.resolved => AppColors.positive,
-        TicketStatus.closed => AppColors.brandBlack,
-      };
+  /// The status colour — shared with the Manage Ticket status choices.
+  static Color colorFor(TicketStatus s) => switch (s) {
+    TicketStatus.open => AppColors.accentGold,
+    TicketStatus.pending => AppColors.brandDeep,
+    TicketStatus.inProgress => AppColors.brand,
+    TicketStatus.resolved => AppColors.positive,
+    TicketStatus.closed => AppColors.brandBlack,
+  };
 
   @override
   Widget build(BuildContext context) {
-    final color = _colorFor(status);
+    final color = colorFor(status);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -28,7 +29,11 @@ class TicketStatusBadge extends StatelessWidget {
       ),
       child: Text(
         statusLabel(status),
-        style: const TextStyle(color: AppColors.white, fontSize: 10.5, fontWeight: FontWeight.w700),
+        style: const TextStyle(
+          color: AppColors.white,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }

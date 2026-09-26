@@ -40,16 +40,39 @@ class SearchField extends StatelessWidget {
                 ),
               ],
       ),
-      child: TextField(
-        controller: controller,
-        onChanged: onChanged,
-        style: TextStyle(color: cs.onSurface, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: hintText,
-          hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
-          prefixIcon: Icon(Icons.search_rounded, color: cs.onSurfaceVariant, size: 20),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 13),
+      // Rebuilds with the text so the ✕ shows only while there's a query.
+      child: ValueListenableBuilder<TextEditingValue>(
+        valueListenable: controller,
+        builder: (context, value, _) => TextField(
+          controller: controller,
+          onChanged: onChanged,
+          style: TextStyle(color: cs.onSurface, fontSize: 14),
+          decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
+            prefixIcon: Icon(
+              Icons.search_rounded,
+              color: cs.onSurfaceVariant,
+              size: 20,
+            ),
+            suffixIcon: value.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Clear search',
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: cs.onSurfaceVariant,
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      controller.clear();
+                      // Tell the page, so it re-runs its search.
+                      onChanged?.call('');
+                    },
+                  ),
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(vertical: 13),
+          ),
         ),
       ),
     );

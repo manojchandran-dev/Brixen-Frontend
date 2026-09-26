@@ -17,6 +17,8 @@ import 'package:intl/intl.dart';
 import '../../../permissions/presentation/providers/module_access_provider.dart';
 import '../../domain/entities/customer.dart';
 import '../providers/customers_provider.dart';
+import '../../../../shared/widgets/list_count_bar.dart';
+import '../../../../shared/widgets/module_title.dart';
 
 class CustomersPage extends ConsumerStatefulWidget {
   final bool fromMasters;
@@ -58,36 +60,66 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
             ? GestureDetector(
                 onTap: () => context.pop(),
                 child: Container(
-                  width: 40, height: 40,
+                  width: 40,
+                  height: 40,
                   margin: const EdgeInsets.all(8),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: isDark ? cs.surfaceContainerHighest : AppColors.white,
+                    color: isDark
+                        ? cs.surfaceContainerHighest
+                        : AppColors.white,
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: AppColors.shadows([
-                      BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
-                      BoxShadow(color: AppColors.highlightShadow(0.8), blurRadius: 4, offset: const Offset(-2, -2)),
+                      BoxShadow(
+                        color: AppColors.shadowDark.withValues(alpha: 0.10),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                      BoxShadow(
+                        color: AppColors.highlightShadow(0.8),
+                        blurRadius: 4,
+                        offset: const Offset(-2, -2),
+                      ),
                     ]),
                   ),
-                  child: Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.ink),
+                  child: Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    size: 16,
+                    color: AppColors.ink,
+                  ),
                 ),
               )
             : Builder(
                 builder: (ctx) => GestureDetector(
                   onTap: () => Scaffold.of(ctx).openDrawer(),
                   child: Container(
-                    width: 40, height: 40,
+                    width: 40,
+                    height: 40,
                     margin: const EdgeInsets.all(8),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: isDark ? cs.surfaceContainerHighest : AppColors.white,
+                      color: isDark
+                          ? cs.surfaceContainerHighest
+                          : AppColors.white,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: AppColors.shadows([
-                        BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
-                        BoxShadow(color: AppColors.highlightShadow(0.8), blurRadius: 4, offset: const Offset(-2, -2)),
+                        BoxShadow(
+                          color: AppColors.shadowDark.withValues(alpha: 0.10),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                        BoxShadow(
+                          color: AppColors.highlightShadow(0.8),
+                          blurRadius: 4,
+                          offset: const Offset(-2, -2),
+                        ),
                       ]),
                     ),
-                    child: Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
+                    child: Icon(
+                      Icons.menu_rounded,
+                      size: 18,
+                      color: AppColors.ink,
+                    ),
                   ),
                 ),
               ),
@@ -98,64 +130,103 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                   children: [
                     GestureDetector(
                       onTap: () => context.pop(),
-                      child: Text('Menu', style: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.6), fontSize: 12)),
+                      child: Text(
+                        'Menu',
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Icon(Icons.chevron_right_rounded, size: 14, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        size: 14,
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                      ),
                     ),
                     GestureDetector(
                       onTap: () => context.pop(),
-                      child: Text('Masters', style: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.6), fontSize: 12)),
+                      child: Text(
+                        'Masters',
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Icon(Icons.chevron_right_rounded, size: 14, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        size: 14,
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                      ),
                     ),
-                    Text('Customers', style: TextStyle(color: cs.onSurface, fontSize: 15, fontWeight: FontWeight.w700)),
+                    Text(
+                      'Customers',
+                      style: TextStyle(
+                        color: cs.onSurface,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ],
                 ),
               )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Customers', style: TextStyle(color: cs.onSurface, fontSize: 17, fontWeight: FontWeight.w700)),
-                  customersAsync.whenOrNull(
-                    data: (list) => Text('${list.length} records',
-                        style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11)),
-                  ) ?? const SizedBox.shrink(),
-                ],
+            : ModuleTitle(
+                title: 'Customers',
+                subtitle: 'Your customer records',
               ),
         actions: [
-          if (ref.watch(moduleAccessProvider('Customers')).delete) DeletedItemsButton(
-            title: 'Deleted customers',
-            listPath: ApiEndpoints.customers,
-            restorePath: (c) => '${ApiEndpoints.customers}/${c['id']}/restore',
-            labelOf: (c) => (c['name'] ?? '').toString(),
-            subtitleOf: (c) => (c['shop_name'] ?? c['phone']) as String?,
-            onRestored: () => ref.invalidate(customersProvider),
-          ),
-          if (ref.watch(moduleAccessProvider('Customers')).create) GestureDetector(
-            onTap: () => context.push(AppRouter.createCustomer,
-                extra: widget.fromMasters ? 'masters' : null),
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
-              width: 38,
-              height: 38,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                gradient: isDark
-                    ? AppColors.silverGradient
-                    : const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppColors.brand, AppColors.brandDeep]),
-                borderRadius: BorderRadius.circular(13),
-                boxShadow: AppColors.shadows([
-                  BoxShadow(color: AppColors.brand.withValues(alpha: isDark ? 0.0 : 0.4), blurRadius: 10, offset: const Offset(0, 4)),
-                ]),
-              ),
-              child: Icon(Icons.add_rounded, size: 20,
-                  color: isDark ? AppColors.black : AppColors.white),
+          if (ref.watch(moduleAccessProvider('Customers')).delete)
+            DeletedItemsButton(
+              title: 'Deleted customers',
+              listPath: ApiEndpoints.customers,
+              restorePath: (c) =>
+                  '${ApiEndpoints.customers}/${c['id']}/restore',
+              labelOf: (c) => (c['name'] ?? '').toString(),
+              subtitleOf: (c) => (c['shop_name'] ?? c['phone']) as String?,
+              onRestored: () => ref.invalidate(customersProvider),
             ),
-          ),
+          if (ref.watch(moduleAccessProvider('Customers')).create)
+            GestureDetector(
+              onTap: () => context.push(
+                AppRouter.createCustomer,
+                extra: widget.fromMasters ? 'masters' : null,
+              ),
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
+                width: 38,
+                height: 38,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  gradient: isDark
+                      ? AppColors.silverGradient
+                      : const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [AppColors.brand, AppColors.brandDeep],
+                        ),
+                  borderRadius: BorderRadius.circular(13),
+                  boxShadow: AppColors.shadows([
+                    BoxShadow(
+                      color: AppColors.brand.withValues(
+                        alpha: isDark ? 0.0 : 0.4,
+                      ),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]),
+                ),
+                child: Icon(
+                  Icons.add_rounded,
+                  size: 20,
+                  color: isDark ? AppColors.black : AppColors.white,
+                ),
+              ),
+            ),
         ],
       ),
       body: Column(
@@ -170,8 +241,16 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                 boxShadow: isDark
                     ? null
                     : [
-                        BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.06), blurRadius: 14, offset: const Offset(0, 6)),
-                        BoxShadow(color: AppColors.highlightShadow(0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+                        BoxShadow(
+                          color: AppColors.shadowDark.withValues(alpha: 0.06),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                        BoxShadow(
+                          color: AppColors.highlightShadow(0.85),
+                          blurRadius: 6,
+                          offset: const Offset(-3, -3),
+                        ),
                       ],
               ),
               child: TextField(
@@ -180,8 +259,15 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                 style: TextStyle(color: cs.onSurface, fontSize: 14),
                 decoration: InputDecoration(
                   hintText: 'Search by name, phone or email…',
-                  hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
-                  prefixIcon: Icon(Icons.search_rounded, color: cs.onSurfaceVariant, size: 20),
+                  hintStyle: TextStyle(
+                    color: cs.onSurfaceVariant,
+                    fontSize: 14,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: cs.onSurfaceVariant,
+                    size: 20,
+                  ),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 13),
                 ),
@@ -200,27 +286,43 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                 final q = _searchCtrl.text.trim().toLowerCase();
                 final filtered = q.isEmpty
                     ? list
-                    : list.where((c) =>
-                        c.name.toLowerCase().contains(q) ||
-                        (c.phone?.toLowerCase().contains(q) ?? false) ||
-                        (c.email?.toLowerCase().contains(q) ?? false)).toList();
+                    : list
+                          .where(
+                            (c) =>
+                                c.name.toLowerCase().contains(q) ||
+                                (c.phone?.toLowerCase().contains(q) ?? false) ||
+                                (c.email?.toLowerCase().contains(q) ?? false),
+                          )
+                          .toList();
 
                 if (filtered.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.people_outline_rounded, size: 56,
-                            color: cs.onSurfaceVariant.withValues(alpha: 0.3)),
+                        Icon(
+                          Icons.people_outline_rounded,
+                          size: 56,
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.3),
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           list.isEmpty ? 'No customers yet' : 'No results',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant),
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurfaceVariant,
+                          ),
                         ),
                         if (list.isEmpty) ...[
                           const SizedBox(height: 6),
-                          Text('Tap + to add your first customer',
-                              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+                          Text(
+                            'Tap + to add your first customer',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
                         ],
                       ],
                     ),
@@ -229,27 +331,57 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
 
                 // A single rounded card holding every row (dividers between,
                 // no per-row shadow) — same flat list style as Employees.
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                return Column(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: AppColors.shadows([
-                          BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.06), blurRadius: 16, offset: const Offset(0, 8)),
-                          BoxShadow(color: AppColors.highlightShadow(0.85), blurRadius: 6, offset: const Offset(-3, -3)),
-                        ]),
-                      ),
-                      child: Column(
-                        children: filtered.asMap().entries.map((entry) {
-                          final i = entry.key;
-                          return Column(children: [
-                            _CustomerCard(customer: entry.value, index: i),
-                            if (i != filtered.length - 1) Divider(height: 1, color: AppColors.border, indent: 59),
-                          ]);
-                        }).toList(),
+                    ListCountBar(
+                      label: 'Total Customers',
+                      count: filtered.length,
+                    ),
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: AppColors.shadows([
+                                BoxShadow(
+                                  color: AppColors.shadowDark.withValues(
+                                    alpha: 0.06,
+                                  ),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 8),
+                                ),
+                                BoxShadow(
+                                  color: AppColors.highlightShadow(0.85),
+                                  blurRadius: 6,
+                                  offset: const Offset(-3, -3),
+                                ),
+                              ]),
+                            ),
+                            child: Column(
+                              children: filtered.asMap().entries.map((entry) {
+                                final i = entry.key;
+                                return Column(
+                                  children: [
+                                    _CustomerCard(
+                                      customer: entry.value,
+                                      index: i,
+                                    ),
+                                    if (i != filtered.length - 1)
+                                      Divider(
+                                        height: 1,
+                                        color: AppColors.border,
+                                        indent: 59,
+                                      ),
+                                  ],
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -270,7 +402,13 @@ class _CustomerCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final accentColors = [AppColors.brand, AppColors.positive, AppColors.brandDeep, AppColors.brandLight, AppColors.brandBlack];
+    final accentColors = [
+      AppColors.brand,
+      AppColors.positive,
+      AppColors.brandDeep,
+      AppColors.brandLight,
+      AppColors.brandBlack,
+    ];
     final accent = accentColors[index % accentColors.length];
 
     final fg = AppColors.ink;
@@ -282,18 +420,21 @@ class _CustomerCard extends ConsumerWidget {
     return SwipeActions(
       onTap: () => _showCustomerDetail(context, ref, customer, accent),
       actions: [
-        if (ref.watch(moduleAccessProvider('Customers')).edit) SwipeAction(
-          icon: Icons.edit_outlined,
-          label: 'Edit',
-          color: AppColors.accentIndigo,
-          onTap: () => context.push(AppRouter.createCustomer, extra: customer),
-        ),
-        if (ref.watch(moduleAccessProvider('Customers')).delete) SwipeAction(
-          icon: Icons.delete_outline,
-          label: 'Delete',
-          color: AppColors.brandBlack,
-          onTap: () => _confirmDelete(context, ref),
-        ),
+        if (ref.watch(moduleAccessProvider('Customers')).edit)
+          SwipeAction(
+            icon: Icons.edit_outlined,
+            label: 'Edit',
+            color: AppColors.accentIndigo,
+            onTap: () =>
+                context.push(AppRouter.createCustomer, extra: customer),
+          ),
+        if (ref.watch(moduleAccessProvider('Customers')).delete)
+          SwipeAction(
+            icon: Icons.delete_outline,
+            label: 'Delete',
+            color: AppColors.brandBlack,
+            onTap: () => _confirmDelete(context, ref),
+          ),
       ],
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -314,8 +455,14 @@ class _CustomerCard extends ConsumerWidget {
                 shape: BoxShape.circle,
               ),
               child: Text(
-                customer.name.trim().isNotEmpty ? customer.name.trim()[0].toUpperCase() : '?',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.white),
+                customer.name.trim().isNotEmpty
+                    ? customer.name.trim()[0].toUpperCase()
+                    : '?',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.white,
+                ),
               ),
             ),
             const SizedBox(width: 13),
@@ -323,20 +470,36 @@ class _CustomerCard extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(customer.name,
-                      style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: fg),
-                      overflow: TextOverflow.ellipsis),
+                  Text(
+                    customer.name,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: fg,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: 2),
-                  Text(customer.shopName ?? '—',
-                      style: TextStyle(fontSize: 12, color: fgMuted), overflow: TextOverflow.ellipsis),
+                  Text(
+                    customer.shopName ?? '—',
+                    style: TextStyle(fontSize: 12, color: fgMuted),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: 2),
-                  Text(customer.gstNumber ?? 'No GST',
-                      style: TextStyle(fontSize: 11, color: fgFaint), overflow: TextOverflow.ellipsis),
+                  Text(
+                    customer.gstNumber ?? 'No GST',
+                    style: TextStyle(fontSize: 11, color: fgFaint),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textHint),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 18,
+              color: AppColors.textHint,
+            ),
           ],
         ),
       ),
@@ -350,10 +513,18 @@ class _CustomerCard extends ConsumerWidget {
       builder: (_) => AlertDialog(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Delete Customer',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: cs.onSurface)),
-        content: Text('Delete "${customer.name}"? This cannot be undone.',
-            style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant)),
+        title: Text(
+          'Delete Customer',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: cs.onSurface,
+          ),
+        ),
+        content: Text(
+          'Delete "${customer.name}"? This cannot be undone.',
+          style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -363,20 +534,32 @@ class _CustomerCard extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(context);
               try {
-                await ref.read(customersProvider.notifier).deleteCustomer(
+                await ref
+                    .read(customersProvider.notifier)
+                    .deleteCustomer(
                       customer.id,
-                      companyId: Session.isSuperAdmin ? customer.companyId : null,
+                      companyId: Session.isSuperAdmin
+                          ? customer.companyId
+                          : null,
                     );
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(e.toString()), backgroundColor: AppColors.dangerFill),
+                    SnackBar(
+                      content: Text(e.toString()),
+                      backgroundColor: AppColors.dangerFill,
+                    ),
                   );
                 }
               }
             },
-            child: Text('Delete',
-                style: TextStyle(color: AppColors.accentRose, fontWeight: FontWeight.w700)),
+            child: Text(
+              'Delete',
+              style: TextStyle(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),
@@ -384,54 +567,143 @@ class _CustomerCard extends ConsumerWidget {
   }
 }
 
-void _showCustomerDetail(BuildContext context, WidgetRef ref, Customer customer, Color accent) {
-  showDetailSheet(context, (ctx) => DetailSheetScaffold(
-    avatarText: customer.name.trim().isNotEmpty ? customer.name.trim()[0].toUpperCase() : '?',
-    avatarGradient: AppColors.accentGradient(accent),
-    title: customer.name,
-    subtitle: customer.shopName,
-    onEdit: !ref.read(moduleAccessProvider('Customers')).edit ? null : () {
-      Navigator.of(ctx).pop();
-      ctx.push(AppRouter.createCustomer, extra: customer);
-    },
-    onDelete: !ref.read(moduleAccessProvider('Customers')).delete ? null : () async {
-      final confirmed = await showDialog<bool>(
-        context: ctx,
-        builder: (dCtx) => AlertDialog(
-          backgroundColor: Theme.of(dCtx).scaffoldBackgroundColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Delete Customer', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.ink)),
-          content: Text('Delete "${customer.name}"? This cannot be undone.', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(dCtx).pop(false), child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary))),
-            TextButton(onPressed: () => Navigator.of(dCtx).pop(true), child: Text('Delete', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700))),
+void _showCustomerDetail(
+  BuildContext context,
+  WidgetRef ref,
+  Customer customer,
+  Color accent,
+) {
+  showDetailSheet(
+    context,
+    (ctx) => DetailSheetScaffold(
+      avatarText: customer.name.trim().isNotEmpty
+          ? customer.name.trim()[0].toUpperCase()
+          : '?',
+      avatarGradient: AppColors.accentGradient(accent),
+      title: customer.name,
+      subtitle: customer.shopName,
+      onEdit: !ref.read(moduleAccessProvider('Customers')).edit
+          ? null
+          : () {
+              Navigator.of(ctx).pop();
+              ctx.push(AppRouter.createCustomer, extra: customer);
+            },
+      onDelete: !ref.read(moduleAccessProvider('Customers')).delete
+          ? null
+          : () async {
+              final confirmed = await showDialog<bool>(
+                context: ctx,
+                builder: (dCtx) => AlertDialog(
+                  backgroundColor: Theme.of(dCtx).scaffoldBackgroundColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  title: Text(
+                    'Delete Customer',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  content: Text(
+                    'Delete "${customer.name}"? This cannot be undone.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(dCtx).pop(false),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(dCtx).pop(true),
+                      child: Text(
+                        'Delete',
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed != true) return;
+              try {
+                await ref
+                    .read(customersProvider.notifier)
+                    .deleteCustomer(
+                      customer.id,
+                      companyId: Session.isSuperAdmin
+                          ? customer.companyId
+                          : null,
+                    );
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              } catch (e) {
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(
+                      content: Text(e.toString()),
+                      backgroundColor: AppColors.dangerFill,
+                    ),
+                  );
+                }
+              }
+            },
+      sections: [
+        DetailSection(
+          title: 'Contact',
+          items: [
+            if (customer.phone != null)
+              DetailRow(
+                icon: Icons.phone_rounded,
+                label: 'Phone',
+                value: customer.phone!,
+              ),
+            if (customer.email != null)
+              DetailRow(
+                icon: Icons.mail_rounded,
+                label: 'Email',
+                value: customer.email!,
+                iconColor: AppColors.positive,
+              ),
+            if (customer.address != null && customer.address!.isNotEmpty)
+              DetailRow(
+                icon: Icons.location_on_rounded,
+                label: 'Address',
+                value: customer.address!,
+              ),
           ],
         ),
-      );
-      if (confirmed != true) return;
-      try {
-        await ref.read(customersProvider.notifier).deleteCustomer(
-                      customer.id,
-                      companyId: Session.isSuperAdmin ? customer.companyId : null,
-                    );
-        if (ctx.mounted) Navigator.of(ctx).pop();
-      } catch (e) {
-        if (ctx.mounted) {
-          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: AppColors.dangerFill));
-        }
-      }
-    },
-    sections: [
-      DetailSection(title: 'Contact', items: [
-        if (customer.phone != null) DetailRow(icon: Icons.phone_rounded, label: 'Phone', value: customer.phone!),
-        if (customer.email != null) DetailRow(icon: Icons.mail_rounded, label: 'Email', value: customer.email!, iconColor: AppColors.positive),
-        if (customer.address != null && customer.address!.isNotEmpty) DetailRow(icon: Icons.location_on_rounded, label: 'Address', value: customer.address!),
-      ]),
-      DetailSection(title: 'Business', items: [
-        if (customer.shopName != null) DetailRow(icon: Icons.storefront_rounded, label: 'Shop Name', value: customer.shopName!),
-        DetailRow(icon: Icons.receipt_long_rounded, label: 'GST No', value: customer.gstNumber ?? 'No GST', iconColor: AppColors.positive),
-        DetailRow(icon: Icons.calendar_today_rounded, label: 'Added', value: DateFormat('dd MMM yyyy').format(customer.createdAt)),
-      ]),
-    ],
-  ));
+        DetailSection(
+          title: 'Business',
+          items: [
+            if (customer.shopName != null)
+              DetailRow(
+                icon: Icons.storefront_rounded,
+                label: 'Shop Name',
+                value: customer.shopName!,
+              ),
+            DetailRow(
+              icon: Icons.receipt_long_rounded,
+              label: 'GST No',
+              value: customer.gstNumber ?? 'No GST',
+              iconColor: AppColors.positive,
+            ),
+            DetailRow(
+              icon: Icons.calendar_today_rounded,
+              label: 'Added',
+              value: DateFormat('dd MMM yyyy').format(customer.createdAt),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
 }

@@ -6,7 +6,12 @@ import '../entities/master_item.dart';
 /// mirrors that exactly instead of adding four copies of the same 5 methods.
 abstract class MastersRepository {
   bool isRemote(String typeKey);
-  Future<List<MasterItem>> getAll(String typeKey, {int page = 1, int limit = 100, String? search});
+  Future<List<MasterItem>> getAll(
+    String typeKey, {
+    int page = 1,
+    int limit = 100,
+    String? search,
+  });
   Future<MasterItem> getById(String typeKey, String id);
   Future<MasterItem> create(
     String typeKey, {
@@ -14,7 +19,7 @@ abstract class MastersRepository {
     String? description,
     String? fullForm,
     bool isActive = true,
-    required String companyId,
+    String? companyId,
   });
   Future<MasterItem> update(
     String typeKey,

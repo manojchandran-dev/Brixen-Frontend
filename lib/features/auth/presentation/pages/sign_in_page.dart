@@ -91,7 +91,6 @@ class _SignInViewState extends State<_SignInView> {
                             ],
                           ),
                           style: const TextStyle(
-                            fontFamily: 'SpaceGrotesk',
                             fontSize: 30,
                             fontWeight: FontWeight.w700,
                             letterSpacing: -1,

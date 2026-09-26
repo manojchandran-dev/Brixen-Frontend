@@ -16,18 +16,24 @@ import '../../../../shared/widgets/brixen_button.dart';
 import '../../domain/entities/company.dart';
 import '../providers/companies_provider.dart';
 import '../widgets/company_card.dart';
+import '../widgets/company_filter_sheet.dart';
 import '../../../../shared/widgets/rich_card_shell.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/app_bottom_nav.dart';
 import '../../../../shared/widgets/welcome_dashboard_view.dart';
 import '../../../../shared/widgets/skeleton.dart';
 import '../../../../shared/widgets/error_state.dart';
-import '../../../reports/presentation/pages/reports_body.dart';
+import '../../../../shared/widgets/image_viewer.dart';
+import '../../../reports/presentation/superadmin/superadmin_reports_hub.dart';
 import '../../../masters/domain/entities/master_item.dart';
 import '../../../masters/domain/entities/master_type.dart';
 import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../masters/presentation/cubit/master_cubit.dart';
 import '../../../masters/presentation/cubit/master_state.dart';
+import '../../../../shared/widgets/list_count_bar.dart';
+import '../../../../shared/widgets/module_title.dart';
+import '../../../../shared/widgets/search_field.dart';
+import '../../../../shared/widgets/confirm_dialog.dart';
 // Attendance module disabled for now — uncomment to re-enable.
 // import '../../../attendance/presentation/pages/attendance_body.dart';
 
@@ -68,7 +74,16 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
   // is a destination in its own right — it keeps the hamburger + drawer
   // like every other module page, instead of a back-arrow that empties the
   // stack and reveals whatever the "More" tab happens to render.
-  bool get _isDrilledDown => _stack.length > 1;
+  // 'masters' isn't a page of its own (drawer links go straight to a
+  // master type), so it doesn't count as a level.
+  bool get _isDrilledDown => _stack.where((seg) => seg != 'masters').length > 1;
+
+  /// Tagline under a top-level section's title (like other module pages).
+  String? _sectionTagline(String seg) => switch (seg) {
+    'companies' => 'Manage your client companies',
+    'companyCategory' => 'Group companies by category',
+    _ => null,
+  };
 
   // AppRouter.companiesSection() appends a unique `#nonce` so every
   // navigation is a distinct `extra` value even for the identical section
@@ -220,16 +235,15 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
                 ),
               ),
             ),
-            title: _inMenuSub
+            // A single section reached from the drawer gets the plain
+            // module title + tagline; a real drill-down gets the breadcrumb.
+            title: !_inMenuSub
+                ? ModuleTitle(title: _navLabel(_navIndex))
+                : _isDrilledDown
                 ? _buildBreadcrumb(cs)
-                : Text(
-                    _navLabel(_navIndex),
-                    style: TextStyle(
-                      color: AppColors.ink,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.4,
-                    ),
+                : ModuleTitle(
+                    title: _segLabel(_stack.last),
+                    subtitle: _sectionTagline(_stack.last),
                   ),
             actions: [_buildAction(cs, isDark)],
           ),
@@ -437,7 +451,7 @@ class _CompaniesViewState extends ConsumerState<_CompaniesView> {
       // Attendance module disabled for now — uncomment to re-enable.
       // case 1: return const AttendanceBody();
       case 2:
-        return const ReportsBody();
+        return const SuperadminReportsHub();
       case 3:
         return const _MenuBody();
       default:
@@ -462,144 +476,165 @@ class _CompaniesListBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final companiesAsync = ref.watch(companiesProvider);
-    return companiesAsync.when(
-      loading: () =>
-          const SkeletonListView(padding: EdgeInsets.fromLTRB(14, 70, 14, 100)),
-      error: (e, _) => ErrorCard(
-        error: e,
-        onRetry: () => ref.invalidate(companiesProvider),
-      ),
-      data: (companies) {
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: AppColors.shadows([
-                          BoxShadow(
-                            color: AppColors.shadowDark.withValues(alpha: 0.06),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                          BoxShadow(
-                            color: AppColors.highlightShadow(0.85),
-                            blurRadius: 6,
-                            offset: const Offset(-3, -3),
-                          ),
-                        ]),
-                      ),
-                      child: TextField(
-                        controller: searchCtrl,
-                        style: TextStyle(color: AppColors.ink, fontSize: 13),
-                        decoration: InputDecoration(
-                          hintText: 'Search companies...',
-                          hintStyle: TextStyle(
-                            color: AppColors.textHint,
-                            fontSize: 13,
-                          ),
-                          prefixIcon: Icon(
-                            Icons.search_rounded,
-                            color: AppColors.textHint,
-                            size: 20,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 11,
-                          ),
+    final resultsAsync = ref.watch(companyResultsProvider);
+    // The search box and buttons always show; only the list below them
+    // switches to the skeleton (or the error) while loading.
+    final page = resultsAsync.valueOrNull;
+    final firstLoadFailed =
+        page == null && resultsAsync.hasError && !resultsAsync.isLoading;
+    {
+      final searching = ref.watch(companySearchProvider).trim().isNotEmpty;
+      final filters = ref.watch(companyFiltersProvider);
+      final companies = (page?.items ?? const <Company>[])
+          .where(filters.matches)
+          .toList();
+      final hasMore = page != null && page.items.length < page.total;
+      // The API total covers every match, not just the rows returned —
+      // unless an app-only filter (onboarding) narrowed them further.
+      final total = page == null
+          ? 0
+          : page.counts.isEmpty || filters.hasLocalOnly
+          ? companies.length
+          : page.total;
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: AppColors.shadows([
+                        BoxShadow(
+                          color: AppColors.shadowDark.withValues(alpha: 0.06),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
                         ),
-                        onChanged: (v) =>
-                            ref.read(companiesProvider.notifier).search(v),
-                      ),
+                        BoxShadow(
+                          color: AppColors.highlightShadow(0.85),
+                          blurRadius: 6,
+                          offset: const Offset(-3, -3),
+                        ),
+                      ]),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Tooltip(
-                    message: 'Deleted companies',
-                    child: GestureDetector(
-                      onTap: () => _showDeletedCompanies(context, ref),
-                      child: Container(
-                        width: 46,
-                        height: 46,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: AppColors.shadows([
-                            BoxShadow(
-                              color: AppColors.shadowDark.withValues(alpha: 0.06),
-                              blurRadius: 14,
-                              offset: const Offset(0, 6),
-                            ),
-                            BoxShadow(
-                              color: AppColors.highlightShadow(0.85),
-                              blurRadius: 6,
-                              offset: const Offset(-3, -3),
-                            ),
-                          ]),
+                    child: TextField(
+                      controller: searchCtrl,
+                      style: TextStyle(color: AppColors.ink, fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: 'Search companies...',
+                        hintStyle: TextStyle(
+                          color: AppColors.textHint,
+                          fontSize: 13,
                         ),
-                        child: const Icon(
-                          Icons.restore_from_trash_rounded,
-                          color: AppColors.brand,
+                        prefixIcon: Icon(
+                          Icons.search_rounded,
+                          color: AppColors.textHint,
                           size: 20,
                         ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 2, 14, 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Total Companies',
-                    style: TextStyle(color: AppColors.textHint, fontSize: 12.5),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.brand.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      companies.length.toString(),
-                      style: const TextStyle(
-                        color: AppColors.brand,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: companies.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No companies found',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        suffixIcon: searching
+                            ? IconButton(
+                                tooltip: 'Clear search',
+                                icon: Icon(
+                                  Icons.close_rounded,
+                                  color: AppColors.textHint,
+                                  size: 20,
+                                ),
+                                onPressed: () {
+                                  searchCtrl.clear();
+                                  ref
+                                          .read(companySearchProvider.notifier)
+                                          .state =
+                                      '';
+                                },
+                              )
+                            : null,
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 11,
                         ),
                       ),
-                    )
-                  : ListView.builder(
+                      onChanged: (v) =>
+                          ref.read(companySearchProvider.notifier).state = v,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                HeaderIconButton(
+                  tooltip: 'Filter by status',
+                  icon: Icons.filter_list_rounded,
+                  active: filters.count > 0,
+                  onTap: () => _showCompanyFilter(context, ref),
+                ),
+                const SizedBox(width: 10),
+                HeaderIconButton(
+                  tooltip: 'Deleted companies',
+                  icon: Icons.restore_from_trash_rounded,
+                  onTap: () => _showDeletedCompanies(context, ref),
+                ),
+              ],
+            ),
+          ),
+          ListCountBar(
+            label: 'Total Companies',
+            count: total,
+            padding: const EdgeInsets.fromLTRB(14, 2, 14, 10),
+          ),
+          Expanded(
+            // A search/filter/refresh in flight shows skeleton cards (the
+            // search box above stays usable). loadMore doesn't count — it
+            // has its own spinner at the end of the list.
+            child: firstLoadFailed
+                ? ErrorCard(
+                    error: resultsAsync.error!,
+                    onRetry: () => ref.invalidate(companyResultsProvider),
+                  )
+                : page == null || resultsAsync.isLoading
+                ? const SkeletonListView(
+                    padding: EdgeInsets.fromLTRB(14, 0, 14, 100),
+                  )
+                : companies.isEmpty
+                ? Center(
+                    child: Text(
+                      resultsAsync.hasError
+                          ? resultsAsync.error.toString()
+                          : filters.count == 0 && !searching
+                          ? 'No companies found'
+                          : 'No companies match these filters',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  )
+                // Near the bottom → fetch the next page of 50.
+                : NotificationListener<ScrollNotification>(
+                    onNotification: (n) {
+                      if (hasMore && n.metrics.extentAfter < 400) {
+                        ref.read(companyResultsProvider.notifier).loadMore();
+                      }
+                      return false;
+                    },
+                    child: ListView.builder(
                       padding: const EdgeInsets.fromLTRB(14, 0, 14, 100),
-                      itemCount: companies.length,
+                      itemCount: companies.length + (hasMore ? 1 : 0),
                       itemBuilder: (context, i) {
+                        if (i == companies.length) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: Center(
+                              child: SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
                         final c = companies[i];
                         return CompanyCard(
                           company: c,
@@ -607,7 +642,7 @@ class _CompaniesListBody extends ConsumerWidget {
                           onToggleStatus: () {
                             ref
                                 .read(companiesProvider.notifier)
-                                .toggleStatus(c.id)
+                                .toggleStatus(c)
                                 .then((err) {
                                   if (err != null && context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -619,7 +654,8 @@ class _CompaniesListBody extends ConsumerWidget {
                                   }
                                 });
                           },
-                          onDelete: () => _confirmDeleteCompany(context, ref, c),
+                          onDelete: () =>
+                              _confirmDeleteCompany(context, ref, c),
                           onView: () => _viewCompanyDetail(context, ref, c.id),
                           onEdit: () => context.push(
                             AppRouter.createCompany,
@@ -632,12 +668,31 @@ class _CompaniesListBody extends ConsumerWidget {
                         );
                       },
                     ),
-            ),
-          ],
-        );
-      },
-    );
+                  ),
+          ),
+        ],
+      );
+    }
   }
+}
+
+/// Opens the shared filter panel on this page's filter state.
+// ponytail: onboarding filters the loaded page only — move it to an API
+// query param if a company list ever outgrows one page.
+void _showCompanyFilter(BuildContext context, WidgetRef ref) {
+  final page = ref.read(companyResultsProvider).valueOrNull;
+  showCompanyFilterSheet(
+    context,
+    initial: ref.read(companyFiltersProvider),
+    companies: page?.items ?? const [],
+    serverOptions: page?.counts ?? const {},
+    onApply: (f) => ref.read(companyFiltersProvider.notifier).state = f,
+    onClear: () {
+      ref.read(companyFiltersProvider.notifier).state = const CompanyFilters();
+      // Reload even if no filter was applied before.
+      ref.invalidate(companyResultsProvider);
+    },
+  );
 }
 
 /// Lists soft-deleted companies with a Restore button each. A restored
@@ -656,9 +711,9 @@ void _showDeletedCompanies(BuildContext context, WidgetRef ref) {
     try {
       await notifier.restoreCompany(c.id);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('"${c.name}" restored')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('"${c.name}" restored')));
       }
       setSheet(() => future = notifier.fetchDeleted());
     } catch (e) {
@@ -787,11 +842,13 @@ Future<bool> _confirmDeleteCompany(
                 .read(companiesProvider.notifier)
                 .restoreCompany(company.id)
                 .catchError((Object e) {
-              messenger.showSnackBar(SnackBar(
-                content: Text(e.toString()),
-                backgroundColor: AppColors.dangerFill,
-              ));
-            }),
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text(e.toString()),
+                      backgroundColor: AppColors.dangerFill,
+                    ),
+                  );
+                }),
           ),
         ),
       );
@@ -866,7 +923,7 @@ void _showCompanyDetail(BuildContext context, WidgetRef ref, Company company) {
         onToggleStatus: () async {
           final err = await ref
               .read(companiesProvider.notifier)
-              .toggleStatus(company.id);
+              .toggleStatus(company);
           if (ctx.mounted) {
             Navigator.of(ctx).pop();
             if (err != null) {
@@ -884,6 +941,68 @@ void _showCompanyDetail(BuildContext context, WidgetRef ref, Company company) {
   );
 }
 
+/// The company's gallery photos as thumbnails; tap one to view full screen
+/// (swipe between them).
+class _CompanyPhotos extends StatelessWidget {
+  final List<String> urls;
+  const _CompanyPhotos({required this.urls});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Photos',
+          style: TextStyle(
+            color: AppColors.ink,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            for (var i = 0; i < urls.length; i++) ...[
+              if (i > 0) const SizedBox(width: 10),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => showImageViewer(context, urls, initialIndex: i),
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: Image.network(
+                        urls[i],
+                        fit: BoxFit.cover,
+                        loadingBuilder: (_, child, progress) => progress == null
+                            ? child
+                            : Container(color: AppColors.surface),
+                        errorBuilder: (_, _, _) => Container(
+                          color: AppColors.surface,
+                          child: Icon(
+                            Icons.broken_image_outlined,
+                            color: AppColors.textHint,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            // Keep thumbnails the same size when there are fewer than 3.
+            for (var i = urls.length; i < 3; i++) ...[
+              const SizedBox(width: 10),
+              const Expanded(child: SizedBox()),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class _CompanyDetailSheet extends StatelessWidget {
   final Company company;
   final VoidCallback onEdit;
@@ -899,6 +1018,15 @@ class _CompanyDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = company; // Company — all fields are typed with null safety
+    final hasLogo = c.logoUrl?.isNotEmpty == true;
+    final initials = Text(
+      c.initials,
+      style: const TextStyle(
+        color: AppColors.white,
+        fontWeight: FontWeight.w800,
+        fontSize: 16,
+      ),
+    );
     final isPending =
         c.onboardingStatus != null && c.onboardingStatus != 'completed';
     return DraggableScrollableSheet(
@@ -930,32 +1058,40 @@ class _CompanyDetailSheet extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(18, 8, 18, 16),
                 child: Row(
                   children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [AppColors.brand, AppColors.brandDeep],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: AppColors.shadows([
-                          BoxShadow(
-                            color: AppColors.brand.withValues(alpha: 0.35),
-                            blurRadius: 12,
-                            offset: const Offset(0, 5),
+                    GestureDetector(
+                      onTap: hasLogo
+                          ? () => showImageViewer(context, [c.logoUrl!])
+                          : null,
+                      child: Container(
+                        width: 52,
+                        height: 52,
+                        alignment: Alignment.center,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [AppColors.brand, AppColors.brandDeep],
                           ),
-                        ]),
-                      ),
-                      child: Text(
-                        c.initials,
-                        style: const TextStyle(
-                          color: AppColors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: AppColors.shadows([
+                            BoxShadow(
+                              color: AppColors.brand.withValues(alpha: 0.35),
+                              blurRadius: 12,
+                              offset: const Offset(0, 5),
+                            ),
+                          ]),
                         ),
+                        child: hasLogo
+                            ? Image.network(
+                                c.logoUrl!,
+                                width: 52,
+                                height: 52,
+                                fit: BoxFit.cover,
+                                // Unreachable image → fall back to initials.
+                                errorBuilder: (_, _, _) => initials,
+                              )
+                            : initials,
                       ),
                     ),
                     const SizedBox(width: 14),
@@ -1091,6 +1227,10 @@ class _CompanyDetailSheet extends StatelessWidget {
                   controller: controller,
                   padding: const EdgeInsets.fromLTRB(18, 0, 18, 32),
                   children: [
+                    if (c.galleryUrls.isNotEmpty) ...[
+                      _CompanyPhotos(urls: c.galleryUrls),
+                      const SizedBox(height: 18),
+                    ],
                     _DetailSection(
                       title: 'Contact Information',
                       items: [
@@ -1466,12 +1606,14 @@ class _MenuBodyState extends State<_MenuBody> {
               color: AppColors.brand,
               onTap: () => context.push(AppRouter.security),
             ),
-            _MenuItem(
-              icon: Icons.help_rounded,
-              label: 'Support',
-              color: AppColors.positive,
-              onTap: () => context.push(AppRouter.support),
-            ),
+            // Company users only — superadmin manages tickets from the menu.
+            if (!Session.isSuperAdmin)
+              _MenuItem(
+                icon: Icons.help_rounded,
+                label: 'Support',
+                color: AppColors.positive,
+                onTap: () => context.push(AppRouter.support),
+              ),
           ],
         ),
         const SizedBox(height: 12),
@@ -1485,6 +1627,14 @@ class _MenuBodyState extends State<_MenuBody> {
         // ── Logout ────────────────────────────────────────────────
         GestureDetector(
           onTap: () async {
+            final ok = await showConfirmDialog(
+              context,
+              title: 'Log out?',
+              message: 'Are you sure you want to log out of Brixen?',
+              confirmLabel: 'Log out',
+              isDestructive: true,
+            );
+            if (!ok) return;
             await authCubit.signOut();
             if (context.mounted) context.go(AppRouter.signIn);
           },
@@ -1864,17 +2014,34 @@ class _MasterItemsBodyState extends State<_MasterItemsBody> {
     return BlocBuilder<MasterCubit, MasterState>(
       bloc: masterCubit,
       builder: (context, state) {
-        if (state is MasterError) {
-          return Center(
-            child: Text(
-              state.message,
-              style: TextStyle(color: cs.onSurfaceVariant),
-            ),
-          );
-        }
+        // Search bar stays put while loading / on error — only the list
+        // area below it changes.
+        final searchBar = Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+          // Shared search box — includes the ✕ that clears the query.
+          child: SearchField(
+            controller: _searchCtrl,
+            hintText: 'Search ${typeCfg?.name ?? 'items'}...',
+            onChanged: masterCubit.search,
+          ),
+        );
         if (state is! MasterLoaded) {
-          return const SkeletonListView(
-            padding: EdgeInsets.fromLTRB(14, 70, 14, 100),
+          return Column(
+            children: [
+              searchBar,
+              Expanded(
+                child: state is MasterError
+                    ? Center(
+                        child: Text(
+                          state.message,
+                          style: TextStyle(color: cs.onSurfaceVariant),
+                        ),
+                      )
+                    : const SkeletonListView(
+                        padding: EdgeInsets.fromLTRB(14, 4, 14, 100),
+                      ),
+              ),
+            ],
           );
         }
 
@@ -1906,48 +2073,7 @@ class _MasterItemsBodyState extends State<_MasterItemsBody> {
 
         return Column(
           children: [
-            // Search bar
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
-              child: Container(
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: AppColors.shadows([
-                    BoxShadow(
-                      color: AppColors.shadowDark.withValues(alpha: 0.06),
-                      blurRadius: 14,
-                      offset: const Offset(0, 6),
-                    ),
-                    BoxShadow(
-                      color: AppColors.highlightShadow(0.85),
-                      blurRadius: 6,
-                      offset: const Offset(-3, -3),
-                    ),
-                  ]),
-                ),
-                child: TextField(
-                  controller: _searchCtrl,
-                  style: TextStyle(color: AppColors.ink, fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: 'Search ${typeCfg?.name ?? 'items'}...',
-                    hintStyle: TextStyle(
-                      color: AppColors.textHint,
-                      fontSize: 14,
-                    ),
-                    prefixIcon: Icon(
-                      Icons.search_rounded,
-                      color: AppColors.textHint,
-                      size: 20,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 13),
-                  ),
-                  onChanged: masterCubit.search,
-                ),
-              ),
-            ),
+            searchBar,
 
             // Category filter chips (only for assignable types)
             if (_hasCategories && categoryMap.isNotEmpty)
@@ -2464,7 +2590,12 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
   String? _loadError;
   String? _selectedCategoryId;
   String? _selectedCategoryName;
-  Company? _selectedCompany; // superAdmin only — companyAdmin/employee use Session.companyId
+  Company?
+  _selectedCompany; // superAdmin only — companyAdmin/employee use Session.companyId
+
+  /// Company Category is one global list (picked when creating a company),
+  /// so it has no owning company; every other master belongs to one.
+  bool get _perCompany => widget.typeKey != 'companyCategory';
 
   bool get _isEdit => widget.editId != null;
   bool get _needsCategory =>
@@ -2511,7 +2642,10 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
   Future<void> _loadItemFromApi() async {
     setState(() => _loadingItem = true);
     try {
-      final item = await masterCubit.fetchByIdRemote(widget.typeKey, widget.editId!);
+      final item = await masterCubit.fetchByIdRemote(
+        widget.typeKey,
+        widget.editId!,
+      );
       if (!mounted) return;
       setState(() => _fillFrom(item));
     } catch (e) {
@@ -2537,9 +2671,15 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
       );
       return;
     }
-    if (!_isEdit && Session.isSuperAdmin && _selectedCompany == null) {
+    if (!_isEdit &&
+        _perCompany &&
+        Session.isSuperAdmin &&
+        _selectedCompany == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a company'), backgroundColor: AppColors.dangerFill),
+        const SnackBar(
+          content: Text('Please select a company'),
+          backgroundColor: AppColors.dangerFill,
+        ),
       );
       return;
     }
@@ -2579,7 +2719,11 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
             assignedCategoryId: _selectedCategoryId,
             assignedCategoryName: _selectedCategoryName,
           ),
-          companyId: (Session.isSuperAdmin ? _selectedCompany!.id : Session.companyId)!,
+          companyId: !_perCompany
+              ? null
+              : (Session.isSuperAdmin
+                    ? _selectedCompany!.id
+                    : Session.companyId)!,
         );
       }
       if (mounted) widget.onSaved();
@@ -2622,7 +2766,7 @@ class _MasterFormBodyState extends State<_MasterFormBody> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
               children: [
-                if (!_isEdit && Session.isSuperAdmin) ...[
+                if (!_isEdit && _perCompany && Session.isSuperAdmin) ...[
                   CompanySelectorField(
                     value: _selectedCompany,
                     onChanged: (c) => setState(() => _selectedCompany = c),
@@ -3031,10 +3175,8 @@ class _DashboardBody extends ConsumerWidget {
       loading: () => const Center(
         child: CircularProgressIndicator(color: AppColors.silver),
       ),
-      error: (e, _) => ErrorCard(
-        error: e,
-        onRetry: () => ref.invalidate(companiesProvider),
-      ),
+      error: (e, _) =>
+          ErrorCard(error: e, onRetry: () => ref.invalidate(companiesProvider)),
       data: (all) {
         final active = all.where((c) => c.isActive).length;
 
@@ -3812,7 +3954,7 @@ class _RecentRow extends StatelessWidget {
               style: TextStyle(
                 color: company.isActive
                     ? AppColors.accentEmerald
-                    : AppColors.accentRose,
+                    : AppColors.ink,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),

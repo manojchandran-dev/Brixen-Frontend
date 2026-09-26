@@ -43,9 +43,20 @@ flutter:
     - assets/images/
 
   fonts:
-    - family: SpaceGrotesk
+    # Inter (SIL OFL 1.1 — assets/fonts/Inter-OFL.txt), the app-wide font
+    # set in AppTheme. Other weights snap to the nearest of these.
+    - family: Inter
       fonts:
-        - asset: assets/fonts/SpaceGrotesk-VariableFont_wght.ttf
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Inter-ExtraBold.ttf
+          weight: 800
 
 flutter_launcher_icons:
   android: true

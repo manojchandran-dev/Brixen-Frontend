@@ -8,6 +8,7 @@ import '../../core/theme/theme_cubit.dart';
 import '../../features/auth/domain/entities/user_role.dart';
 import '../../features/auth/presentation/cubit/auth_cubit.dart';
 import 'account_switcher_sheet.dart';
+import 'confirm_dialog.dart';
 
 String _profileDisplayName() {
   switch (Session.role) {
@@ -186,12 +187,14 @@ class _AppMenuBodyState extends State<AppMenuBody> {
               color: AppColors.brand,
               onTap: () => context.push(AppRouter.security),
             ),
-            _MenuItem(
-              icon: Icons.help_rounded,
-              label: 'Support',
-              color: AppColors.positive,
-              onTap: () => context.push(AppRouter.support),
-            ),
+            // Company users only — superadmin manages tickets from the menu.
+            if (!Session.isSuperAdmin)
+              _MenuItem(
+                icon: Icons.help_rounded,
+                label: 'Support',
+                color: AppColors.positive,
+                onTap: () => context.push(AppRouter.support),
+              ),
           ],
         ),
         const SizedBox(height: 12),
@@ -205,6 +208,14 @@ class _AppMenuBodyState extends State<AppMenuBody> {
         // ── Logout ────────────────────────────────────────────────
         GestureDetector(
           onTap: () async {
+            final ok = await showConfirmDialog(
+              context,
+              title: 'Log out?',
+              message: 'Are you sure you want to log out of Brixen?',
+              confirmLabel: 'Log out',
+              isDestructive: true,
+            );
+            if (!ok) return;
             await authCubit.signOut();
             if (context.mounted) context.go(AppRouter.signIn);
           },

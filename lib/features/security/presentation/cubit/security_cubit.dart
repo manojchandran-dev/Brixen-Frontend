@@ -23,12 +23,14 @@ class SecurityCubit extends Cubit<SecurityState> {
     try {
       bioAvailable = await _localAuth.canCheckBiometrics;
     } catch (_) {}
-    emit(state.copyWith(
-      isPinEnabled: pinEnabled,
-      isBiometricEnabled: bioEnabled,
-      isBiometricAvailable: bioAvailable,
-      status: SecurityStatus.ready,
-    ));
+    emit(
+      state.copyWith(
+        isPinEnabled: pinEnabled,
+        isBiometricEnabled: bioEnabled,
+        isBiometricAvailable: bioAvailable,
+        status: SecurityStatus.ready,
+      ),
+    );
   }
 
   /// Saves PIN locally first (lock screen works immediately), then syncs the
@@ -109,6 +111,22 @@ class SecurityCubit extends Cubit<SecurityState> {
     } catch (_) {
       return false;
     }
+  }
+
+  /// Forgot PIN, last step: set [pin] on the server with the OTP's reset
+  /// token, store the fresh session, and cache the PIN for offline unlock.
+  Future<void> resetForgottenPin(String resetToken, String pin) async {
+    final result = await pinRemoteDatasource.resetPin(
+      resetToken: resetToken,
+      pin: pin,
+    );
+    await TokenService.save(
+      token: result['token']!,
+      role: result['role'] ?? TokenService.role ?? 'employee',
+      refreshToken: result['refreshToken'],
+    );
+    await _src.savePin(pin);
+    emit(state.copyWith(isPinEnabled: true));
   }
 
   Future<bool> isLockActive() => _src.isPinEnabled();

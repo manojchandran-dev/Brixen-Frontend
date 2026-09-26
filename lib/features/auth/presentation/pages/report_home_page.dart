@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/services/session_service.dart';
 import '../../../../core/theme/theme_cubit.dart';
 import '../../../../features/reports/presentation/pages/company_reports_body.dart';
-import '../../../../features/reports/presentation/pages/reports_body.dart';
+import '../../../../features/reports/presentation/superadmin/superadmin_reports_hub.dart';
 import '../../../../shared/widgets/app_shell.dart';
 import '../../../../shared/widgets/coming_soon_view.dart';
 import '../../../../shared/widgets/page_header_bar.dart';
@@ -52,7 +52,7 @@ class _ReportHomePageState extends State<ReportHomePage> {
           PageHeaderBar(title: 'Reports'),
           Expanded(
             child: switch (Session.role) {
-              UserRole.superAdmin => ReportsBody(),
+              UserRole.superAdmin => const SuperadminReportsHub(),
               UserRole.companyAdmin => CompanyReportsBody(),
               UserRole.employee => ComingSoonView(
                   icon: Icons.bar_chart_rounded,

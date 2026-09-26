@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_colors.dart';
+import 'chip_filter_sheet.dart';
 
 /// App-bar button that opens a "Deleted …" sheet for a soft-deleted resource:
 /// lists `GET [listPath]?deleted=true` and restores via
@@ -20,6 +21,10 @@ class DeletedItemsButton extends ConsumerWidget {
   /// Refresh the screen's own list after a restore.
   final VoidCallback onRestored;
 
+  /// true: the square button used beside a search box (next to a filter
+  /// button); false: the smaller app-bar button.
+  final bool inline;
+
   const DeletedItemsButton({
     super.key,
     required this.title,
@@ -28,10 +33,18 @@ class DeletedItemsButton extends ConsumerWidget {
     required this.labelOf,
     this.subtitleOf,
     required this.onRestored,
+    this.inline = false,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (inline) {
+      return HeaderIconButton(
+        tooltip: title,
+        icon: Icons.restore_from_trash_rounded,
+        onTap: () => _open(context, ref.read(dioProvider)),
+      );
+    }
     return Tooltip(
       message: title,
       child: GestureDetector(
@@ -46,7 +59,11 @@ class DeletedItemsButton extends ConsumerWidget {
             borderRadius: BorderRadius.circular(13),
             border: Border.all(color: AppColors.border),
           ),
-          child: const Icon(Icons.restore_from_trash_rounded, size: 19, color: AppColors.brand),
+          child: const Icon(
+            Icons.restore_from_trash_rounded,
+            size: 19,
+            color: AppColors.brand,
+          ),
         ),
       ),
     );
@@ -54,7 +71,10 @@ class DeletedItemsButton extends ConsumerWidget {
 
   Future<List<Map<String, dynamic>>> _load(Dio dio) async {
     try {
-      final resp = await dio.get(listPath, queryParameters: {'deleted': 'true', 'limit': 100});
+      final resp = await dio.get(
+        listPath,
+        queryParameters: {'deleted': 'true', 'limit': 100},
+      );
       final data = resp.data['data'] ?? resp.data;
       final list = data is List ? data : (data['items'] as List? ?? const []);
       return list.cast<Map<String, dynamic>>();
@@ -83,9 +103,13 @@ class DeletedItemsButton extends ConsumerWidget {
             try {
               // The item's own company, not the list filter: a superadmin
               // browsing "All companies" has no company_id to send otherwise.
-              await dio.post(key, queryParameters: {
-                if (item['company_id'] != null) 'company_id': item['company_id'].toString(),
-              });
+              await dio.post(
+                key,
+                queryParameters: {
+                  if (item['company_id'] != null)
+                    'company_id': item['company_id'].toString(),
+                },
+              );
               onRestored();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -95,10 +119,14 @@ class DeletedItemsButton extends ConsumerWidget {
               if (sheetCtx.mounted) setSheet(() => future = _load(dio));
             } catch (e) {
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(e is DioException ? mapDioError(e).message : e.toString()),
-                  backgroundColor: AppColors.dangerFill,
-                ));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      e is DioException ? mapDioError(e).message : e.toString(),
+                    ),
+                    backgroundColor: AppColors.dangerFill,
+                  ),
+                );
               }
             } finally {
               restoring.remove(key);
@@ -108,7 +136,9 @@ class DeletedItemsButton extends ConsumerWidget {
 
           return SafeArea(
             child: ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: MediaQuery.of(sheetCtx).size.height * 0.8),
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(sheetCtx).size.height * 0.8,
+              ),
               child: FutureBuilder<List<Map<String, dynamic>>>(
                 future: future,
                 builder: (_, snap) {
@@ -117,7 +147,10 @@ class DeletedItemsButton extends ConsumerWidget {
                   if (snap.connectionState != ConnectionState.done) {
                     body = const DeletedSheetMessage.loading();
                   } else if (snap.hasError) {
-                    body = DeletedSheetMessage(icon: Icons.cloud_off_rounded, text: snap.error.toString());
+                    body = DeletedSheetMessage(
+                      icon: Icons.cloud_off_rounded,
+                      text: snap.error.toString(),
+                    );
                   } else if (items!.isEmpty) {
                     body = const DeletedSheetMessage(
                       icon: Icons.delete_outline_rounded,
@@ -182,10 +215,16 @@ class DeletedSheetHeader extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [AppColors.brand, AppColors.brandDeep]),
+              gradient: const LinearGradient(
+                colors: [AppColors.brand, AppColors.brandDeep],
+              ),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.restore_from_trash_rounded, color: Colors.white, size: 20),
+            child: const Icon(
+              Icons.restore_from_trash_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -198,27 +237,41 @@ class DeletedSheetHeader extends StatelessWidget {
                       child: Text(
                         title,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: AppColors.ink, fontSize: 16.5, fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     if (count != null && count! > 0) ...[
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.brand.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
                           '$count',
-                          style: const TextStyle(color: AppColors.brand, fontSize: 11.5, fontWeight: FontWeight.w800),
+                          style: const TextStyle(
+                            color: AppColors.brand,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
                     ],
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text(subtitle, style: TextStyle(color: AppColors.textHint, fontSize: 11.5)),
+                Text(
+                  subtitle,
+                  style: TextStyle(color: AppColors.textHint, fontSize: 11.5),
+                ),
               ],
             ),
           ),
@@ -237,10 +290,12 @@ class DeletedSheetHeader extends StatelessWidget {
 class DeletedSheetMessage extends StatelessWidget {
   final IconData? icon;
   final String text;
-  const DeletedSheetMessage({super.key, required IconData this.icon, required this.text});
-  const DeletedSheetMessage.loading({super.key})
-      : icon = null,
-        text = '';
+  const DeletedSheetMessage({
+    super.key,
+    required IconData this.icon,
+    required this.text,
+  });
+  const DeletedSheetMessage.loading({super.key}) : icon = null, text = '';
 
   @override
   Widget build(BuildContext context) {
@@ -291,9 +346,15 @@ class DeletedItemTile extends StatelessWidget {
   });
 
   String get _initials {
-    final words = title.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    final words = title
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .toList();
     if (words.isEmpty) return '?';
-    if (words.length == 1) return words[0].substring(0, words[0].length.clamp(0, 2)).toUpperCase();
+    if (words.length == 1) {
+      return words[0].substring(0, words[0].length.clamp(0, 2)).toUpperCase();
+    }
     return '${words[0][0]}${words[1][0]}'.toUpperCase();
   }
 
@@ -320,7 +381,11 @@ class DeletedItemTile extends StatelessWidget {
             ),
             child: Text(
               _initials,
-              style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w800, fontSize: 14),
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -332,7 +397,11 @@ class DeletedItemTile extends StatelessWidget {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: AppColors.ink, fontSize: 14.5, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 if (subtitle != null && subtitle!.isNotEmpty) ...[
                   const SizedBox(height: 3),
@@ -340,7 +409,11 @@ class DeletedItemTile extends StatelessWidget {
                     subtitle!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 11.5, letterSpacing: 0.3),
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11.5,
+                      letterSpacing: 0.3,
+                    ),
                   ),
                 ],
               ],
@@ -355,18 +428,31 @@ class DeletedItemTile extends StatelessWidget {
                 backgroundColor: AppColors.brand,
                 disabledBackgroundColor: AppColors.brand.withValues(alpha: 0.5),
                 padding: const EdgeInsets.symmetric(horizontal: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               icon: busy
                   ? const SizedBox(
                       width: 14,
                       height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
-                  : const Icon(Icons.restore_rounded, size: 17, color: Colors.white),
+                  : const Icon(
+                      Icons.restore_rounded,
+                      size: 17,
+                      color: Colors.white,
+                    ),
               label: const Text(
                 'Restore',
-                style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),

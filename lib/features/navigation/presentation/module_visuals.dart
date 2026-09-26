@@ -35,15 +35,9 @@ ModuleVisual moduleVisualFor(String name) {
         AppColors.brandLight,
       );
     case 'customers':
-      return const ModuleVisual(
-        Icons.people_alt_rounded,
-        AppColors.brandLight,
-      );
+      return const ModuleVisual(Icons.people_alt_rounded, AppColors.brandLight);
     case 'expenses':
-      return const ModuleVisual(
-        Icons.receipt_outlined,
-        AppColors.brandBlack,
-      );
+      return const ModuleVisual(Icons.receipt_outlined, AppColors.brandBlack);
     case 'products':
       return const ModuleVisual(Icons.checkroom_rounded, AppColors.brand);
     case 'companycategory':
@@ -52,27 +46,40 @@ ModuleVisual moduleVisualFor(String name) {
       return const ModuleVisual(Icons.sell_rounded, AppColors.positive);
     case 'units':
     case 'unit':
-      return const ModuleVisual(
-        Icons.straighten_rounded,
-        AppColors.brandDeep,
-      );
+      return const ModuleVisual(Icons.straighten_rounded, AppColors.brandDeep);
     case 'productcategory':
-      return const ModuleVisual(
-        Icons.checkroom_outlined,
-        AppColors.brandLight,
-      );
+      return const ModuleVisual(Icons.checkroom_outlined, AppColors.brandLight);
     case 'notifications':
     case 'pushnotifications':
-      return const ModuleVisual(Icons.notifications_active_rounded, AppColors.brand);
+      return const ModuleVisual(
+        Icons.notifications_active_rounded,
+        AppColors.brand,
+      );
     case 'announcements':
       return const ModuleVisual(Icons.campaign_rounded, AppColors.brandDeep);
     case 'chat':
     case 'chatbot':
-      return const ModuleVisual(Icons.chat_bubble_outline_rounded, AppColors.brandDeep);
+      return const ModuleVisual(
+        Icons.chat_bubble_outline_rounded,
+        AppColors.brandDeep,
+      );
     case 'support':
     case 'supportticket':
     case 'supporttickets':
-      return const ModuleVisual(Icons.support_agent_rounded, AppColors.positive);
+      return const ModuleVisual(
+        Icons.support_agent_rounded,
+        AppColors.positive,
+      );
+    case 'dashboard':
+      return const ModuleVisual(Icons.dashboard_rounded, AppColors.brand);
+    case 'reports':
+    case 'report':
+      return const ModuleVisual(Icons.bar_chart_rounded, AppColors.positive);
+    case 'attendance':
+      return const ModuleVisual(Icons.access_time_rounded, AppColors.brandDeep);
+    case 'more':
+    case 'menu':
+      return const ModuleVisual(Icons.apps_rounded, AppColors.brandDeep);
     default:
       return ModuleVisual(Icons.widgets_outlined, AppColors.textHint);
   }

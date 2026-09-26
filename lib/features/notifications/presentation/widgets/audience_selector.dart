@@ -40,7 +40,7 @@ class AudienceSelector extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Text(
           'Could not load companies: $e',
-          style: TextStyle(color: AppColors.accentRose, fontSize: 12.5),
+          style: TextStyle(color: AppColors.ink, fontSize: 12.5),
         ),
       ),
       data: (companies) => _buildBody(context, companies),

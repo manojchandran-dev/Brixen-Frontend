@@ -19,15 +19,16 @@ class Session {
   // What `GET /api/v1/modules?employee_id=...` expects for an `employee`
   // session — falls back to the generic login id if the response didn't
   // carry a distinct employee id.
-  static String? get employeeId => TokenService.employeeId ?? TokenService.userId;
+  static String? get employeeId =>
+      TokenService.employeeId ?? TokenService.userId;
 
   /// The company id to send on a create/update call. For a superAdmin this
   /// is null — the caller must supply one via a company picker instead.
-  static String? get companyId        => TokenService.companyId;
-  static String? get companyName      => TokenService.companyName;
-  static String? get companyCode      => TokenService.companyCode;
-  static String? get ownerName        => TokenService.ownerName;
+  static String? get companyId => TokenService.companyId;
+  static String? get companyName => TokenService.companyName;
+  static String? get companyCode => TokenService.companyCode;
+  static String? get ownerName => TokenService.ownerName;
   static String? get subscriptionPlan => TokenService.subscriptionPlan;
   static String? get onboardingStatus => TokenService.onboardingStatus;
-  static String? get companyStatus    => TokenService.companyStatus;
+  static String? get companyStatus => TokenService.companyStatus;
 }

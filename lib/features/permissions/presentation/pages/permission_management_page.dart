@@ -3,14 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/app_bottom_nav.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/error_state.dart';
 import '../../../../shared/widgets/rich_card_shell.dart';
 import '../../../../shared/widgets/skeleton.dart';
 import '../../../companies/domain/entities/company.dart';
 import '../../../companies/presentation/providers/companies_provider.dart';
-import '../../domain/entities/module_permission.dart';
+import '../../../companies/presentation/widgets/company_filter_sheet.dart';
 import '../providers/permissions_provider.dart';
+import '../../../../shared/widgets/list_count_bar.dart';
+import '../../../../shared/widgets/module_title.dart';
 
 /// List of companies with their module-access summary — same list/create/
 /// edit/delete shape as every other module (Products, Employees, ...).
@@ -35,11 +38,19 @@ class _PermissionManagementPageState
 
   @override
   Widget build(BuildContext context) {
-    final companiesAsync = ref.watch(companiesProvider);
+    // GET /permissions/companies: search, filters, paging and each
+    // company's Full/Custom/None counts all come from the server.
+    final resultsAsync = ref.watch(permissionCompaniesProvider);
+    final page = resultsAsync.valueOrNull;
+    final filters = ref.watch(permissionFiltersProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       drawer: const AppDrawer(),
+      // AppBottomNav fills the Scaffold height (its pill is Align-ed to the
+      // bottom) — without extendBody the body gets zero height.
+      extendBody: true,
+      bottomNavigationBar: const AppBottomNav(activeIndex: 3),
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
@@ -50,13 +61,9 @@ class _PermissionManagementPageState
             child: Icon(Icons.menu_rounded, color: AppColors.ink),
           ),
         ),
-        title: Text(
-          'Permissions',
-          style: TextStyle(
-            color: AppColors.ink,
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
-          ),
+        title: ModuleTitle(
+          title: 'Permissions',
+          subtitle: 'Module access for each company',
         ),
         actions: [
           GestureDetector(
@@ -72,7 +79,11 @@ class _PermissionManagementPageState
                 ),
                 borderRadius: BorderRadius.circular(13),
               ),
-              child: const Icon(Icons.add_rounded, size: 20, color: AppColors.white),
+              child: const Icon(
+                Icons.add_rounded,
+                size: 20,
+                color: AppColors.white,
+              ),
             ),
           ),
         ],
@@ -81,66 +92,153 @@ class _PermissionManagementPageState
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: Container(
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: AppColors.shadows([
-                  BoxShadow(
-                    color: AppColors.shadowDark.withValues(alpha: 0.06),
-                    blurRadius: 14,
-                    offset: const Offset(0, 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: AppColors.shadows([
+                        BoxShadow(
+                          color: AppColors.shadowDark.withValues(alpha: 0.06),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                      ]),
+                    ),
+                    child: TextField(
+                      controller: _searchCtrl,
+                      onChanged: (v) {
+                        ref.read(permissionSearchProvider.notifier).state = v;
+                        setState(() {}); // show/hide the ✕
+                      },
+                      style: TextStyle(color: AppColors.ink, fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'Search company…',
+                        hintStyle: TextStyle(
+                          color: AppColors.textHint,
+                          fontSize: 14,
+                        ),
+                        prefixIcon: Icon(
+                          Icons.search_rounded,
+                          color: AppColors.textHint,
+                          size: 20,
+                        ),
+                        suffixIcon: _searchCtrl.text.isEmpty
+                            ? null
+                            : IconButton(
+                                tooltip: 'Clear search',
+                                icon: Icon(
+                                  Icons.close_rounded,
+                                  color: AppColors.textHint,
+                                  size: 20,
+                                ),
+                                onPressed: () => setState(() {
+                                  _searchCtrl.clear();
+                                  ref
+                                          .read(
+                                            permissionSearchProvider.notifier,
+                                          )
+                                          .state =
+                                      '';
+                                }),
+                              ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 13,
+                        ),
+                      ),
+                    ),
                   ),
-                ]),
-              ),
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (_) => setState(() {}),
-                style: TextStyle(color: AppColors.ink, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Search company…',
-                  hintStyle: TextStyle(color: AppColors.textHint, fontSize: 14),
-                  prefixIcon: Icon(Icons.search_rounded, color: AppColors.textHint, size: 20),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 13),
                 ),
-              ),
+                const SizedBox(width: 10),
+                HeaderIconButton(
+                  tooltip: 'Filter companies',
+                  icon: Icons.filter_list_rounded,
+                  active: filters.count > 0,
+                  onTap: () => showCompanyFilterSheet(
+                    context,
+                    initial: filters,
+                    companies: page?.items ?? const [],
+                    serverOptions: page?.counts ?? const {},
+                    onApply: (f) =>
+                        ref.read(permissionFiltersProvider.notifier).state = f,
+                    onClear: () {
+                      ref.read(permissionFiltersProvider.notifier).state =
+                          const CompanyFilters();
+                      ref.invalidate(permissionCompaniesProvider);
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
+          ListCountBar(label: 'Total Companies', count: page?.total ?? 0),
           Expanded(
-            child: companiesAsync.when(
-              loading: () => const SkeletonListView(),
-              error: (e, _) => ErrorCard(
-                error: e,
-                onRetry: () => ref.invalidate(companiesProvider),
-              ),
-              data: (companies) {
-                final q = _searchCtrl.text.trim().toLowerCase();
-                final filtered = q.isEmpty
-                    ? companies
-                    : companies
-                        .where((c) => c.name.toLowerCase().contains(q))
-                        .toList();
-
-                if (filtered.isEmpty) {
-                  return Center(
+            child: page == null
+                // First load: skeleton, or the error if it failed.
+                ? (resultsAsync.hasError && !resultsAsync.isLoading
+                      ? ErrorCard(
+                          error: resultsAsync.error!,
+                          onRetry: () =>
+                              ref.invalidate(permissionCompaniesProvider),
+                        )
+                      : const SkeletonListView())
+                // A search/filter/refresh in flight: skeleton; the search
+                // box above stays usable.
+                : resultsAsync.isLoading
+                ? const SkeletonListView()
+                : page.items.isEmpty
+                ? Center(
                     child: Text(
-                      companies.isEmpty ? 'No companies yet' : 'No results',
+                      resultsAsync.hasError
+                          ? resultsAsync.error.toString()
+                          : filters.count > 0
+                          ? 'No companies match these filters'
+                          : _searchCtrl.text.trim().isNotEmpty
+                          ? 'No results'
+                          : 'No companies yet',
                       style: TextStyle(color: AppColors.textHint, fontSize: 14),
                     ),
-                  );
-                }
-
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) =>
-                      _CompanyPermissionCard(company: filtered[i]),
-                );
-              },
-            ),
+                  )
+                // Near the bottom → fetch the next page of 50.
+                : NotificationListener<ScrollNotification>(
+                    onNotification: (n) {
+                      if (page.items.length < page.total &&
+                          n.metrics.extentAfter < 400) {
+                        ref
+                            .read(permissionCompaniesProvider.notifier)
+                            .loadMore();
+                      }
+                      return false;
+                    },
+                    child: ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                      itemCount:
+                          page.items.length +
+                          (page.items.length < page.total ? 1 : 0),
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (_, i) => i == page.items.length
+                          ? const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Center(
+                                child: SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : _CompanyPermissionCard(
+                              company: page.items[i],
+                              index: i,
+                            ),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -150,14 +248,27 @@ class _PermissionManagementPageState
 
 class _CompanyPermissionCard extends ConsumerWidget {
   final Company company;
-  const _CompanyPermissionCard({required this.company});
+  final int index;
+  const _CompanyPermissionCard({required this.company, this.index = 0});
+
+  // Same accent cycle as the Employees / Products cards.
+  static const _accents = [
+    AppColors.brand,
+    AppColors.positive,
+    AppColors.brandDeep,
+    AppColors.brandLight,
+    AppColors.brandBlack,
+  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final permissions = ref.watch(permissionsProvider(company.id)).valueOrNull ?? [];
-    final fullCount = permissions.where((m) => m.accessLevel == AccessLevel.full).length;
-    final customCount = permissions.where((m) => m.accessLevel == AccessLevel.custom).length;
-    final noneCount = permissions.where((m) => m.accessLevel == AccessLevel.none).length;
+    // From GET /permissions/companies — no per-company request.
+    final access = company.access ?? const AccessCounts();
+    final fullCount = access.full;
+    final customCount = access.custom;
+    final noneCount = access.none;
+    final total = access.total;
+    final accent = _accents[index % _accents.length];
 
     return SwipeActions(
       onTap: () => context.push(AppRouter.createPermission, extra: company),
@@ -176,69 +287,161 @@ class _CompanyPermissionCard extends ConsumerWidget {
         ),
       ],
       child: RichCardShell(
-        accentColor: AppColors.brand,
+        accentColor: accent,
+        backgroundColor: Color.lerp(
+          AppColors.surface,
+          accent,
+          AppColors.cardTintBlend(accent),
+        ),
+        backgroundGradient: AppColors.cardTintGradient(accent),
+        edgeColor: accent,
         showAccentBar: false,
         child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
+          padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: AppColors.accentGradient(AppColors.brand),
-                  ),
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: Text(
-                  company.initials,
-                  style: const TextStyle(
-                    color: AppColors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      company.name,
-                      style: TextStyle(
-                        color: AppColors.ink,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14.5,
+              Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: AppColors.accentGradient(accent),
                       ),
-                      overflow: TextOverflow.ellipsis,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: AppColors.shadows([
+                        BoxShadow(
+                          color: accent.withValues(alpha: 0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Owner: ${company.ownerName}',
+                    child: Text(
+                      company.initials,
                       style: const TextStyle(
-                        color: AppColors.positive,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                        color: AppColors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 8),
-                    Row(
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _CountChip(count: fullCount, label: 'Full', color: AppColors.positive),
-                        const SizedBox(width: 6),
-                        _CountChip(count: customCount, label: 'Custom', color: AppColors.brand),
-                        const SizedBox(width: 6),
-                        _CountChip(count: noneCount, label: 'None', color: AppColors.textHint),
+                        Text(
+                          company.name,
+                          style: TextStyle(
+                            color: AppColors.ink,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.person_outline_rounded,
+                              size: 14,
+                              color: AppColors.ink.withValues(alpha: 0.5),
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                company.ownerName.isEmpty
+                                    ? 'No owner'
+                                    : company.ownerName,
+                                style: TextStyle(
+                                  color: AppColors.ink.withValues(alpha: 0.6),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: accent,
+                    ),
+                  ),
+                ],
               ),
-              Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textHint),
+              const SizedBox(height: 12),
+              // Access at a glance: one segment per level, sized by count.
+              if (total > 0)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: SizedBox(
+                    height: 6,
+                    child: Row(
+                      children: [
+                        if (fullCount > 0)
+                          Expanded(
+                            flex: fullCount,
+                            child: Container(color: AppColors.positive),
+                          ),
+                        if (customCount > 0)
+                          Expanded(
+                            flex: customCount,
+                            child: Container(color: AppColors.brand),
+                          ),
+                        if (noneCount > 0)
+                          Expanded(
+                            flex: noneCount,
+                            child: Container(
+                              color: AppColors.textHint.withValues(alpha: 0.35),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _CountChip(
+                    icon: Icons.verified_user_rounded,
+                    count: fullCount,
+                    label: 'Full',
+                    color: AppColors.positive,
+                  ),
+                  const SizedBox(width: 6),
+                  _CountChip(
+                    icon: Icons.tune_rounded,
+                    count: customCount,
+                    label: 'Custom',
+                    color: AppColors.brand,
+                  ),
+                  const SizedBox(width: 6),
+                  _CountChip(
+                    icon: Icons.block_rounded,
+                    count: noneCount,
+                    label: 'None',
+                    color: AppColors.textSecondary,
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -252,7 +455,10 @@ class _CompanyPermissionCard extends ConsumerWidget {
       builder: (dCtx) => AlertDialog(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Reset Permissions', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700)),
+        title: Text(
+          'Reset Permissions',
+          style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700),
+        ),
         content: Text(
           'Clear every saved permission for "${company.name}"? The company will lose access to all modules except Support Ticket and Chatbot until you grant them again.',
           style: TextStyle(color: AppColors.textHint, fontSize: 13.5),
@@ -266,12 +472,20 @@ class _CompanyPermissionCard extends ConsumerWidget {
             onPressed: () async {
               Navigator.of(dCtx).pop();
               try {
-                await ref.read(permissionsProvider(company.id).notifier).reset();
+                await ref
+                    .read(permissionsProvider(company.id).notifier)
+                    .reset();
               } catch (e) {
                 if (context.mounted) showErrorDialog(context, e);
               }
             },
-            child: const Text('Reset', style: TextStyle(color: AppColors.brandBlack, fontWeight: FontWeight.w700)),
+            child: Text(
+              'Reset',
+              style: TextStyle(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),
@@ -280,22 +494,40 @@ class _CompanyPermissionCard extends ConsumerWidget {
 }
 
 class _CountChip extends StatelessWidget {
+  final IconData icon;
   final int count;
   final String label;
   final Color color;
-  const _CountChip({required this.count, required this.label, required this.color});
+  const _CountChip({
+    required this.icon,
+    required this.count,
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.13),
+        color: AppColors.surface.withValues(alpha: 0.75),
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
-      child: Text(
-        '$count $label',
-        style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w700),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            '$count $label',
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }

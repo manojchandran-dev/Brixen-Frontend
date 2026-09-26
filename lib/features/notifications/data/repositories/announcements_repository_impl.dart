@@ -4,8 +4,12 @@ import '../../domain/repositories/announcements_repository.dart';
 import '../datasources/announcements_remote_datasource.dart';
 import '../models/announcement_model.dart';
 
-final announcementsRepositoryProvider = Provider<AnnouncementsRepository>((ref) {
-  return AnnouncementsRepositoryImpl(ref.read(announcementsRemoteDatasourceProvider));
+final announcementsRepositoryProvider = Provider<AnnouncementsRepository>((
+  ref,
+) {
+  return AnnouncementsRepositoryImpl(
+    ref.read(announcementsRemoteDatasourceProvider),
+  );
 });
 
 class AnnouncementsRepositoryImpl implements AnnouncementsRepository {

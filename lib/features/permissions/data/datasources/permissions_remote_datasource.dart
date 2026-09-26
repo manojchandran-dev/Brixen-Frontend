@@ -4,11 +4,10 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../models/permission_model.dart';
 
-final permissionsRemoteDatasourceProvider = Provider<PermissionsRemoteDatasource>((
-  ref,
-) {
-  return PermissionsRemoteDatasource(ref.read(dioProvider));
-});
+final permissionsRemoteDatasourceProvider =
+    Provider<PermissionsRemoteDatasource>((ref) {
+      return PermissionsRemoteDatasource(ref.read(dioProvider));
+    });
 
 class PermissionsRemoteDatasource {
   final Dio _dio;
@@ -96,10 +95,7 @@ class PermissionsRemoteDatasource {
     try {
       final resp = await _dio.post(
         ApiEndpoints.permissionsBulk,
-        data: {
-          'company_id': int.parse(companyId),
-          'permissions': permissions,
-        },
+        data: {'company_id': int.parse(companyId), 'permissions': permissions},
       );
       final data = resp.data['data'] ?? resp.data;
       final list = (data is List) ? data : (data['items'] ?? []);

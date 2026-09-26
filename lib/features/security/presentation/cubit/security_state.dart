@@ -20,15 +20,18 @@ class SecurityState extends Equatable {
     bool? isBiometricEnabled,
     bool? isBiometricAvailable,
     SecurityStatus? status,
-  }) =>
-      SecurityState(
-        isPinEnabled: isPinEnabled ?? this.isPinEnabled,
-        isBiometricEnabled: isBiometricEnabled ?? this.isBiometricEnabled,
-        isBiometricAvailable: isBiometricAvailable ?? this.isBiometricAvailable,
-        status: status ?? this.status,
-      );
+  }) => SecurityState(
+    isPinEnabled: isPinEnabled ?? this.isPinEnabled,
+    isBiometricEnabled: isBiometricEnabled ?? this.isBiometricEnabled,
+    isBiometricAvailable: isBiometricAvailable ?? this.isBiometricAvailable,
+    status: status ?? this.status,
+  );
 
   @override
-  List<Object?> get props =>
-      [isPinEnabled, isBiometricEnabled, isBiometricAvailable, status];
+  List<Object?> get props => [
+    isPinEnabled,
+    isBiometricEnabled,
+    isBiometricAvailable,
+    status,
+  ];
 }

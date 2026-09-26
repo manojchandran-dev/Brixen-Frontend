@@ -4,7 +4,9 @@ import '../datasources/permissions_remote_datasource.dart';
 import '../models/permission_model.dart';
 
 final permissionsRepositoryProvider = Provider<PermissionsRepository>((ref) {
-  return PermissionsRepositoryImpl(ref.read(permissionsRemoteDatasourceProvider));
+  return PermissionsRepositoryImpl(
+    ref.read(permissionsRemoteDatasourceProvider),
+  );
 });
 
 class PermissionsRepositoryImpl implements PermissionsRepository {
@@ -12,8 +14,10 @@ class PermissionsRepositoryImpl implements PermissionsRepository {
   const PermissionsRepositoryImpl(this._ds);
 
   @override
-  Future<List<PermissionModel>> getPermissions({required String companyId, String? moduleId}) =>
-      _ds.getPermissions(companyId: companyId, moduleId: moduleId);
+  Future<List<PermissionModel>> getPermissions({
+    required String companyId,
+    String? moduleId,
+  }) => _ds.getPermissions(companyId: companyId, moduleId: moduleId);
 
   @override
   Future<PermissionModel> create({
@@ -23,15 +27,14 @@ class PermissionsRepositoryImpl implements PermissionsRepository {
     required bool create,
     required bool edit,
     required bool delete,
-  }) =>
-      _ds.create(
-        companyId: companyId,
-        moduleId: moduleId,
-        view: view,
-        create: create,
-        edit: edit,
-        delete: delete,
-      );
+  }) => _ds.create(
+    companyId: companyId,
+    moduleId: moduleId,
+    view: view,
+    create: create,
+    edit: edit,
+    delete: delete,
+  );
 
   @override
   Future<PermissionModel> update(
@@ -41,15 +44,20 @@ class PermissionsRepositoryImpl implements PermissionsRepository {
     required bool create,
     required bool edit,
     required bool delete,
-  }) =>
-      _ds.update(id, companyId: companyId, view: view, create: create, edit: edit, delete: delete);
+  }) => _ds.update(
+    id,
+    companyId: companyId,
+    view: view,
+    create: create,
+    edit: edit,
+    delete: delete,
+  );
 
   @override
   Future<List<PermissionModel>> bulkUpsert({
     required String companyId,
     required List<Map<String, dynamic>> permissions,
-  }) =>
-      _ds.bulkUpsert(companyId: companyId, permissions: permissions);
+  }) => _ds.bulkUpsert(companyId: companyId, permissions: permissions);
 
   @override
   Future<void> delete(String id, {required String companyId}) =>

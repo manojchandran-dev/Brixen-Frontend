@@ -16,13 +16,25 @@ class ModuleAccess {
     required this.delete,
   });
 
-  static const full = ModuleAccess(view: true, create: true, edit: true, delete: true);
-  static const none = ModuleAccess(view: false, create: false, edit: false, delete: false);
+  static const full = ModuleAccess(
+    view: true,
+    create: true,
+    edit: true,
+    delete: true,
+  );
+  static const none = ModuleAccess(
+    view: false,
+    create: false,
+    edit: false,
+    delete: false,
+  );
 }
 
 /// The signed-in company's saved grants, keyed by module id. Employees
 /// inherit their company's grants. Empty for superadmin (no restrictions).
-final _myGrantsProvider = FutureProvider<Map<String, PermissionModel>>((ref) async {
+final _myGrantsProvider = FutureProvider<Map<String, PermissionModel>>((
+  ref,
+) async {
   ref.watch(authStateProvider);
   final companyId = Session.companyId;
   if (Session.isSuperAdmin || companyId == null) return const {};
@@ -41,7 +53,10 @@ const _allowedWithoutRow = {'support ticket', 'chatbot'};
 /// Mirrors the backend's rules (it enforces them too, with a 403):
 /// every action needs `view` plus its own flag; no saved row = denied,
 /// except Support Ticket / Chatbot; Company Category is never writable.
-final moduleAccessProvider = Provider.family<ModuleAccess, String>((ref, moduleName) {
+final moduleAccessProvider = Provider.family<ModuleAccess, String>((
+  ref,
+  moduleName,
+) {
   ref.watch(authStateProvider);
   if (Session.isSuperAdmin) return ModuleAccess.full;
 
@@ -56,7 +71,9 @@ final moduleAccessProvider = Provider.family<ModuleAccess, String>((ref, moduleN
   final id = _findId(tree, name);
   final g = id == null ? null : grants[id];
   if (g == null) {
-    return _allowedWithoutRow.contains(name) ? ModuleAccess.full : ModuleAccess.none;
+    return _allowedWithoutRow.contains(name)
+        ? ModuleAccess.full
+        : ModuleAccess.none;
   }
   return ModuleAccess(
     view: g.view,

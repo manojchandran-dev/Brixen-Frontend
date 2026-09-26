@@ -20,7 +20,8 @@ class CreatePermissionPage extends ConsumerStatefulWidget {
   const CreatePermissionPage({super.key, this.company});
 
   @override
-  ConsumerState<CreatePermissionPage> createState() => _CreatePermissionPageState();
+  ConsumerState<CreatePermissionPage> createState() =>
+      _CreatePermissionPageState();
 }
 
 class _CreatePermissionPageState extends ConsumerState<CreatePermissionPage> {
@@ -67,7 +68,11 @@ class _CreatePermissionPageState extends ConsumerState<CreatePermissionPage> {
         ),
         title: Text(
           _isEditing ? 'Edit Permissions' : 'New Permissions',
-          style: TextStyle(color: AppColors.ink, fontSize: 17, fontWeight: FontWeight.w700),
+          style: TextStyle(
+            color: AppColors.ink,
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
       body: ListView(
@@ -75,7 +80,11 @@ class _CreatePermissionPageState extends ConsumerState<CreatePermissionPage> {
         children: [
           Text(
             'Company',
-            style: TextStyle(color: AppColors.ink, fontSize: 13, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              color: AppColors.ink,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 10),
           Opacity(
@@ -96,7 +105,11 @@ class _CreatePermissionPageState extends ConsumerState<CreatePermissionPage> {
             const SizedBox(height: 8),
             Text(
               'Owner: ${_selected!.ownerName}',
-              style: const TextStyle(color: AppColors.positive, fontSize: 12, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                color: AppColors.positive,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
           const SizedBox(height: 26),
@@ -189,7 +202,12 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: TextStyle(color: AppColors.textHint, fontSize: 12.5, fontWeight: FontWeight.w700, letterSpacing: 0.3),
+      style: TextStyle(
+        color: AppColors.textHint,
+        fontSize: 12.5,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.3,
+      ),
     );
   }
 }
@@ -207,7 +225,12 @@ class _PermissionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final flags = [module.canView, module.canCreate, module.canEdit, module.canDelete];
+    final flags = [
+      module.canView,
+      module.canCreate,
+      module.canEdit,
+      module.canDelete,
+    ];
 
     return RichCardShell(
       accentColor: module.color,
@@ -225,7 +248,9 @@ class _PermissionRow extends StatelessWidget {
               height: 40,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                gradient: LinearGradient(colors: AppColors.accentGradient(module.color)),
+                gradient: LinearGradient(
+                  colors: AppColors.accentGradient(module.color),
+                ),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(module.icon, size: 18, color: AppColors.white),
@@ -237,7 +262,11 @@ class _PermissionRow extends StatelessWidget {
                 children: [
                   Text(
                     module.name,
-                    style: TextStyle(color: AppColors.ink, fontSize: 14, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      color: AppColors.ink,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 6),
@@ -251,7 +280,12 @@ class _PermissionRow extends StatelessWidget {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: on ? AppColors.positive : Colors.transparent,
-                            border: on ? null : Border.all(color: AppColors.border, width: 1.2),
+                            border: on
+                                ? null
+                                : Border.all(
+                                    color: AppColors.border,
+                                    width: 1.2,
+                                  ),
                           ),
                         ),
                     ],
@@ -267,11 +301,19 @@ class _PermissionRow extends StatelessWidget {
               ),
               child: Text(
                 module.summary,
-                style: TextStyle(color: _levelColor, fontSize: 11.5, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  color: _levelColor,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             const SizedBox(width: 4),
-            Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textHint.withValues(alpha: 0.6)),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: AppColors.textHint.withValues(alpha: 0.6),
+            ),
           ],
         ),
       ),

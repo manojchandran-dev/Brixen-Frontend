@@ -18,6 +18,8 @@ import '../../data/repositories/sales_repository_impl.dart';
 import '../../domain/entities/sale.dart';
 import '../../domain/entities/sale_item.dart';
 import '../providers/sales_provider.dart';
+import '../../../../shared/widgets/list_count_bar.dart';
+import '../../../../shared/widgets/module_title.dart';
 
 class SalesPage extends ConsumerStatefulWidget {
   final bool fromMasters;
@@ -175,66 +177,45 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                   ],
                 ),
               )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Sales',
-                    style: TextStyle(
-                      color: cs.onSurface,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  salesAsync.whenOrNull(
-                        data: (list) => Text(
-                          '${list.length} records',
-                          style: TextStyle(
-                            color: cs.onSurfaceVariant,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ) ??
-                      const SizedBox.shrink(),
-                ],
-              ),
+            : ModuleTitle(title: 'Sales', subtitle: 'Invoices and sales'),
         actions: [
-          if (ref.watch(moduleAccessProvider('Sales')).create) GestureDetector(
-            onTap: () => context.push(
-              AppRouter.createSale,
-              extra: widget.fromMasters ? 'masters' : null,
-            ),
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
-              width: 38,
-              height: 38,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                gradient: isDark
-                    ? AppColors.silverGradient
-                    : const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [AppColors.brand, AppColors.brandDeep],
+          if (ref.watch(moduleAccessProvider('Sales')).create)
+            GestureDetector(
+              onTap: () => context.push(
+                AppRouter.createSale,
+                extra: widget.fromMasters ? 'masters' : null,
+              ),
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
+                width: 38,
+                height: 38,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  gradient: isDark
+                      ? AppColors.silverGradient
+                      : const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [AppColors.brand, AppColors.brandDeep],
+                        ),
+                  borderRadius: BorderRadius.circular(13),
+                  boxShadow: AppColors.shadows([
+                    BoxShadow(
+                      color: AppColors.brand.withValues(
+                        alpha: isDark ? 0.0 : 0.4,
                       ),
-                borderRadius: BorderRadius.circular(13),
-                boxShadow: AppColors.shadows([
-                  BoxShadow(
-                    color: AppColors.brand.withValues(
-                      alpha: isDark ? 0.0 : 0.4,
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ]),
-              ),
-              child: Icon(
-                Icons.add_rounded,
-                size: 20,
-                color: isDark ? AppColors.black : AppColors.white,
+                  ]),
+                ),
+                child: Icon(
+                  Icons.add_rounded,
+                  size: 20,
+                  color: isDark ? AppColors.black : AppColors.white,
+                ),
               ),
             ),
-          ),
         ],
       ),
       body: Column(
@@ -344,11 +325,20 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                   );
                 }
 
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                  itemCount: filtered.length,
-                  separatorBuilder: (context, i) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) => _SaleCard(sale: filtered[i], index: i),
+                return Column(
+                  children: [
+                    ListCountBar(label: 'Total Sales', count: filtered.length),
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                        itemCount: filtered.length,
+                        separatorBuilder: (context, i) =>
+                            const SizedBox(height: 10),
+                        itemBuilder: (_, i) =>
+                            _SaleCard(sale: filtered[i], index: i),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -389,21 +379,23 @@ class _SaleCard extends ConsumerWidget {
     return SwipeActions(
       onTap: () => _showSaleDetail(context, ref, sale, accent),
       actions: [
-        if (ref.watch(moduleAccessProvider('Sales')).edit) SwipeAction(
-          icon: Icons.edit_outlined,
-          label: 'Edit',
-          color: AppColors.accentIndigo,
-          onTap: () => context.push(
-            AppRouter.createSale,
-            extra: {'sale': sale, 'fromMasters': false, 'fromMenu': false},
+        if (ref.watch(moduleAccessProvider('Sales')).edit)
+          SwipeAction(
+            icon: Icons.edit_outlined,
+            label: 'Edit',
+            color: AppColors.accentIndigo,
+            onTap: () => context.push(
+              AppRouter.createSale,
+              extra: {'sale': sale, 'fromMasters': false, 'fromMenu': false},
+            ),
           ),
-        ),
-        if (ref.watch(moduleAccessProvider('Sales')).delete) SwipeAction(
-          icon: Icons.delete_outline,
-          label: 'Delete',
-          color: AppColors.brandBlack,
-          onTap: () => _confirmDelete(context, ref),
-        ),
+        if (ref.watch(moduleAccessProvider('Sales')).delete)
+          SwipeAction(
+            icon: Icons.delete_outline,
+            label: 'Delete',
+            color: AppColors.brandBlack,
+            onTap: () => _confirmDelete(context, ref),
+          ),
       ],
       child: Container(
         decoration: BoxDecoration(
@@ -662,7 +654,7 @@ class _SaleCard extends ConsumerWidget {
             child: Text(
               'Delete',
               style: TextStyle(
-                color: AppColors.accentRose,
+                color: AppColors.ink,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -707,74 +699,81 @@ void _showSaleDetail(
       avatarGradient: AppColors.accentGradient(accent),
       title: title,
       subtitle: sale.invoiceType,
-      onEdit: !ref.read(moduleAccessProvider('Sales')).edit ? null : () {
-        Navigator.of(ctx).pop();
-        ctx.push(
-          AppRouter.createSale,
-          extra: {'sale': sale, 'fromMasters': false, 'fromMenu': false},
-        );
-      },
-      onDelete: !ref.read(moduleAccessProvider('Sales')).delete ? null : () async {
-        final confirmed = await showDialog<bool>(
-          context: ctx,
-          builder: (dCtx) => AlertDialog(
-            backgroundColor: Theme.of(dCtx).scaffoldBackgroundColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Text(
-              'Delete Sale',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.ink,
-              ),
-            ),
-            content: Text(
-              'Delete this sale? This cannot be undone.',
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dCtx).pop(false),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(dCtx).pop(true),
-                child: Text(
-                  'Delete',
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-        if (confirmed != true) return;
-        try {
-          await ref
-              .read(salesProvider.notifier)
-              .deleteSale(
-                sale.id,
-                companyId: Session.isSuperAdmin ? sale.companyId : null,
+      onEdit: !ref.read(moduleAccessProvider('Sales')).edit
+          ? null
+          : () {
+              Navigator.of(ctx).pop();
+              ctx.push(
+                AppRouter.createSale,
+                extra: {'sale': sale, 'fromMasters': false, 'fromMenu': false},
               );
-          if (ctx.mounted) Navigator.of(ctx).pop();
-        } catch (e) {
-          if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(
-              SnackBar(
-                content: Text(e.toString()),
-                backgroundColor: AppColors.dangerFill,
-              ),
-            );
-          }
-        }
-      },
+            },
+      onDelete: !ref.read(moduleAccessProvider('Sales')).delete
+          ? null
+          : () async {
+              final confirmed = await showDialog<bool>(
+                context: ctx,
+                builder: (dCtx) => AlertDialog(
+                  backgroundColor: Theme.of(dCtx).scaffoldBackgroundColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  title: Text(
+                    'Delete Sale',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  content: Text(
+                    'Delete this sale? This cannot be undone.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(dCtx).pop(false),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(dCtx).pop(true),
+                      child: Text(
+                        'Delete',
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed != true) return;
+              try {
+                await ref
+                    .read(salesProvider.notifier)
+                    .deleteSale(
+                      sale.id,
+                      companyId: Session.isSuperAdmin ? sale.companyId : null,
+                    );
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              } catch (e) {
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(
+                      content: Text(e.toString()),
+                      backgroundColor: AppColors.dangerFill,
+                    ),
+                  );
+                }
+              }
+            },
       statusRow: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(

@@ -34,9 +34,13 @@ class _CreateTicketPageState extends ConsumerState<CreateTicketPage> {
   }
 
   Future<void> _submit() async {
-    if (_subjectCtrl.text.trim().isEmpty || _descriptionCtrl.text.trim().isEmpty) {
+    if (_subjectCtrl.text.trim().isEmpty ||
+        _descriptionCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Subject and description are required'), backgroundColor: AppColors.dangerFill),
+        const SnackBar(
+          content: Text('Subject and description are required'),
+          backgroundColor: AppColors.dangerFill,
+        ),
       );
       return;
     }
@@ -61,7 +65,10 @@ class _CreateTicketPageState extends ConsumerState<CreateTicketPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.dangerFill),
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: AppColors.dangerFill,
+          ),
         );
       }
     } finally {
@@ -76,7 +83,14 @@ class _CreateTicketPageState extends ConsumerState<CreateTicketPage> {
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
-        title: Text('New Ticket', style: TextStyle(color: cs.onSurface, fontSize: 17, fontWeight: FontWeight.w700)),
+        title: Text(
+          'New Ticket',
+          style: TextStyle(
+            color: cs.onSurface,
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
       body: SafeArea(
         child: ListView(
@@ -104,29 +118,47 @@ class _CreateTicketPageState extends ConsumerState<CreateTicketPage> {
               onChanged: (v) => setState(() => _category = v ?? _category),
             ),
             const SizedBox(height: 16),
-            Text('Priority', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface)),
+            Text(
+              'Priority',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
+              ),
+            ),
             const SizedBox(height: 10),
             Row(
               children: TicketPriority.values.map((p) {
                 final selected = _priority == p;
                 return Expanded(
                   child: Padding(
-                    padding: EdgeInsets.only(right: p != TicketPriority.values.last ? 8 : 0),
+                    padding: EdgeInsets.only(
+                      right: p != TicketPriority.values.last ? 8 : 0,
+                    ),
                     child: GestureDetector(
                       onTap: () => setState(() => _priority = p),
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: selected ? cs.primary.withValues(alpha: 0.12) : cs.surfaceContainerHighest,
+                          color: selected
+                              ? cs.primary.withValues(alpha: 0.12)
+                              : cs.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: selected ? cs.primary : Theme.of(context).dividerColor, width: selected ? 1.5 : 1),
+                          border: Border.all(
+                            color: selected
+                                ? cs.primary
+                                : Theme.of(context).dividerColor,
+                            width: selected ? 1.5 : 1,
+                          ),
                         ),
                         child: Text(
                           priorityLabel(p),
                           style: TextStyle(
                             fontSize: 12.5,
-                            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight: selected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
                             color: selected ? cs.primary : cs.onSurfaceVariant,
                           ),
                         ),

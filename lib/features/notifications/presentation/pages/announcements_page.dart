@@ -21,6 +21,8 @@ import '../../domain/entities/push_notification.dart' show CommunicationStatus;
 import '../providers/announcements_provider.dart';
 import '../widgets/notification_labels.dart';
 import '../widgets/notification_status_badge.dart';
+import '../../../../shared/widgets/list_count_bar.dart';
+import '../../../../shared/widgets/module_title.dart';
 
 class AnnouncementsPage extends ConsumerStatefulWidget {
   const AnnouncementsPage({super.key});
@@ -54,29 +56,39 @@ class _AnnouncementsPageState extends ConsumerState<AnnouncementsPage> {
         elevation: 0,
         shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
-        leading: Builder(builder: (ctx) => GestureDetector(
-          onTap: () => Scaffold.of(ctx).openDrawer(),
-          child: Container(
-            width: 40,
-            height: 40,
-            margin: const EdgeInsets.all(8),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: AppColors.shadows([
-                BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
-              ]),
+        leading: Builder(
+          builder: (ctx) => GestureDetector(
+            onTap: () => Scaffold.of(ctx).openDrawer(),
+            child: Container(
+              width: 40,
+              height: 40,
+              margin: const EdgeInsets.all(8),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: AppColors.shadows([
+                  BoxShadow(
+                    color: AppColors.shadowDark.withValues(alpha: 0.10),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]),
+              ),
+              child: Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
             ),
-            child: Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
           ),
-        )),
-        title: Text('Announcements', style: TextStyle(color: cs.onSurface, fontSize: 17, fontWeight: FontWeight.w700)),
+        ),
+        title: ModuleTitle(
+          title: 'Announcements',
+          subtitle: 'Updates shown to companies',
+        ),
         actions: [
           DeletedItemsButton(
             title: 'Deleted announcements',
             listPath: ApiEndpoints.announcements,
-            restorePath: (a) => '${ApiEndpoints.announcements}/${a['id']}/restore',
+            restorePath: (a) =>
+                '${ApiEndpoints.announcements}/${a['id']}/restore',
             labelOf: (a) => (a['title'] ?? '').toString(),
             onRestored: () => ref.invalidate(announcementsProvider),
           ),
@@ -88,10 +100,16 @@ class _AnnouncementsPageState extends ConsumerState<AnnouncementsPage> {
               height: 38,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [AppColors.brand, AppColors.brandDeep]),
+                gradient: const LinearGradient(
+                  colors: [AppColors.brand, AppColors.brandDeep],
+                ),
                 borderRadius: BorderRadius.circular(13),
               ),
-              child: const Icon(Icons.add_rounded, size: 20, color: AppColors.white),
+              child: const Icon(
+                Icons.add_rounded,
+                size: 20,
+                color: AppColors.white,
+              ),
             ),
           ),
         ],
@@ -109,34 +127,60 @@ class _AnnouncementsPageState extends ConsumerState<AnnouncementsPage> {
           Expanded(
             child: announcementsAsync.when(
               loading: () => const SkeletonListView(),
-              error: (e, _) => ErrorCard(error: e, onRetry: () => ref.invalidate(announcementsProvider)),
+              error: (e, _) => ErrorCard(
+                error: e,
+                onRetry: () => ref.invalidate(announcementsProvider),
+              ),
               data: (list) {
                 final query = _searchCtrl.text.trim().toLowerCase();
                 final filtered = query.isEmpty
                     ? list
-                    : list.where((a) => a.title.toLowerCase().contains(query)).toList();
+                    : list
+                          .where((a) => a.title.toLowerCase().contains(query))
+                          .toList();
 
                 if (filtered.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.campaign_outlined, size: 56, color: cs.onSurfaceVariant.withValues(alpha: 0.3)),
+                        Icon(
+                          Icons.campaign_outlined,
+                          size: 56,
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.3),
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           list.isEmpty ? 'No announcements yet' : 'No results',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant),
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurfaceVariant,
+                          ),
                         ),
                       ],
                     ),
                   );
                 }
 
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) => _AnnouncementCard(index: i, announcement: filtered[i]),
+                return Column(
+                  children: [
+                    ListCountBar(
+                      label: 'Total Announcements',
+                      count: filtered.length,
+                    ),
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (_, i) => _AnnouncementCard(
+                          index: i,
+                          announcement: filtered[i],
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -162,13 +206,16 @@ class _AnnouncementCard extends ConsumerWidget {
           icon: Icons.edit_outlined,
           label: 'Edit',
           color: AppColors.accentIndigo,
-          onTap: () => context.push(AppRouter.createAnnouncement, extra: announcement),
+          onTap: () =>
+              context.push(AppRouter.createAnnouncement, extra: announcement),
         ),
         SwipeAction(
           icon: Icons.copy_rounded,
           label: 'Duplicate',
           color: AppColors.accentGold,
-          onTap: () => ref.read(announcementsProvider.notifier).duplicate(announcement.id),
+          onTap: () => ref
+              .read(announcementsProvider.notifier)
+              .duplicate(announcement.id),
         ),
         if (announcement.status == CommunicationStatus.published)
           SwipeAction(
@@ -179,11 +226,16 @@ class _AnnouncementCard extends ConsumerWidget {
               final ok = await showConfirmDialog(
                 context,
                 title: 'Unpublish Announcement',
-                message: 'Unpublish "${announcement.title}"? It will no longer be visible to companies.',
+                message:
+                    'Unpublish "${announcement.title}"? It will no longer be visible to companies.',
                 confirmLabel: 'Unpublish',
                 isDestructive: true,
               );
-              if (ok) await ref.read(announcementsProvider.notifier).unpublish(announcement.id);
+              if (ok) {
+                await ref
+                    .read(announcementsProvider.notifier)
+                    .unpublish(announcement.id);
+              }
             },
           ),
         SwipeAction(
@@ -198,11 +250,17 @@ class _AnnouncementCard extends ConsumerWidget {
               confirmLabel: 'Delete',
               isDestructive: true,
             );
-            if (ok) await ref.read(announcementsProvider.notifier).delete(announcement.id);
+            if (ok) {
+              await ref
+                  .read(announcementsProvider.notifier)
+                  .delete(announcement.id);
+            }
           },
         ),
       ],
-      child: RichCardShell.tinted(index: index, child: Padding(
+      child: RichCardShell.tinted(
+        index: index,
+        child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -213,14 +271,21 @@ class _AnnouncementCard extends ConsumerWidget {
                   if (announcement.bannerUrl != null) ...[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: pickedImage(announcement.bannerUrl!, width: 56, height: 56),
+                      child: pickedImage(
+                        announcement.bannerUrl!,
+                        width: 56,
+                        height: 56,
+                      ),
                     ),
                     const SizedBox(width: 12),
                   ],
                   Expanded(
                     child: Text(
                       announcement.title,
-                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
+                      style: const TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -232,23 +297,34 @@ class _AnnouncementCard extends ConsumerWidget {
               const SizedBox(height: 4),
               Text(
                 announcement.shortDescription,
-                style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: AppColors.textSecondary,
+                ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 10),
-              StatGrid(items: [
-                StatGridItem(label: 'Audience', value: audienceLabel(announcement.audience)),
-                StatGridItem(label: 'Views', value: '${announcement.views}'),
-                StatGridItem(label: 'CTA', value: announcement.ctaLabel ?? '—'),
-              ]),
+              StatGrid(
+                items: [
+                  StatGridItem(
+                    label: 'Audience',
+                    value: audienceLabel(announcement.audience),
+                  ),
+                  StatGridItem(label: 'Views', value: '${announcement.views}'),
+                  StatGridItem(
+                    label: 'CTA',
+                    value: announcement.ctaLabel ?? '—',
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
               Text(
                 announcement.publishedAt != null
                     ? 'Published ${fmt.format(announcement.publishedAt!)}'
                     : announcement.scheduledAt != null
-                        ? 'Scheduled for ${fmt.format(announcement.scheduledAt!)}'
-                        : 'Created ${fmt.format(announcement.createdAt)}',
+                    ? 'Scheduled for ${fmt.format(announcement.scheduledAt!)}'
+                    : 'Created ${fmt.format(announcement.createdAt)}',
                 style: TextStyle(fontSize: 11, color: AppColors.textHint),
               ),
             ],
@@ -269,37 +345,96 @@ class _AnnouncementCard extends ConsumerWidget {
         subtitle: announcement.shortDescription,
         statusRow: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-          decoration: BoxDecoration(color: AppColors.brandDeep, borderRadius: BorderRadius.circular(16)),
+          decoration: BoxDecoration(
+            color: AppColors.brandDeep,
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Row(
             children: [
-              const Icon(Icons.campaign_rounded, color: AppColors.white, size: 18),
+              const Icon(
+                Icons.campaign_rounded,
+                color: AppColors.white,
+                size: 18,
+              ),
               const SizedBox(width: 8),
               NotificationStatusBadge(status: announcement.status),
               const Spacer(),
-              Text('${announcement.views} views', style: const TextStyle(color: AppColors.white, fontSize: 12.5, fontWeight: FontWeight.w700)),
+              Text(
+                '${announcement.views} views',
+                style: const TextStyle(
+                  color: AppColors.white,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
         ),
         sections: [
-          DetailSection(title: 'Details', items: [
-            DetailRow(icon: Icons.short_text_rounded, label: 'Description', value: announcement.shortDescription),
-            DetailRow(icon: Icons.person_outline, label: 'Created By', value: announcement.createdBy),
-          ]),
-          DetailSection(title: 'Audience', items: [
-            DetailRow(icon: Icons.groups_outlined, label: 'Target', value: audienceLabel(announcement.audience)),
-          ]),
+          DetailSection(
+            title: 'Details',
+            items: [
+              DetailRow(
+                icon: Icons.short_text_rounded,
+                label: 'Description',
+                value: announcement.shortDescription,
+              ),
+              DetailRow(
+                icon: Icons.person_outline,
+                label: 'Created By',
+                value: announcement.createdBy,
+              ),
+            ],
+          ),
+          DetailSection(
+            title: 'Audience',
+            items: [
+              DetailRow(
+                icon: Icons.groups_outlined,
+                label: 'Target',
+                value: audienceLabel(announcement.audience),
+              ),
+            ],
+          ),
           if (announcement.ctaLabel != null)
-            DetailSection(title: 'Call to Action', items: [
-              DetailRow(icon: Icons.touch_app_outlined, label: 'Button', value: announcement.ctaLabel!),
-              DetailRow(icon: Icons.link_rounded, label: 'Action', value: openOnTapLabel(announcement.ctaTarget), iconColor: AppColors.positive),
-            ]),
-          DetailSection(title: 'Timeline', items: [
-            DetailRow(icon: Icons.add_circle_outline, label: 'Created', value: fmt.format(announcement.createdAt)),
-            if (announcement.scheduledAt != null)
-              DetailRow(icon: Icons.schedule_outlined, label: 'Scheduled', value: fmt.format(announcement.scheduledAt!)),
-            if (announcement.publishedAt != null)
-              DetailRow(icon: Icons.publish_outlined, label: 'Published', value: fmt.format(announcement.publishedAt!)),
-          ]),
+            DetailSection(
+              title: 'Call to Action',
+              items: [
+                DetailRow(
+                  icon: Icons.touch_app_outlined,
+                  label: 'Button',
+                  value: announcement.ctaLabel!,
+                ),
+                DetailRow(
+                  icon: Icons.link_rounded,
+                  label: 'Action',
+                  value: openOnTapLabel(announcement.ctaTarget),
+                  iconColor: AppColors.positive,
+                ),
+              ],
+            ),
+          DetailSection(
+            title: 'Timeline',
+            items: [
+              DetailRow(
+                icon: Icons.add_circle_outline,
+                label: 'Created',
+                value: fmt.format(announcement.createdAt),
+              ),
+              if (announcement.scheduledAt != null)
+                DetailRow(
+                  icon: Icons.schedule_outlined,
+                  label: 'Scheduled',
+                  value: fmt.format(announcement.scheduledAt!),
+                ),
+              if (announcement.publishedAt != null)
+                DetailRow(
+                  icon: Icons.publish_outlined,
+                  label: 'Published',
+                  value: fmt.format(announcement.publishedAt!),
+                ),
+            ],
+          ),
         ],
       ),
     );

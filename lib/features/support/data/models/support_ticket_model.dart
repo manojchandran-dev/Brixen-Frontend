@@ -46,40 +46,46 @@ class SupportTicketModel extends SupportTicket {
       messages: (json['messages'] as List? ?? [])
           .map((e) => TicketMessageModel.fromJson(e as Map<String, dynamic>))
           .toList(),
-      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(json['updated_at']?.toString() ?? '') ??
+          DateTime.now(),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'subject': subject,
-        'description': description,
-        'category': category.name,
-        'priority': priority.name,
-        'status': status.name,
-        'company_id': companyId,
-        'company_name': companyName,
-        'raised_by': raisedBy,
-        'assigned_to': assignedTo,
-        'messages': messages.map((m) => TicketMessageModel.fromEntity(m).toJson()).toList(),
-        'created_at': createdAt.toIso8601String(),
-        'updated_at': updatedAt.toIso8601String(),
-      };
+    'id': id,
+    'subject': subject,
+    'description': description,
+    'category': category.name,
+    'priority': priority.name,
+    'status': status.name,
+    'company_id': companyId,
+    'company_name': companyName,
+    'raised_by': raisedBy,
+    'assigned_to': assignedTo,
+    'messages': messages
+        .map((m) => TicketMessageModel.fromEntity(m).toJson())
+        .toList(),
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt.toIso8601String(),
+  };
 
   factory SupportTicketModel.fromEntity(SupportTicket t) => SupportTicketModel(
-        id: t.id,
-        subject: t.subject,
-        description: t.description,
-        category: t.category,
-        priority: t.priority,
-        status: t.status,
-        companyId: t.companyId,
-        companyName: t.companyName,
-        raisedBy: t.raisedBy,
-        assignedTo: t.assignedTo,
-        messages: t.messages,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt,
-      );
+    id: t.id,
+    subject: t.subject,
+    description: t.description,
+    category: t.category,
+    priority: t.priority,
+    status: t.status,
+    companyId: t.companyId,
+    companyName: t.companyName,
+    raisedBy: t.raisedBy,
+    assignedTo: t.assignedTo,
+    messages: t.messages,
+    createdAt: t.createdAt,
+    updatedAt: t.updatedAt,
+  );
 }

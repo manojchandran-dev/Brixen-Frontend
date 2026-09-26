@@ -6,7 +6,10 @@ import '../../data/models/permission_model.dart';
 /// [PermissionModel] plus the module tree). Inventing one here purely for
 /// layering purity would be an entity nothing else would ever consume.
 abstract class PermissionsRepository {
-  Future<List<PermissionModel>> getPermissions({required String companyId, String? moduleId});
+  Future<List<PermissionModel>> getPermissions({
+    required String companyId,
+    String? moduleId,
+  });
   Future<PermissionModel> create({
     required String companyId,
     required String moduleId,

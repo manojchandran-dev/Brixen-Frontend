@@ -17,6 +17,8 @@ import '../../../../shared/widgets/super_admin_company_filter_bar.dart';
 import '../../data/repositories/expenses_repository_impl.dart';
 import '../../domain/entities/expense.dart';
 import '../providers/expenses_provider.dart';
+import '../../../../shared/widgets/list_count_bar.dart';
+import '../../../../shared/widgets/module_title.dart';
 
 class ExpensesPage extends ConsumerStatefulWidget {
   final bool fromMasters;
@@ -183,66 +185,45 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
                   ],
                 ),
               )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Expenses',
-                    style: TextStyle(
-                      color: cs.onSurface,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  expensesAsync.whenOrNull(
-                        data: (l) => Text(
-                          '${l.length} records',
-                          style: TextStyle(
-                            color: cs.onSurfaceVariant,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ) ??
-                      const SizedBox.shrink(),
-                ],
-              ),
+            : ModuleTitle(title: 'Expenses', subtitle: 'Track your spending'),
         actions: [
-          if (ref.watch(moduleAccessProvider('Expenses')).create) GestureDetector(
-            onTap: () => context.push(
-              AppRouter.createExpense,
-              extra: widget.fromMasters ? 'masters' : null,
-            ),
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
-              width: 38,
-              height: 38,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                gradient: isDark
-                    ? AppColors.silverGradient
-                    : const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [AppColors.brand, AppColors.brandDeep],
+          if (ref.watch(moduleAccessProvider('Expenses')).create)
+            GestureDetector(
+              onTap: () => context.push(
+                AppRouter.createExpense,
+                extra: widget.fromMasters ? 'masters' : null,
+              ),
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
+                width: 38,
+                height: 38,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  gradient: isDark
+                      ? AppColors.silverGradient
+                      : const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [AppColors.brand, AppColors.brandDeep],
+                        ),
+                  borderRadius: BorderRadius.circular(13),
+                  boxShadow: AppColors.shadows([
+                    BoxShadow(
+                      color: AppColors.brand.withValues(
+                        alpha: isDark ? 0.0 : 0.4,
                       ),
-                borderRadius: BorderRadius.circular(13),
-                boxShadow: AppColors.shadows([
-                  BoxShadow(
-                    color: AppColors.brand.withValues(
-                      alpha: isDark ? 0.0 : 0.4,
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ]),
-              ),
-              child: Icon(
-                Icons.add_rounded,
-                size: 20,
-                color: isDark ? AppColors.black : AppColors.white,
+                  ]),
+                ),
+                child: Icon(
+                  Icons.add_rounded,
+                  size: 20,
+                  color: isDark ? AppColors.black : AppColors.white,
+                ),
               ),
             ),
-          ),
         ],
       ),
       body: Column(
@@ -342,14 +323,24 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
                     ),
                   );
                 }
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 18),
-                  itemBuilder: (_, i) => _ExpenseCard(
-                    expense: filtered[i],
-                    categoryColor: _cardColors[i % _cardColors.length],
-                  ),
+                return Column(
+                  children: [
+                    ListCountBar(
+                      label: 'Total Expenses',
+                      count: filtered.length,
+                    ),
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 18),
+                        itemBuilder: (_, i) => _ExpenseCard(
+                          expense: filtered[i],
+                          categoryColor: _cardColors[i % _cardColors.length],
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -385,18 +376,20 @@ class _ExpenseCard extends ConsumerWidget {
     return SwipeActions(
       onTap: () => _showExpenseDetail(context, ref, expense, categoryColor),
       actions: [
-        if (ref.watch(moduleAccessProvider('Expenses')).edit) SwipeAction(
-          icon: Icons.edit_outlined,
-          label: 'Edit',
-          color: AppColors.accentIndigo,
-          onTap: () => context.push(AppRouter.createExpense, extra: expense),
-        ),
-        if (ref.watch(moduleAccessProvider('Expenses')).delete) SwipeAction(
-          icon: Icons.delete_outline,
-          label: 'Delete',
-          color: AppColors.brandBlack,
-          onTap: () => _confirmDelete(context, ref),
-        ),
+        if (ref.watch(moduleAccessProvider('Expenses')).edit)
+          SwipeAction(
+            icon: Icons.edit_outlined,
+            label: 'Edit',
+            color: AppColors.accentIndigo,
+            onTap: () => context.push(AppRouter.createExpense, extra: expense),
+          ),
+        if (ref.watch(moduleAccessProvider('Expenses')).delete)
+          SwipeAction(
+            icon: Icons.delete_outline,
+            label: 'Delete',
+            color: AppColors.brandBlack,
+            onTap: () => _confirmDelete(context, ref),
+          ),
       ],
       child: RichCardShell(
         accentColor: categoryColor,
@@ -523,7 +516,7 @@ class _ExpenseCard extends ConsumerWidget {
             child: Text(
               'Delete',
               style: TextStyle(
-                color: AppColors.accentRose,
+                color: AppColors.ink,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -547,71 +540,80 @@ void _showExpenseDetail(
       showAvatar: false,
       title: expense.title,
       subtitle: expense.category,
-      onEdit: !ref.read(moduleAccessProvider('Expenses')).edit ? null : () {
-        Navigator.of(ctx).pop();
-        ctx.push(AppRouter.createExpense, extra: expense);
-      },
-      onDelete: !ref.read(moduleAccessProvider('Expenses')).delete ? null : () async {
-        final confirmed = await showDialog<bool>(
-          context: ctx,
-          builder: (dCtx) => AlertDialog(
-            backgroundColor: Theme.of(dCtx).scaffoldBackgroundColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Text(
-              'Delete Expense',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.ink,
-              ),
-            ),
-            content: Text(
-              'Delete "${expense.title}"? This cannot be undone.',
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dCtx).pop(false),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(dCtx).pop(true),
-                child: Text(
-                  'Delete',
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    fontWeight: FontWeight.w700,
+      onEdit: !ref.read(moduleAccessProvider('Expenses')).edit
+          ? null
+          : () {
+              Navigator.of(ctx).pop();
+              ctx.push(AppRouter.createExpense, extra: expense);
+            },
+      onDelete: !ref.read(moduleAccessProvider('Expenses')).delete
+          ? null
+          : () async {
+              final confirmed = await showDialog<bool>(
+                context: ctx,
+                builder: (dCtx) => AlertDialog(
+                  backgroundColor: Theme.of(dCtx).scaffoldBackgroundColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
+                  title: Text(
+                    'Delete Expense',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  content: Text(
+                    'Delete "${expense.title}"? This cannot be undone.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(dCtx).pop(false),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(dCtx).pop(true),
+                      child: Text(
+                        'Delete',
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-        );
-        if (confirmed != true) return;
-        try {
-          await ref
-              .read(expensesProvider.notifier)
-              .deleteExpense(
-                expense.id,
-                companyId: Session.isSuperAdmin ? expense.companyId : null,
               );
-          if (ctx.mounted) Navigator.of(ctx).pop();
-        } catch (e) {
-          if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(
-              SnackBar(
-                content: Text(e.toString()),
-                backgroundColor: AppColors.dangerFill,
-              ),
-            );
-          }
-        }
-      },
+              if (confirmed != true) return;
+              try {
+                await ref
+                    .read(expensesProvider.notifier)
+                    .deleteExpense(
+                      expense.id,
+                      companyId: Session.isSuperAdmin
+                          ? expense.companyId
+                          : null,
+                    );
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              } catch (e) {
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(
+                      content: Text(e.toString()),
+                      backgroundColor: AppColors.dangerFill,
+                    ),
+                  );
+                }
+              }
+            },
       statusRow: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(

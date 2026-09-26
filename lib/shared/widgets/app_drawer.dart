@@ -10,6 +10,12 @@ import '../../features/navigation/presentation/providers/nav_modules_provider.da
 import 'error_state.dart';
 import 'skeleton.dart';
 
+/// Company users open Support from the More page, so it's left out of
+/// their menu. Superadmin keeps it here (their More page doesn't have it).
+bool _supportInMore(NavModule m) =>
+    !Session.isSuperAdmin &&
+    m.name.toLowerCase().replaceAll(RegExp(r's+'), '').startsWith('support');
+
 /// Slide-out navigation drawer used across module pages (Employees, Sales,
 /// Customers, Expenses, Purchases, Companies) — opened via the hamburger
 /// icon in the AppBar. Shows modules only — profile, theme and settings
@@ -87,7 +93,6 @@ class AppDrawer extends ConsumerWidget {
                       ],
                     ),
                     style: const TextStyle(
-                      fontFamily: 'SpaceGrotesk',
                       fontSize: 32,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.2,
@@ -123,7 +128,9 @@ class AppDrawer extends ConsumerWidget {
                   children: [
                     // Groups (Masters) always last, whatever order the API returns.
                     for (final m in [
-                      ...modules.where((m) => m.children.isEmpty),
+                      ...modules.where(
+                        (m) => m.children.isEmpty && !_supportInMore(m),
+                      ),
                       ...modules.where((m) => m.children.isNotEmpty),
                     ])
                       if (m.children.isEmpty)

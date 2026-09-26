@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import '../../../../core/network/api_client.dart' show mapDioError, CompanyScopeInterceptor;
+import '../../../../core/network/api_client.dart'
+    show mapDioError, CompanyScopeInterceptor;
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/token_refresh_interceptor.dart';
 import '../../../../core/services/token_service.dart';
@@ -91,13 +92,12 @@ class CompanyCategoriesRemoteDatasource implements RemoteMasterDatasource {
     String? description,
     String? fullForm,
     bool isActive = true,
-    required String companyId,
+    String? companyId, // unused: company categories are global
   }) async {
     try {
       final resp = await _dio.post(
         ApiEndpoints.companyCategories,
         data: {
-          'company_id': int.parse(companyId),
           'name': name,
           if (description != null && description.isNotEmpty)
             'description': description,

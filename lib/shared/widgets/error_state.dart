@@ -47,7 +47,7 @@ class ErrorCard extends StatelessWidget {
                 ),
                 child: Icon(
                   Icons.error_outline_rounded,
-                  color: AppColors.brandBlack,
+                  color: AppColors.ink,
                   size: 26,
                 ),
               ),
@@ -95,7 +95,7 @@ Future<void> showErrorDialog(BuildContext context, Object error) {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Row(
         children: [
-          Icon(Icons.error_outline_rounded, color: AppColors.brandBlack, size: 20),
+          Icon(Icons.error_outline_rounded, color: AppColors.ink, size: 20),
           const SizedBox(width: 8),
           Text(
             'Something went wrong',

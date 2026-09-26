@@ -5,8 +5,12 @@ import '../../domain/repositories/support_tickets_repository.dart';
 import '../datasources/support_tickets_remote_datasource.dart';
 import '../models/support_ticket_model.dart';
 
-final supportTicketsRepositoryProvider = Provider<SupportTicketsRepository>((ref) {
-  return SupportTicketsRepositoryImpl(ref.read(supportTicketsRemoteDatasourceProvider));
+final supportTicketsRepositoryProvider = Provider<SupportTicketsRepository>((
+  ref,
+) {
+  return SupportTicketsRepositoryImpl(
+    ref.read(supportTicketsRemoteDatasourceProvider),
+  );
 });
 
 class SupportTicketsRepositoryImpl implements SupportTicketsRepository {
@@ -14,20 +18,36 @@ class SupportTicketsRepositoryImpl implements SupportTicketsRepository {
   const SupportTicketsRepositoryImpl(this._ds);
 
   @override
-  Future<List<SupportTicket>> getAll() => _ds.getAll();
+  Future<List<SupportTicket>> getAll({
+    String? search,
+    String? status,
+    String? priority,
+    String? category,
+    String? companyId,
+  }) => _ds.getAll(
+    search: search,
+    status: status,
+    priority: priority,
+    category: category,
+    companyId: companyId,
+  );
 
   @override
   Future<SupportTicket> getById(String id) => _ds.getById(id);
 
   @override
-  Future<SupportTicket> create(SupportTicket ticket) => _ds.create(SupportTicketModel.fromEntity(ticket));
+  Future<SupportTicket> create(SupportTicket ticket) =>
+      _ds.create(SupportTicketModel.fromEntity(ticket));
 
   @override
-  Future<SupportTicket> addMessage(String ticketId, TicketMessage message) => _ds.addMessage(ticketId, message.text);
+  Future<SupportTicket> addMessage(String ticketId, TicketMessage message) =>
+      _ds.addMessage(ticketId, message.text);
 
   @override
-  Future<SupportTicket> updateStatus(String ticketId, TicketStatus status) => _ds.updateStatus(ticketId, status.name);
+  Future<SupportTicket> updateStatus(String ticketId, TicketStatus status) =>
+      _ds.updateStatus(ticketId, status.name);
 
   @override
-  Future<SupportTicket> assign(String ticketId, String assignee) => _ds.assign(ticketId, assignee);
+  Future<SupportTicket> assign(String ticketId, String assignee) =>
+      _ds.assign(ticketId, assignee);
 }

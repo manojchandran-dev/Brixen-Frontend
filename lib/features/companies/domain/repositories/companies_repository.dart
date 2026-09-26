@@ -1,14 +1,38 @@
 import '../entities/company.dart';
+import '../entities/company_page.dart';
 
 abstract class CompaniesRepository {
   /// [deleted] lists soft-deleted companies instead (for restore).
-  Future<List<Company>> getCompanies({int page = 1, int limit = 50, String? search, bool deleted = false});
+  Future<List<Company>> getCompanies({
+    int page = 1,
+    int limit = 50,
+    String? search,
+    bool deleted = false,
+  });
+
+  /// Companies page: search + status/plan/industry filters, with chip counts.
+  Future<CompanyPage> getCompanyPage({
+    String? search,
+    String? status,
+    String? plan,
+    String? industry,
+    int page = 1,
+    int limit = 50,
+    /// true → the Permissions screen's list, each company with its access counts.
+    bool withAccess = false,
+  });
   Future<Company> getCompanyById(String id);
 
   // Multi-step creation
-  Future<Company> createCompany(Company company);          // POST — step 1 (identity)
-  Future<Company> updateCompanyStep2(String id, Company company); // PUT /step2 (contact)
-  Future<Company> updateCompanyStep3(String id, Company company); // PUT /step3 (location)
+  Future<Company> createCompany(Company company); // POST — step 1 (identity)
+  Future<Company> updateCompanyStep2(
+    String id,
+    Company company,
+  ); // PUT /step2 (contact)
+  Future<Company> updateCompanyStep3(
+    String id,
+    Company company,
+  ); // PUT /step3 (location)
 
   // Status toggle — dedicated endpoint, rejects if onboarding not completed
   Future<Company> updateCompanyStatus(String id, bool isActive);

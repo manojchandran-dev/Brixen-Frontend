@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/datasources/company_categories_remote_datasource.dart';
 import '../../data/datasources/expense_categories_remote_datasource.dart';
@@ -29,6 +30,12 @@ class MasterCubit extends Cubit<MasterState> {
   String _activeType = '';
   String _query = '';
 
+  // Server search results for [_query] (remote types). Kept apart from
+  // [_store] so dropdowns elsewhere (itemsOfType) still see the full list.
+  List<MasterItem>? _searchResults;
+  Timer? _searchDebounce;
+  int _searchGeneration = 0;
+
   bool isRemote(String typeKey) => _repository.isRemote(typeKey);
 
   /// Exposed for the edit form, which needs to fetch a single item fresh
@@ -39,6 +46,8 @@ class MasterCubit extends Cubit<MasterState> {
   Future<void> load(String typeKey) async {
     _activeType = typeKey;
     _query = '';
+    _searchResults = null;
+    _searchDebounce?.cancel();
     if (_repository.isRemote(typeKey)) {
       emit(MasterLoading());
       try {
@@ -54,7 +63,7 @@ class MasterCubit extends Cubit<MasterState> {
     _emit();
   }
 
-  Future<void> add(MasterItem item, {required String companyId}) async {
+  Future<void> add(MasterItem item, {String? companyId}) async {
     if (_repository.isRemote(item.typeKey)) {
       final created = await _repository.create(
         item.typeKey,
@@ -66,6 +75,7 @@ class MasterCubit extends Cubit<MasterState> {
       );
       _store[item.typeKey] = [...(_store[item.typeKey] ?? []), created];
       _emit();
+      _refreshSearch();
       return;
     }
     _store[item.typeKey]?.add(item);
@@ -86,6 +96,7 @@ class MasterCubit extends Cubit<MasterState> {
       final i = list?.indexWhere((x) => x.id == saved.id) ?? -1;
       if (i != -1) list![i] = saved;
       _emit();
+      _refreshSearch();
       return;
     }
     final list = _store[updated.typeKey];
@@ -105,13 +116,44 @@ class MasterCubit extends Cubit<MasterState> {
       }
     }
     _store[_activeType]?.removeWhere((x) => x.id == id);
+    _searchResults?.removeWhere((x) => x.id == id);
     _emit();
     return null;
   }
 
+  /// Name matches from the loaded list show at once; for API-backed types
+  /// the server search (name + description, every item — not just the
+  /// loaded page) replaces them 350ms after typing stops.
   void search(String q) {
     _query = q;
+    _searchResults = null;
+    _searchDebounce?.cancel();
     _emit();
+    final query = q.trim();
+    if (query.isEmpty || !_repository.isRemote(_activeType)) return;
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () async {
+      final generation = ++_searchGeneration;
+      final type = _activeType;
+      try {
+        final results = await _repository.getAll(type, search: query);
+        // A newer search, or another master type, took over meanwhile.
+        if (generation != _searchGeneration || type != _activeType) return;
+        _searchResults = results;
+        _emit();
+      } catch (_) {
+        // Keep the local name matches already shown.
+      }
+    });
+  }
+
+  void _refreshSearch() {
+    if (_query.trim().isNotEmpty) search(_query);
+  }
+
+  @override
+  Future<void> close() {
+    _searchDebounce?.cancel();
+    return super.close();
   }
 
   /// Returns all active items of a given type (for dropdown use in other forms).
@@ -130,11 +172,13 @@ class MasterCubit extends Cubit<MasterState> {
           .where((x) => x.isActive && x.assignedCategoryId == categoryId)
           .toList();
 
+  // Server results are already filtered — pass no query so the state's
+  // name-only filter doesn't drop description matches.
   void _emit() => emit(
     MasterLoaded(
       typeKey: _activeType,
-      items: List.from(_store[_activeType] ?? []),
-      query: _query,
+      items: List.from(_searchResults ?? _store[_activeType] ?? []),
+      query: _searchResults != null ? '' : _query,
     ),
   );
 }

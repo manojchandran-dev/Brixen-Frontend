@@ -5,12 +5,15 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/services/token_service.dart';
 
 /// Standalone Dio for auth — no Bearer token needed for login itself.
+/// Timeouts are long on purpose: the backend (Render + Neon) sleeps when
+/// idle, and the first login after that waits ~20–60s for it to boot. At
+/// 30s that first login timed out and looked like bad credentials.
 final _dio =
     Dio(
         BaseOptions(
           baseUrl: ApiEndpoints.baseUrl,
-          connectTimeout: const Duration(seconds: 30),
-          receiveTimeout: const Duration(seconds: 30),
+          connectTimeout: const Duration(seconds: 90),
+          receiveTimeout: const Duration(seconds: 90),
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -112,14 +115,37 @@ class AuthRemoteDatasource {
           'companyStatus': companyStatus,
       };
     } on DioException catch (e) {
-      final status = e.response?.statusCode;
+      // No reply at all is never "wrong credentials" — say what happened.
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        throw const ApiException(
+          'The server is taking too long to respond. Please try again.',
+        );
+      }
+      if (e.response == null) {
+        throw const ApiException(
+          'Unable to connect to server. Check your internet connection.',
+        );
+      }
+      final status = e.response!.statusCode;
+      final data = e.response!.data;
+      final serverMsg = data is Map ? (data['message'] ?? data['error']) : null;
       final msg =
-          e.response?.data?['message'] ??
-          e.response?.data?['error'] ??
-          e.message ??
-          'Login failed';
+          serverMsg ??
+          switch (status) {
+            401 => 'Invalid email or password',
+            403 => 'Your company account is inactive.',
+            _ => 'Login failed',
+          };
       throw ApiException(msg.toString(), statusCode: status);
     }
+  }
+
+  /// Wakes a sleeping backend in the background so it is warm by the time
+  /// the user submits the sign-in form. Result and errors are ignored.
+  static void warmUp() {
+    _dio.get(ApiEndpoints.health).ignore();
   }
 
   /// Confirms the token currently held by [TokenService] (just restored

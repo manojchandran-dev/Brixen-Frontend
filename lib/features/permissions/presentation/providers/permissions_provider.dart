@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../companies/presentation/providers/companies_provider.dart';
 import '../../../navigation/domain/entities/nav_module.dart';
 import '../../../navigation/presentation/module_visuals.dart';
 import '../../../navigation/presentation/providers/nav_modules_provider.dart';
@@ -13,9 +14,11 @@ import '../../domain/entities/module_permission.dart';
 /// yet is denied (No Access), except Support Ticket / Chatbot — matches
 /// the server.
 final permissionsProvider =
-    AsyncNotifierProvider.family<PermissionsNotifier, List<ModulePermission>, String>(
-  PermissionsNotifier.new,
-);
+    AsyncNotifierProvider.family<
+      PermissionsNotifier,
+      List<ModulePermission>,
+      String
+    >(PermissionsNotifier.new);
 
 class PermissionsNotifier
     extends FamilyAsyncNotifier<List<ModulePermission>, String> {
@@ -116,6 +119,8 @@ class PermissionsNotifier
     state = AsyncData([
       for (final m in current) m.key == merged.key ? merged : m,
     ]);
+    // Refresh the Permissions list's Full/Custom/None counts.
+    ref.invalidate(permissionCompaniesProvider);
   }
 
   /// Persists every module currently shown for this company in one bulk
@@ -126,30 +131,31 @@ class PermissionsNotifier
   Future<void> bulkSave() async {
     final current = state.valueOrNull;
     if (current == null) return;
-    final results = await ref.read(permissionsRepositoryProvider).bulkUpsert(
-      companyId: arg,
-      permissions: [
-        for (final m in current)
-          {
-            'module_id': m.key,
-            'view': m.canView,
-            'create': m.canCreate,
-            'edit': m.canEdit,
-            'delete': m.canDelete,
-          },
-      ],
-    );
+    final results = await ref
+        .read(permissionsRepositoryProvider)
+        .bulkUpsert(
+          companyId: arg,
+          permissions: [
+            for (final m in current)
+              {
+                'module_id': m.key,
+                'view': m.canView,
+                'create': m.canCreate,
+                'edit': m.canEdit,
+                'delete': m.canDelete,
+              },
+          ],
+        );
     final byModuleId = {for (final r in results) r.moduleId: r};
     state = AsyncData([
       for (final m in current)
         if (byModuleId[m.key] case final saved?)
-          m.copyWith(
-            remoteId: saved.id,
-            accessLevel: _levelOf(saved),
-          )
+          m.copyWith(remoteId: saved.id, accessLevel: _levelOf(saved))
         else
           m,
     ]);
+    // Refresh the Permissions list's Full/Custom/None counts.
+    ref.invalidate(permissionCompaniesProvider);
   }
 
   /// "Delete" — removes every saved override for this company, so every
@@ -165,6 +171,7 @@ class PermissionsNotifier
       }
     }
     ref.invalidateSelf();
+    ref.invalidate(permissionCompaniesProvider);
     await future;
   }
 }

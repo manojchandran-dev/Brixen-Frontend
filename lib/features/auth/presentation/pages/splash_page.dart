@@ -149,7 +149,6 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
                         ],
                       ),
                       style: const TextStyle(
-                        fontFamily: 'SpaceGrotesk',
                         fontSize: 36,
                         fontWeight: FontWeight.w700,
                         letterSpacing: -1,

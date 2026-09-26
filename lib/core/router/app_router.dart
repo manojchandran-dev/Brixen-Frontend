@@ -54,6 +54,7 @@ import '../../features/security/presentation/pages/lock_screen_page.dart';
 import '../../features/security/presentation/pages/pin_setup_page.dart';
 import '../../features/security/presentation/pages/security_settings_page.dart';
 import '../../features/security/presentation/pages/set_pin_page.dart';
+import '../../shared/widgets/exit_guard.dart';
 
 class AppRouter {
   AppRouter._();
@@ -121,251 +122,311 @@ class AppRouter {
   static const String setPin = RouteNames.setPin;
   static const String pinSetup = RouteNames.pinSetup;
 
+  /// [child]'s path relative to [parent] — go_router nested routes take
+  /// relative paths, while [RouteNames] keeps the full ones for go/push.
+  static String _sub(String child, String parent) {
+    assert(child.startsWith('$parent/'), '$child is not under $parent');
+    return child.substring(parent.length + 1);
+  }
+
   static final GoRouter router = GoRouter(
     initialLocation: splash,
     routes: [
       GoRoute(path: splash, builder: (context, state) => const SplashPage()),
-      GoRoute(path: signIn, builder: (context, state) => const SignInPage()),
+      GoRoute(
+        path: signIn,
+        builder: (context, state) => const ExitGuard(child: SignInPage()),
+      ),
       GoRoute(path: signUp, builder: (context, state) => const SignUpPage()),
       GoRoute(
         path: forgotPassword,
         builder: (context, state) => const ForgotPasswordPage(),
       ),
-      GoRoute(path: profile, builder: (context, state) => const ProfilePage()),
-      GoRoute(
-        path: changePassword,
-        builder: (context, state) => const ChangePasswordPage(),
-      ),
-      GoRoute(
-        path: companies,
-        builder: (context, state) =>
-            CompaniesPage(initialSection: state.extra as String?),
-      ),
       GoRoute(
         path: dashboard,
-        pageBuilder: (context, state) =>
-            const NoTransitionPage(child: DashboardHomePage()),
-      ),
-      GoRoute(
-        path: report,
-        pageBuilder: (context, state) =>
-            const NoTransitionPage(child: ReportHomePage()),
-      ),
-      GoRoute(
-        path: more,
-        pageBuilder: (context, state) =>
-            const NoTransitionPage(child: MoreHomePage()),
-      ),
-      GoRoute(
-        path: createCompany,
-        builder: (context, state) {
-          final extra = state.extra;
-          if (extra is Map) {
-            return CreateCompanyPage(editCompany: extra['edit'] as Company?);
-          }
-          return CreateCompanyPage(fromMenu: extra == 'menu');
-        },
-      ),
-      GoRoute(
-        path: sales,
-        builder: (context, state) =>
-            SalesPage(fromMasters: state.extra == 'masters'),
-      ),
-      GoRoute(
-        path: createSale,
-        builder: (context, state) {
-          final extra = state.extra;
-          if (extra is Map) {
-            return CreateSalePage(
-              fromMasters: extra['fromMasters'] == true,
-              fromMenu: extra['fromMenu'] == true,
-              editSale: extra['sale'] as Sale?,
-            );
-          }
-          return CreateSalePage(
-            fromMenu: extra == 'menu',
-            fromMasters: extra == 'masters',
-          );
-        },
-      ),
-      GoRoute(
-        path: customers,
-        builder: (context, state) =>
-            CustomersPage(fromMasters: state.extra == 'masters'),
-      ),
-      GoRoute(
-        path: createCustomer,
-        builder: (context, state) {
-          final extra = state.extra;
-          if (extra is Customer) return CreateCustomerPage(editCustomer: extra);
-          return CreateCustomerPage(fromMasters: extra == 'masters');
-        },
-      ),
-      GoRoute(
-        path: purchases,
-        builder: (context, state) =>
-            PurchasesPage(fromMasters: state.extra == 'masters'),
-      ),
-      GoRoute(
-        path: createPurchase,
-        builder: (context, state) {
-          final extra = state.extra;
-          if (extra is Map) {
-            return CreatePurchasePage(
-              fromMasters: extra['fromMasters'] == true,
-              editPurchase: extra['purchase'] as Purchase?,
-            );
-          }
-          return CreatePurchasePage(fromMasters: extra == 'masters');
-        },
-      ),
-      GoRoute(
-        path: expenses,
-        builder: (context, state) =>
-            ExpensesPage(fromMasters: state.extra == 'masters'),
-      ),
-      GoRoute(
-        path: createExpense,
-        builder: (context, state) {
-          final extra = state.extra;
-          if (extra is Expense) return CreateExpensePage(editExpense: extra);
-          return CreateExpensePage(fromMasters: extra == 'masters');
-        },
-      ),
-      GoRoute(
-        path: employees,
-        builder: (context, state) =>
-            EmployeesPage(fromMasters: state.extra == 'masters'),
-      ),
-      GoRoute(
-        path: createEmployee,
-        builder: (context, state) {
-          final extra = state.extra;
-          if (extra is Employee) return CreateEmployeePage(editEmployee: extra);
-          return CreateEmployeePage(fromMasters: extra == 'masters');
-        },
-      ),
-      GoRoute(
-        path: products,
-        builder: (context, state) =>
-            ProductsPage(fromMasters: state.extra == 'masters'),
-      ),
-      GoRoute(
-        path: createProduct,
-        builder: (context, state) {
-          final extra = state.extra;
-          if (extra is Product) return CreateProductPage(editProduct: extra);
-          return CreateProductPage(fromMasters: extra == 'masters');
-        },
-      ),
-      GoRoute(
-        path: permissions,
-        builder: (context, state) => const PermissionManagementPage(),
-      ),
-      GoRoute(
-        path: createPermission,
-        builder: (context, state) =>
-            CreatePermissionPage(company: state.extra as Company?),
-      ),
-      GoRoute(
-        path: pushNotifications,
-        builder: (context, state) => const PushNotificationsPage(),
-      ),
-      GoRoute(
-        path: createPushNotification,
-        builder: (context, state) => CreatePushNotificationPage(
-          editNotification: state.extra as PushNotification?,
+        pageBuilder: (context, state) => const NoTransitionPage(
+          child: ExitGuard(child: DashboardHomePage()),
         ),
-      ),
-      GoRoute(
-        path: announcements,
-        builder: (context, state) => const AnnouncementsPage(),
-      ),
-      GoRoute(
-        path: createAnnouncement,
-        builder: (context, state) => CreateAnnouncementPage(
-          editAnnouncement: state.extra as Announcement?,
-        ),
-      ),
-      GoRoute(
-        path: support,
-        builder: (context, state) => const SupportTicketsPage(),
-      ),
-      GoRoute(
-        path: createTicket,
-        builder: (context, state) => const CreateTicketPage(),
-      ),
-      GoRoute(
-        path: ticketDetail,
-        builder: (context, state) {
-          final ticket = state.extra as SupportTicket;
-          return Session.isSuperAdmin
-              ? TicketManagePage(ticket: ticket)
-              : TicketDetailPage(ticket: ticket);
-        },
-      ),
-      GoRoute(path: chat, builder: (context, state) => const ChatPage()),
-      GoRoute(
-        path: chatRoom,
-        builder: (context, state) {
-          final extra = state.extra as Map;
-          return ChatRoomPage(
-            companyId: extra['companyId'] as String,
-            companyName: extra['companyName'] as String,
-          );
-        },
-      ),
-      GoRoute(
-        path: moduleAccess,
-        builder: (context, state) {
-          final extra = state.extra as Map;
-          return ModuleAccessPage(
-            companyId: extra['companyId'] as String,
-            moduleKey: extra['moduleKey'] as String,
-          );
-        },
-      ),
-      GoRoute(
-        path: masterCompanyCategories,
-        builder: (context, state) =>
-            const MasterCategoryPage(typeKey: 'companyCategory'),
-      ),
-      GoRoute(
-        path: masterExpenseCategories,
-        builder: (context, state) =>
-            const MasterCategoryPage(typeKey: 'expenseCategory'),
-      ),
-      GoRoute(
-        path: masterProductCategories,
-        builder: (context, state) =>
-            const MasterCategoryPage(typeKey: 'productCategory'),
-      ),
-      GoRoute(
-        path: masterUnits,
-        builder: (context, state) => const MasterCategoryPage(typeKey: 'unit'),
+        routes: [
+          GoRoute(
+            path: _sub(companies, dashboard),
+            builder: (context, state) =>
+                CompaniesPage(initialSection: state.extra as String?),
+            routes: [
+              GoRoute(
+                path: _sub(createCompany, companies),
+                builder: (context, state) {
+                  final extra = state.extra;
+                  if (extra is Map) {
+                    return CreateCompanyPage(
+                      editCompany: extra['edit'] as Company?,
+                    );
+                  }
+                  return CreateCompanyPage(fromMenu: extra == 'menu');
+                },
+              ),
+            ],
+          ),
+          GoRoute(
+            path: _sub(report, dashboard),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ReportHomePage()),
+          ),
+          GoRoute(
+            path: _sub(more, dashboard),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: MoreHomePage()),
+          ),
+          GoRoute(
+            path: _sub(sales, dashboard),
+            builder: (context, state) =>
+                SalesPage(fromMasters: state.extra == 'masters'),
+            routes: [
+              GoRoute(
+                path: _sub(createSale, sales),
+                builder: (context, state) {
+                  final extra = state.extra;
+                  if (extra is Map) {
+                    return CreateSalePage(
+                      fromMasters: extra['fromMasters'] == true,
+                      fromMenu: extra['fromMenu'] == true,
+                      editSale: extra['sale'] as Sale?,
+                    );
+                  }
+                  return CreateSalePage(
+                    fromMenu: extra == 'menu',
+                    fromMasters: extra == 'masters',
+                  );
+                },
+              ),
+            ],
+          ),
+          GoRoute(
+            path: _sub(customers, dashboard),
+            builder: (context, state) =>
+                CustomersPage(fromMasters: state.extra == 'masters'),
+            routes: [
+              GoRoute(
+                path: _sub(createCustomer, customers),
+                builder: (context, state) {
+                  final extra = state.extra;
+                  if (extra is Customer) {
+                    return CreateCustomerPage(editCustomer: extra);
+                  }
+                  return CreateCustomerPage(fromMasters: extra == 'masters');
+                },
+              ),
+            ],
+          ),
+          GoRoute(
+            path: _sub(purchases, dashboard),
+            builder: (context, state) =>
+                PurchasesPage(fromMasters: state.extra == 'masters'),
+            routes: [
+              GoRoute(
+                path: _sub(createPurchase, purchases),
+                builder: (context, state) {
+                  final extra = state.extra;
+                  if (extra is Map) {
+                    return CreatePurchasePage(
+                      fromMasters: extra['fromMasters'] == true,
+                      editPurchase: extra['purchase'] as Purchase?,
+                    );
+                  }
+                  return CreatePurchasePage(fromMasters: extra == 'masters');
+                },
+              ),
+            ],
+          ),
+          GoRoute(
+            path: _sub(expenses, dashboard),
+            builder: (context, state) =>
+                ExpensesPage(fromMasters: state.extra == 'masters'),
+            routes: [
+              GoRoute(
+                path: _sub(createExpense, expenses),
+                builder: (context, state) {
+                  final extra = state.extra;
+                  if (extra is Expense) {
+                    return CreateExpensePage(editExpense: extra);
+                  }
+                  return CreateExpensePage(fromMasters: extra == 'masters');
+                },
+              ),
+            ],
+          ),
+          GoRoute(
+            path: _sub(employees, dashboard),
+            builder: (context, state) =>
+                EmployeesPage(fromMasters: state.extra == 'masters'),
+            routes: [
+              GoRoute(
+                path: _sub(createEmployee, employees),
+                builder: (context, state) {
+                  final extra = state.extra;
+                  if (extra is Employee) {
+                    return CreateEmployeePage(editEmployee: extra);
+                  }
+                  return CreateEmployeePage(fromMasters: extra == 'masters');
+                },
+              ),
+            ],
+          ),
+          GoRoute(
+            path: _sub(products, dashboard),
+            builder: (context, state) =>
+                ProductsPage(fromMasters: state.extra == 'masters'),
+            routes: [
+              GoRoute(
+                path: _sub(createProduct, products),
+                builder: (context, state) {
+                  final extra = state.extra;
+                  if (extra is Product) {
+                    return CreateProductPage(editProduct: extra);
+                  }
+                  return CreateProductPage(fromMasters: extra == 'masters');
+                },
+              ),
+            ],
+          ),
+          GoRoute(
+            path: _sub(permissions, dashboard),
+            builder: (context, state) => const PermissionManagementPage(),
+            routes: [
+              GoRoute(
+                path: _sub(createPermission, permissions),
+                builder: (context, state) =>
+                    CreatePermissionPage(company: state.extra as Company?),
+              ),
+              GoRoute(
+                path: _sub(moduleAccess, permissions),
+                builder: (context, state) {
+                  final extra = state.extra as Map;
+                  return ModuleAccessPage(
+                    companyId: extra['companyId'] as String,
+                    moduleKey: extra['moduleKey'] as String,
+                  );
+                },
+              ),
+            ],
+          ),
+          GoRoute(
+            path: _sub(pushNotifications, dashboard),
+            builder: (context, state) => const PushNotificationsPage(),
+            routes: [
+              GoRoute(
+                path: _sub(createPushNotification, pushNotifications),
+                builder: (context, state) => CreatePushNotificationPage(
+                  editNotification: state.extra as PushNotification?,
+                ),
+              ),
+            ],
+          ),
+          GoRoute(
+            path: _sub(announcements, dashboard),
+            builder: (context, state) => const AnnouncementsPage(),
+            routes: [
+              GoRoute(
+                path: _sub(createAnnouncement, announcements),
+                builder: (context, state) => CreateAnnouncementPage(
+                  editAnnouncement: state.extra as Announcement?,
+                ),
+              ),
+            ],
+          ),
+          GoRoute(
+            path: _sub(support, dashboard),
+            builder: (context, state) => const SupportTicketsPage(),
+            routes: [
+              GoRoute(
+                path: _sub(createTicket, support),
+                builder: (context, state) => const CreateTicketPage(),
+              ),
+              GoRoute(
+                path: _sub(ticketDetail, support),
+                builder: (context, state) {
+                  final ticket = state.extra as SupportTicket;
+                  return Session.isSuperAdmin
+                      ? TicketManagePage(ticket: ticket)
+                      : TicketDetailPage(ticket: ticket);
+                },
+              ),
+            ],
+          ),
+          GoRoute(
+            path: _sub(chat, dashboard),
+            builder: (context, state) => const ChatPage(),
+            routes: [
+              GoRoute(
+                path: _sub(chatRoom, chat),
+                builder: (context, state) {
+                  final extra = state.extra as Map;
+                  return ChatRoomPage(
+                    companyId: extra['companyId'] as String,
+                    companyName: extra['companyName'] as String,
+                  );
+                },
+              ),
+            ],
+          ),
+          GoRoute(
+            path: _sub(masterCompanyCategories, dashboard),
+            builder: (context, state) =>
+                const MasterCategoryPage(typeKey: 'companyCategory'),
+          ),
+          GoRoute(
+            path: _sub(masterExpenseCategories, dashboard),
+            builder: (context, state) =>
+                const MasterCategoryPage(typeKey: 'expenseCategory'),
+          ),
+          GoRoute(
+            path: _sub(masterProductCategories, dashboard),
+            builder: (context, state) =>
+                const MasterCategoryPage(typeKey: 'productCategory'),
+          ),
+          GoRoute(
+            path: _sub(masterUnits, dashboard),
+            builder: (context, state) =>
+                const MasterCategoryPage(typeKey: 'unit'),
+          ),
+          GoRoute(
+            path: _sub(profile, dashboard),
+            builder: (context, state) => const ProfilePage(),
+            routes: [
+              GoRoute(
+                path: _sub(changePassword, profile),
+                builder: (context, state) => const ChangePasswordPage(),
+              ),
+            ],
+          ),
+          GoRoute(
+            path: _sub(security, dashboard),
+            builder: (context, state) => BlocProvider.value(
+              value: securityCubit,
+              child: const SecuritySettingsPage(),
+            ),
+            routes: [
+              GoRoute(
+                path: _sub(setPin, security),
+                builder: (context, state) => BlocProvider.value(
+                  value: securityCubit,
+                  child: const SetPinPage(),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       GoRoute(
         path: pinSetup,
-        builder: (context, state) => const PinSetupPage(),
+        builder: (context, state) => const ExitGuard(child: PinSetupPage()),
       ),
       GoRoute(
         path: lockScreen,
         builder: (context, state) => BlocProvider.value(
           value: securityCubit,
-          child: const LockScreenPage(),
+          child: const ExitGuard(child: LockScreenPage()),
         ),
-      ),
-      GoRoute(
-        path: security,
-        builder: (context, state) => BlocProvider.value(
-          value: securityCubit,
-          child: const SecuritySettingsPage(),
-        ),
-      ),
-      GoRoute(
-        path: setPin,
-        builder: (context, state) =>
-            BlocProvider.value(value: securityCubit, child: const SetPinPage()),
       ),
     ],
   );

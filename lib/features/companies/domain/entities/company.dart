@@ -1,5 +1,13 @@
 import 'package:equatable/equatable.dart';
 
+/// How many of a company's grantable modules have Full / Custom / No access
+/// (`access` on `GET /permissions/companies` items).
+class AccessCounts {
+  final int full, custom, none;
+  const AccessCounts({this.full = 0, this.custom = 0, this.none = 0});
+  int get total => full + custom + none;
+}
+
 class Company extends Equatable {
   final String id;
   final String name;
@@ -16,7 +24,16 @@ class Company extends Equatable {
   final String? state;
   final String? country;
   final String? pincode;
+
+  /// Company Category master's name — [companyCategoryId] is its id.
   final String? industryType;
+  final String? companyCategoryId;
+
+  /// Hosted image URLs (from `POST /uploads`): one logo, up to 3 pictures.
+  final String? logoUrl;
+  final List<String> galleryUrls;
+  /// Only set on the Permissions screen's list.
+  final AccessCounts? access;
   final String? entityType;
   final String? subscriptionPlan;
   final String? onboardingStatus;
@@ -40,6 +57,10 @@ class Company extends Equatable {
     this.country,
     this.pincode,
     this.industryType,
+    this.companyCategoryId,
+    this.logoUrl,
+    this.galleryUrls = const [],
+    this.access,
     this.entityType,
     this.subscriptionPlan,
     this.onboardingStatus,
@@ -71,34 +92,40 @@ class Company extends Equatable {
     String? country,
     String? pincode,
     String? industryType,
+    String? companyCategoryId,
+    String? logoUrl,
+    List<String>? galleryUrls,
     String? entityType,
     String? subscriptionPlan,
     String? onboardingStatus,
     bool? isActive,
-  }) =>
-      Company(
-        id: id,
-        name: name ?? this.name,
-        code: code ?? this.code,
-        ownerName: ownerName ?? this.ownerName,
-        email: email ?? this.email,
-        phone: phone ?? this.phone,
-        secondaryEmail: secondaryEmail ?? this.secondaryEmail,
-        website: website ?? this.website,
-        gstNumber: gstNumber ?? this.gstNumber,
-        panNumber: panNumber ?? this.panNumber,
-        address: address ?? this.address,
-        city: city ?? this.city,
-        state: state ?? this.state,
-        country: country ?? this.country,
-        pincode: pincode ?? this.pincode,
-        industryType: industryType ?? this.industryType,
-        entityType: entityType ?? this.entityType,
-        subscriptionPlan: subscriptionPlan ?? this.subscriptionPlan,
-        onboardingStatus: onboardingStatus ?? this.onboardingStatus,
-        isActive: isActive ?? this.isActive,
-        createdAt: createdAt,
-      );
+  }) => Company(
+    id: id,
+    name: name ?? this.name,
+    code: code ?? this.code,
+    ownerName: ownerName ?? this.ownerName,
+    email: email ?? this.email,
+    phone: phone ?? this.phone,
+    secondaryEmail: secondaryEmail ?? this.secondaryEmail,
+    website: website ?? this.website,
+    gstNumber: gstNumber ?? this.gstNumber,
+    panNumber: panNumber ?? this.panNumber,
+    address: address ?? this.address,
+    city: city ?? this.city,
+    state: state ?? this.state,
+    country: country ?? this.country,
+    pincode: pincode ?? this.pincode,
+    industryType: industryType ?? this.industryType,
+    companyCategoryId: companyCategoryId ?? this.companyCategoryId,
+    logoUrl: logoUrl ?? this.logoUrl,
+    galleryUrls: galleryUrls ?? this.galleryUrls,
+    access: access,
+    entityType: entityType ?? this.entityType,
+    subscriptionPlan: subscriptionPlan ?? this.subscriptionPlan,
+    onboardingStatus: onboardingStatus ?? this.onboardingStatus,
+    isActive: isActive ?? this.isActive,
+    createdAt: createdAt,
+  );
 
   @override
   List<Object?> get props => [id, name, code, email, isActive, createdAt];

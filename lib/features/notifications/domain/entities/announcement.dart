@@ -5,6 +5,7 @@ class Announcement {
   final String id;
   final String title;
   final String shortDescription;
+
   /// Quill Delta JSON string (flutter_quill's `Document.toDelta().toJson()`
   /// round-tripped through `jsonEncode`) — not plain text.
   final String content;

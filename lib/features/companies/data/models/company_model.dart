@@ -18,6 +18,10 @@ class CompanyModel extends Company {
     super.country,
     super.pincode,
     super.industryType,
+    super.companyCategoryId,
+    super.logoUrl,
+    super.galleryUrls,
+    super.access,
     super.entityType,
     super.subscriptionPlan,
     super.onboardingStatus,
@@ -43,10 +47,23 @@ class CompanyModel extends Company {
       country: json['country'],
       pincode: json['pincode'],
       industryType: json['industry_type'] ?? json['industryType'],
+      companyCategoryId: json['company_category_id']?.toString(),
+      logoUrl: json['logo_url']?.toString(),
+      galleryUrls: json['gallery_urls'] is List
+          ? [for (final u in json['gallery_urls'] as List) u.toString()]
+          : const [],
+      access: json['access'] is Map
+          ? AccessCounts(
+              full: (json['access']['full'] as num?)?.toInt() ?? 0,
+              custom: (json['access']['custom'] as num?)?.toInt() ?? 0,
+              none: (json['access']['none'] as num?)?.toInt() ?? 0,
+            )
+          : null,
       entityType: json['entity_type'] ?? json['entityType'],
       subscriptionPlan: json['subscription_plan'] ?? json['subscriptionPlan'],
       onboardingStatus: json['onboarding_status'] ?? json['onboardingStatus'],
-      isActive: _parseStatus(json['status']) ??
+      isActive:
+          _parseStatus(json['status']) ??
           (json['is_active'] ?? json['isActive'] ?? true),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()

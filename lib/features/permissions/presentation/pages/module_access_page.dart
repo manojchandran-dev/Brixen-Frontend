@@ -34,12 +34,7 @@ class _ModuleAccessPageState extends ConsumerState<ModuleAccessPage> {
     setState(() => _staged = _staged!.withAccessLevel(level));
   }
 
-  void _setFlag({
-    bool? view,
-    bool? create,
-    bool? edit,
-    bool? delete,
-  }) {
+  void _setFlag({bool? view, bool? create, bool? edit, bool? delete}) {
     setState(
       () => _staged = _staged!.copyWith(
         canView: view,
@@ -71,8 +66,9 @@ class _ModuleAccessPageState extends ConsumerState<ModuleAccessPage> {
   @override
   Widget build(BuildContext context) {
     final permissionsAsync = ref.watch(permissionsProvider(widget.companyId));
-    _staged ??= permissionsAsync.valueOrNull
-        ?.firstWhere((m) => m.key == widget.moduleKey);
+    _staged ??= permissionsAsync.valueOrNull?.firstWhere(
+      (m) => m.key == widget.moduleKey,
+    );
 
     if (_staged == null) {
       return Scaffold(
@@ -86,15 +82,22 @@ class _ModuleAccessPageState extends ConsumerState<ModuleAccessPage> {
           ),
           title: Text(
             'Module Access',
-            style: TextStyle(color: AppColors.ink, fontSize: 17, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              color: AppColors.ink,
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
         body: permissionsAsync.hasError
             ? ErrorCard(
                 error: permissionsAsync.error!,
-                onRetry: () => ref.invalidate(permissionsProvider(widget.companyId)),
+                onRetry: () =>
+                    ref.invalidate(permissionsProvider(widget.companyId)),
               )
-            : const Center(child: CircularProgressIndicator(color: AppColors.brand)),
+            : const Center(
+                child: CircularProgressIndicator(color: AppColors.brand),
+              ),
       );
     }
 
@@ -223,7 +226,9 @@ class _ModuleCard extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: AppColors.accentGradient(module.color).map((c) => c.withValues(alpha: 0.12)).toList(),
+          colors: AppColors.accentGradient(
+            module.color,
+          ).map((c) => c.withValues(alpha: 0.12)).toList(),
         ),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: module.color.withValues(alpha: 0.2)),

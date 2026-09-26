@@ -21,7 +21,7 @@ abstract class RemoteMasterDatasource {
     String? description,
     String? fullForm,
     bool isActive = true,
-    required String companyId,
+    String? companyId,
   });
 
   Future<MasterItem> update(

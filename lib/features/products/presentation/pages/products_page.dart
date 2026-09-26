@@ -19,6 +19,8 @@ import '../../../../shared/widgets/picked_image.dart';
 import '../../data/repositories/products_repository_impl.dart';
 import '../../domain/entities/product.dart';
 import '../providers/products_provider.dart';
+import '../../../../shared/widgets/list_count_bar.dart';
+import '../../../../shared/widgets/module_title.dart';
 
 class ProductsPage extends ConsumerStatefulWidget {
   final bool fromMasters;
@@ -175,74 +177,54 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                   ],
                 ),
               )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Products',
-                    style: TextStyle(
-                      color: cs.onSurface,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  productsAsync.whenOrNull(
-                        data: (list) => Text(
-                          '${list.length} records',
-                          style: TextStyle(
-                            color: cs.onSurfaceVariant,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ) ??
-                      const SizedBox.shrink(),
-                ],
-              ),
+            : ModuleTitle(title: 'Products', subtitle: 'Your product catalog'),
         actions: [
-          if (ref.watch(moduleAccessProvider('Products')).delete) DeletedItemsButton(
-            title: 'Deleted products',
-            listPath: ApiEndpoints.products,
-            restorePath: (p) => '${ApiEndpoints.products}/${p['id']}/restore',
-            labelOf: (p) => (p['product_name'] ?? '').toString(),
-            subtitleOf: (p) => p['color'] as String?,
-            onRestored: () => ref.invalidate(productsProvider),
-          ),
-          if (ref.watch(moduleAccessProvider('Products')).create) GestureDetector(
-            onTap: () => context.push(
-              AppRouter.createProduct,
-              extra: widget.fromMasters ? 'masters' : null,
+          if (ref.watch(moduleAccessProvider('Products')).delete)
+            DeletedItemsButton(
+              title: 'Deleted products',
+              listPath: ApiEndpoints.products,
+              restorePath: (p) => '${ApiEndpoints.products}/${p['id']}/restore',
+              labelOf: (p) => (p['product_name'] ?? '').toString(),
+              subtitleOf: (p) => p['color'] as String?,
+              onRestored: () => ref.invalidate(productsProvider),
             ),
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
-              width: 38,
-              height: 38,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                gradient: isDark
-                    ? AppColors.silverGradient
-                    : const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [AppColors.brand, AppColors.brandDeep],
+          if (ref.watch(moduleAccessProvider('Products')).create)
+            GestureDetector(
+              onTap: () => context.push(
+                AppRouter.createProduct,
+                extra: widget.fromMasters ? 'masters' : null,
+              ),
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
+                width: 38,
+                height: 38,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  gradient: isDark
+                      ? AppColors.silverGradient
+                      : const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [AppColors.brand, AppColors.brandDeep],
+                        ),
+                  borderRadius: BorderRadius.circular(13),
+                  boxShadow: AppColors.shadows([
+                    BoxShadow(
+                      color: AppColors.brand.withValues(
+                        alpha: isDark ? 0.0 : 0.4,
                       ),
-                borderRadius: BorderRadius.circular(13),
-                boxShadow: AppColors.shadows([
-                  BoxShadow(
-                    color: AppColors.brand.withValues(
-                      alpha: isDark ? 0.0 : 0.4,
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ]),
-              ),
-              child: Icon(
-                Icons.add_rounded,
-                size: 20,
-                color: isDark ? AppColors.black : AppColors.white,
+                  ]),
+                ),
+                child: Icon(
+                  Icons.add_rounded,
+                  size: 20,
+                  color: isDark ? AppColors.black : AppColors.white,
+                ),
               ),
             ),
-          ),
         ],
       ),
       body: Column(
@@ -345,12 +327,22 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                   );
                 }
 
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) =>
-                      _ProductCard(product: filtered[i], index: i),
+                return Column(
+                  children: [
+                    ListCountBar(
+                      label: 'Total Products',
+                      count: filtered.length,
+                    ),
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (_, i) =>
+                            _ProductCard(product: filtered[i], index: i),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -388,24 +380,27 @@ class _ProductCard extends ConsumerWidget {
     return SwipeActions(
       onTap: () => _showProductDetail(context, ref, product, accent),
       actions: [
-        if (ref.watch(moduleAccessProvider('Products')).edit) SwipeAction(
-          icon: Icons.sync_alt_rounded,
-          label: 'Status',
-          color: AppColors.accentGold,
-          onTap: () => _openStatusPicker(context, ref),
-        ),
-        if (ref.watch(moduleAccessProvider('Products')).edit) SwipeAction(
-          icon: Icons.edit_outlined,
-          label: 'Edit',
-          color: AppColors.accentIndigo,
-          onTap: () => context.push(AppRouter.createProduct, extra: product),
-        ),
-        if (ref.watch(moduleAccessProvider('Products')).delete) SwipeAction(
-          icon: Icons.delete_outline,
-          label: 'Delete',
-          color: AppColors.brandBlack,
-          onTap: () => _confirmDelete(context, ref),
-        ),
+        if (ref.watch(moduleAccessProvider('Products')).edit)
+          SwipeAction(
+            icon: Icons.sync_alt_rounded,
+            label: 'Status',
+            color: AppColors.accentGold,
+            onTap: () => _openStatusPicker(context, ref),
+          ),
+        if (ref.watch(moduleAccessProvider('Products')).edit)
+          SwipeAction(
+            icon: Icons.edit_outlined,
+            label: 'Edit',
+            color: AppColors.accentIndigo,
+            onTap: () => context.push(AppRouter.createProduct, extra: product),
+          ),
+        if (ref.watch(moduleAccessProvider('Products')).delete)
+          SwipeAction(
+            icon: Icons.delete_outline,
+            label: 'Delete',
+            color: AppColors.brandBlack,
+            onTap: () => _confirmDelete(context, ref),
+          ),
       ],
       child: RichCardShell(
         accentColor: accent,
@@ -442,10 +437,16 @@ class _ProductCard extends ConsumerWidget {
                           style: TextStyle(fontSize: 9, color: fgMuted),
                         ),
                         Text(
-                          [product.gender, product.designPattern, product.color]
-                              .where((s) => s != null && s.isNotEmpty)
-                              .join(' · '),
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: fg),
+                          [
+                            product.gender,
+                            product.designPattern,
+                            product.color,
+                          ].where((s) => s != null && s.isNotEmpty).join(' · '),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: fg,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 8),
@@ -460,7 +461,9 @@ class _ProductCard extends ConsumerWidget {
                             const SizedBox(width: 18),
                             _MiniLabelValue(
                               label: 'Category',
-                              value: product.category.isEmpty ? '—' : product.category,
+                              value: product.category.isEmpty
+                                  ? '—'
+                                  : product.category,
                               fgMuted: fgMuted,
                               fg: fg,
                             ),
@@ -563,7 +566,9 @@ class _ProductCard extends ConsumerWidget {
                     .read(productsProvider.notifier)
                     .deleteProduct(
                       product.id,
-                      companyId: Session.isSuperAdmin ? product.companyId : null,
+                      companyId: Session.isSuperAdmin
+                          ? product.companyId
+                          : null,
                     );
               } catch (e) {
                 if (context.mounted) {
@@ -579,7 +584,7 @@ class _ProductCard extends ConsumerWidget {
             child: Text(
               'Delete',
               style: TextStyle(
-                color: AppColors.accentRose,
+                color: AppColors.ink,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -619,11 +624,19 @@ class _Thumb extends StatelessWidget {
                         colors: AppColors.accentGradient(accent),
                       ),
                     ),
-                    child: const Icon(Icons.checkroom_rounded, size: 30, color: AppColors.white),
+                    child: const Icon(
+                      Icons.checkroom_rounded,
+                      size: 30,
+                      color: AppColors.white,
+                    ),
                   )
                 : pickedImage(images.first, width: 92, height: 108),
           ),
-          Positioned(top: 6, left: 6, child: _StatusPill(status: product.status)),
+          Positioned(
+            top: 6,
+            left: 6,
+            child: _StatusPill(status: product.status),
+          ),
           if (extra > 0)
             Positioned(
               bottom: 6,
@@ -634,8 +647,14 @@ class _Thumb extends StatelessWidget {
                   color: Colors.black.withValues(alpha: 0.65),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text('+$extra',
-                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                child: Text(
+                  '+$extra',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
         ],
@@ -664,7 +683,10 @@ class _StatusPill extends StatelessWidget {
           Container(
             width: 6,
             height: 6,
-            decoration: const BoxDecoration(color: AppColors.white, shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+              color: AppColors.white,
+              shape: BoxShape.circle,
+            ),
           ),
           const SizedBox(width: 5),
           Text(
@@ -702,7 +724,11 @@ class _MiniLabelValue extends StatelessWidget {
         Text(label, style: TextStyle(fontSize: 9, color: fgMuted)),
         Text(
           value,
-          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: fg),
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            color: fg,
+          ),
           overflow: TextOverflow.ellipsis,
         ),
       ],
@@ -747,12 +773,19 @@ class _StatBlock extends StatelessWidget {
               children: [
                 Text(
                   amount,
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.ink,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   label,
-                  style: TextStyle(fontSize: 9, color: AppColors.ink.withValues(alpha: 0.6)),
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: AppColors.ink.withValues(alpha: 0.6),
+                  ),
                   maxLines: 2,
                   softWrap: true,
                 ),
@@ -792,7 +825,9 @@ void _openProductStatusPicker(
                     .read(productsProvider.notifier)
                     .updateProduct(
                       product.copyWith(status: s),
-                      companyId: Session.isSuperAdmin ? product.companyId : null,
+                      companyId: Session.isSuperAdmin
+                          ? product.companyId
+                          : null,
                     );
               } catch (e) {
                 if (context.mounted) {
@@ -824,69 +859,80 @@ void _showProductDetail(
       avatarGradient: AppColors.accentGradient(accent),
       title: product.productName,
       subtitle: product.productCode,
-      onEdit: !ref.read(moduleAccessProvider('Products')).edit ? null : () {
-        Navigator.of(ctx).pop();
-        ctx.push(AppRouter.createProduct, extra: product);
-      },
-      onDelete: !ref.read(moduleAccessProvider('Products')).delete ? null : () async {
-        final confirmed = await showDialog<bool>(
-          context: ctx,
-          builder: (dCtx) => AlertDialog(
-            backgroundColor: Theme.of(dCtx).scaffoldBackgroundColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Text(
-              'Delete Product',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.ink,
-              ),
-            ),
-            content: Text(
-              'Delete "${product.productName}"? This cannot be undone.',
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dCtx).pop(false),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(dCtx).pop(true),
-                child: Text(
-                  'Delete',
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    fontWeight: FontWeight.w700,
+      onEdit: !ref.read(moduleAccessProvider('Products')).edit
+          ? null
+          : () {
+              Navigator.of(ctx).pop();
+              ctx.push(AppRouter.createProduct, extra: product);
+            },
+      onDelete: !ref.read(moduleAccessProvider('Products')).delete
+          ? null
+          : () async {
+              final confirmed = await showDialog<bool>(
+                context: ctx,
+                builder: (dCtx) => AlertDialog(
+                  backgroundColor: Theme.of(dCtx).scaffoldBackgroundColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
+                  title: Text(
+                    'Delete Product',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  content: Text(
+                    'Delete "${product.productName}"? This cannot be undone.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(dCtx).pop(false),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(dCtx).pop(true),
+                      child: Text(
+                        'Delete',
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-        );
-        if (confirmed != true) return;
-        try {
-          await ref.read(productsProvider.notifier).deleteProduct(
-                product.id,
-                companyId: Session.isSuperAdmin ? product.companyId : null,
               );
-          if (ctx.mounted) Navigator.of(ctx).pop();
-        } catch (e) {
-          if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(
-              SnackBar(
-                content: Text(e.toString()),
-                backgroundColor: AppColors.dangerFill,
-              ),
-            );
-          }
-        }
-      },
+              if (confirmed != true) return;
+              try {
+                await ref
+                    .read(productsProvider.notifier)
+                    .deleteProduct(
+                      product.id,
+                      companyId: Session.isSuperAdmin
+                          ? product.companyId
+                          : null,
+                    );
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              } catch (e) {
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(
+                      content: Text(e.toString()),
+                      backgroundColor: AppColors.dangerFill,
+                    ),
+                  );
+                }
+              }
+            },
       statusRow: GestureDetector(
         onTap: !ref.read(moduleAccessProvider('Products')).edit
             ? null
@@ -1013,10 +1059,12 @@ class _ProductGallerySection extends ConsumerStatefulWidget {
   const _ProductGallerySection({required this.product});
 
   @override
-  ConsumerState<_ProductGallerySection> createState() => _ProductGallerySectionState();
+  ConsumerState<_ProductGallerySection> createState() =>
+      _ProductGallerySectionState();
 }
 
-class _ProductGallerySectionState extends ConsumerState<_ProductGallerySection> {
+class _ProductGallerySectionState
+    extends ConsumerState<_ProductGallerySection> {
   bool _loading = true;
   List<String> _images = const [];
 
@@ -1028,7 +1076,9 @@ class _ProductGallerySectionState extends ConsumerState<_ProductGallerySection> 
 
   Future<void> _load() async {
     try {
-      final full = await ref.read(productsRepositoryProvider).getProductById(
+      final full = await ref
+          .read(productsRepositoryProvider)
+          .getProductById(
             widget.product.id,
             companyId: Session.isSuperAdmin ? widget.product.companyId : null,
           );
@@ -1049,7 +1099,11 @@ class _ProductGallerySectionState extends ConsumerState<_ProductGallerySection> 
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
         child: Center(
-          child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
         ),
       );
     }
@@ -1058,12 +1112,15 @@ class _ProductGallerySectionState extends ConsumerState<_ProductGallerySection> 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('GALLERY',
-            style: TextStyle(
-                color: AppColors.textHint,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8)),
+        Text(
+          'GALLERY',
+          style: TextStyle(
+            color: AppColors.textHint,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+          ),
+        ),
         const SizedBox(height: 8),
         SizedBox(
           height: 92,

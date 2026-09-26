@@ -18,11 +18,14 @@ class ThemeCubit extends Cubit<ThemeMode> {
     if (prefs.getBool(_kDarkMode) == true) emit(ThemeMode.dark);
   }
 
-  void toggle() => setMode(state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark);
+  void toggle() =>
+      setMode(state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark);
 
   void setMode(ThemeMode mode) {
     emit(mode);
-    SharedPreferences.getInstance().then((prefs) => prefs.setBool(_kDarkMode, mode == ThemeMode.dark));
+    SharedPreferences.getInstance().then(
+      (prefs) => prefs.setBool(_kDarkMode, mode == ThemeMode.dark),
+    );
   }
 
   bool get isDark => state == ThemeMode.dark;

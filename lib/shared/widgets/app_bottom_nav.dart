@@ -14,24 +14,44 @@ class AppBottomNav extends StatelessWidget {
   final void Function(int)? onTap;
   const AppBottomNav({super.key, required this.activeIndex, this.onTap});
 
+  static String _target(int index) => switch (index) {
+    2 => AppRouter.report,
+    3 => AppRouter.more,
+    _ => AppRouter.dashboard,
+  };
+
+  /// Current path, or null outside a GoRouter (tests).
+  static String? _path(BuildContext context) =>
+      GoRouter.maybeOf(context)?.routerDelegate.currentConfiguration.uri.path;
+
+  /// The tab actually showing, from the route — not [activeIndex], which
+  /// module pages (Companies, Customers, …) set to a tab they aren't on.
+  /// A module page highlights nothing, so every tab stays tappable.
+  int _active(BuildContext context) {
+    final path = _path(context);
+    if (path == null) return activeIndex;
+    if (path == AppRouter.more) return 3;
+    if (path == AppRouter.report || path.startsWith('${AppRouter.report}/')) {
+      return 2;
+    }
+    if (path == AppRouter.dashboard) return 0;
+    return -1;
+  }
+
   void _onTap(BuildContext context, int index) {
     if (onTap != null) {
       onTap!(index);
       return;
     }
-    if (index == activeIndex) return;
-    switch (index) {
-      case 2:
-        context.go(AppRouter.report);
-      case 3:
-        context.go(AppRouter.more);
-      default:
-        context.go(AppRouter.dashboard);
-    }
+    final target = _target(index);
+    // Only a no-op when that exact tab page is already showing.
+    if (_path(context) == target) return;
+    context.go(target);
   }
 
   @override
   Widget build(BuildContext context) {
+    final active = _active(context);
     // Reads AppColors' own dark-mode flag rather than Theme.of(context) —
     // this widget is passed as `bottomNavigationBar: const AppBottomNav(...)`
     // on every page, and as a const instance it doesn't reliably rebuild
@@ -67,7 +87,7 @@ class AppBottomNav extends StatelessWidget {
                 icon: Icons.dashboard_outlined,
                 activeIcon: Icons.dashboard_rounded,
                 label: 'Dashboard',
-                isActive: activeIndex == 0,
+                isActive: active == 0,
                 onTap: () => _onTap(context, 0),
               ),
               // Attendance module disabled for now — uncomment to re-enable.
@@ -76,14 +96,14 @@ class AppBottomNav extends StatelessWidget {
                 icon: Icons.bar_chart_outlined,
                 activeIcon: Icons.bar_chart_rounded,
                 label: 'Report',
-                isActive: activeIndex == 2,
+                isActive: active == 2,
                 onTap: () => _onTap(context, 2),
               ),
               _NavBtn(
                 icon: Icons.person_outline_rounded,
                 activeIcon: Icons.person_rounded,
                 label: 'More',
-                isActive: activeIndex == 3,
+                isActive: active == 3,
                 onTap: () => _onTap(context, 3),
               ),
             ],

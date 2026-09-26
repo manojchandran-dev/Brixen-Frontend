@@ -2,7 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/storage_keys.dart';
 
 class SecurityLocalSource {
-  static const _pinKey        = StorageKeys.securityPin;
+  static const _pinKey = StorageKeys.securityPin;
   static const _pinEnabledKey = StorageKeys.securityPinEnabled;
   static const _bioEnabledKey = StorageKeys.securityBioEnabled;
 

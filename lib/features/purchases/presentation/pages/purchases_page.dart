@@ -12,6 +12,8 @@ import '../../../../shared/widgets/detail_sheet.dart';
 import '../../../../shared/widgets/error_state.dart';
 import '../../domain/entities/purchase.dart';
 import '../providers/purchases_provider.dart';
+import '../../../../shared/widgets/list_count_bar.dart';
+import '../../../../shared/widgets/module_title.dart';
 
 class PurchasesPage extends ConsumerStatefulWidget {
   final bool fromMasters;
@@ -168,29 +170,7 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
                   ],
                 ),
               )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Purchases',
-                    style: TextStyle(
-                      color: cs.onSurface,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  purchasesAsync.whenOrNull(
-                        data: (l) => Text(
-                          '${l.length} records',
-                          style: TextStyle(
-                            color: cs.onSurfaceVariant,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ) ??
-                      const SizedBox.shrink(),
-                ],
-              ),
+            : ModuleTitle(title: 'Purchases', subtitle: 'Stock purchases'),
         actions: [
           GestureDetector(
             onTap: () => context.push(
@@ -326,12 +306,22 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
                     ),
                   );
                 }
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) =>
-                      _PurchaseCard(purchase: filtered[i], index: i),
+                return Column(
+                  children: [
+                    ListCountBar(
+                      label: 'Total Purchases',
+                      count: filtered.length,
+                    ),
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (_, i) =>
+                            _PurchaseCard(purchase: filtered[i], index: i),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -582,7 +572,7 @@ class _PurchaseCard extends ConsumerWidget {
             child: Text(
               'Delete',
               style: TextStyle(
-                color: AppColors.accentRose,
+                color: AppColors.ink,
                 fontWeight: FontWeight.w700,
               ),
             ),

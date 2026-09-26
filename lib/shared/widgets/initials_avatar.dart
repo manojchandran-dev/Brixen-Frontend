@@ -25,11 +25,15 @@ Color avatarColorFor(String seed) {
 class InitialsAvatar extends StatelessWidget {
   final String seed;
   final double size;
-  const InitialsAvatar({super.key, required this.seed, this.size = 42});
+
+  /// Overrides the colour picked from [seed] — e.g. to match the card's
+  /// accent (RichCardShell.accentFor).
+  final Color? color;
+  const InitialsAvatar({super.key, required this.seed, this.size = 42, this.color});
 
   @override
   Widget build(BuildContext context) {
-    final color = avatarColorFor(seed);
+    final color = this.color ?? avatarColorFor(seed);
     final letter = seed.trim().isNotEmpty ? seed.trim()[0].toUpperCase() : '?';
     return Container(
       width: size,

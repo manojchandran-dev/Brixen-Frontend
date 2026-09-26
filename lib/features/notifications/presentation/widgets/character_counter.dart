@@ -15,13 +15,17 @@ class CharacterCounter extends StatelessWidget {
     final color = overLimit
         ? AppColors.accentRose
         : nearLimit
-            ? AppColors.accentGold
-            : AppColors.textHint;
+        ? AppColors.accentGold
+        : AppColors.textHint;
     return Align(
       alignment: Alignment.centerRight,
       child: Text(
         '$current/$max',
-        style: TextStyle(fontSize: 11, color: color, fontWeight: nearLimit ? FontWeight.w700 : FontWeight.w500),
+        style: TextStyle(
+          fontSize: 11,
+          color: color,
+          fontWeight: nearLimit ? FontWeight.w700 : FontWeight.w500,
+        ),
       ),
     );
   }

@@ -4,11 +4,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'core/services/account_store.dart';
+import 'features/auth/data/datasources/auth_remote_datasource.dart';
 import 'core/services/push_token_service.dart';
 import 'core/services/token_service.dart';
 import 'core/theme/theme_cubit.dart';
 
 void main() async {
+  // Start waking the backend now — cold start takes ~20–60s.
+  AuthRemoteDatasource.warmUp();
   WidgetsFlutterBinding.ensureInitialized();
   // Swallowed on purpose: fails until google-services.json/
   // GoogleService-Info.plist are added for this project, and push

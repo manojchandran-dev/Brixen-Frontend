@@ -22,14 +22,15 @@ class PermissionModel {
     required this.accessLevel,
   });
 
-  factory PermissionModel.fromJson(Map<String, dynamic> json) => PermissionModel(
-    id: json['id'].toString(),
-    companyId: (json['company_id'] ?? '').toString(),
-    moduleId: (json['module_id'] ?? '').toString(),
-    view: json['view'] == true,
-    create: json['create'] == true,
-    edit: json['edit'] == true,
-    delete: json['delete'] == true,
-    accessLevel: (json['access_level'] ?? '').toString(),
-  );
+  factory PermissionModel.fromJson(Map<String, dynamic> json) =>
+      PermissionModel(
+        id: json['id'].toString(),
+        companyId: (json['company_id'] ?? '').toString(),
+        moduleId: (json['module_id'] ?? '').toString(),
+        view: json['view'] == true,
+        create: json['create'] == true,
+        edit: json['edit'] == true,
+        delete: json['delete'] == true,
+        accessLevel: (json['access_level'] ?? '').toString(),
+      );
 }

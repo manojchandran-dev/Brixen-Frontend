@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_endpoints.dart';
@@ -9,6 +10,7 @@ import '../../../../core/services/session_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/app_bottom_nav.dart';
 import '../../../../shared/widgets/app_drawer.dart';
+import '../../../../shared/widgets/chip_filter_sheet.dart';
 import '../../../../shared/widgets/error_state.dart';
 import '../../../../shared/widgets/initials_avatar.dart';
 import '../../../../shared/widgets/rich_card_shell.dart';
@@ -19,6 +21,8 @@ import '../providers/support_tickets_provider.dart';
 import '../../../permissions/presentation/providers/module_access_provider.dart';
 import '../widgets/ticket_labels.dart';
 import '../widgets/ticket_status_badge.dart';
+import '../../../../shared/widgets/list_count_bar.dart';
+import '../../../../shared/widgets/module_title.dart';
 
 /// ONE shared route for every role — branches its body on `Session.role`,
 /// same pattern as `DashboardHomePage` (`dashboard_home_page.dart`) rather
@@ -32,17 +36,108 @@ class SupportTicketsPage extends ConsumerStatefulWidget {
 
 class _SupportTicketsPageState extends ConsumerState<SupportTicketsPage> {
   final _searchCtrl = TextEditingController();
+  Timer? _searchDebounce;
+  // Ticket filters, applied to the loaded list (null = All).
   TicketStatus? _statusFilter;
+  TicketPriority? _priorityFilter;
+  TicketCategory? _categoryFilter;
+  String? _companyFilter; // company id — superadmin only
+
+  /// Search and every filter are applied by the server.
+  void _reload() {
+    ref
+        .read(supportTicketsProvider.notifier)
+        .reload(
+          search: _searchCtrl.text.trim(),
+          status: _statusFilter?.name,
+          priority: _priorityFilter?.name,
+          category: _categoryFilter?.name,
+          companyId: _companyFilter,
+        );
+  }
+
+  void _onSearchChanged(String _) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), _reload);
+  }
+
+  bool get _filtering =>
+      _statusFilter != null ||
+      _priorityFilter != null ||
+      _categoryFilter != null ||
+      _companyFilter != null;
+
+  void _openFilter(List<SupportTicket> tickets) {
+    // Company options: the companies that have tickets, by name.
+    final companies = <String, String>{
+      for (final t in tickets) t.companyId: t.companyName,
+    }.entries.toList()..sort((a, b) => a.value.compareTo(b.value));
+    showChipFilterSheet(
+      context,
+      title: 'Filter tickets',
+      sections: [
+        FilterSection(
+          key: 'status',
+          title: 'Status',
+          options: [for (final s in TicketStatus.values) (s, statusLabel(s))],
+        ),
+        FilterSection(
+          key: 'priority',
+          title: 'Priority',
+          options: [
+            for (final p in TicketPriority.values) (p, priorityLabel(p)),
+          ],
+        ),
+        FilterSection(
+          key: 'category',
+          title: 'Category',
+          options: [
+            for (final c in TicketCategory.values) (c, categoryLabel(c)),
+          ],
+        ),
+        if (Session.isSuperAdmin)
+          FilterSection(
+            key: 'company',
+            title: 'Company',
+            options: [for (final c in companies) (c.key, c.value)],
+          ),
+      ],
+      selected: {
+        'status': _statusFilter,
+        'priority': _priorityFilter,
+        'category': _categoryFilter,
+        'company': _companyFilter,
+      },
+      onApply: (chosen) {
+        setState(() {
+          _statusFilter = chosen['status'] as TicketStatus?;
+          _priorityFilter = chosen['priority'] as TicketPriority?;
+          _categoryFilter = chosen['category'] as TicketCategory?;
+          _companyFilter = chosen['company'] as String?;
+        });
+        _reload();
+      },
+      onClear: () {
+        setState(() {
+          _statusFilter = null;
+          _priorityFilter = null;
+          _categoryFilter = null;
+          _companyFilter = null;
+        });
+        _reload();
+      },
+    );
+  }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final isSuperAdmin = Session.isSuperAdmin;
     final ticketsAsync = ref.watch(supportTicketsProvider);
 
@@ -55,37 +150,36 @@ class _SupportTicketsPageState extends ConsumerState<SupportTicketsPage> {
         elevation: 0,
         shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
-        leading: Builder(builder: (ctx) => GestureDetector(
-          onTap: () => Scaffold.of(ctx).openDrawer(),
-          child: Container(
-            width: 40,
-            height: 40,
-            margin: const EdgeInsets.all(8),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: AppColors.shadows([
-                BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 4)),
-              ]),
+        leading: Builder(
+          builder: (ctx) => GestureDetector(
+            onTap: () => Scaffold.of(ctx).openDrawer(),
+            child: Container(
+              width: 40,
+              height: 40,
+              margin: const EdgeInsets.all(8),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: AppColors.shadows([
+                  BoxShadow(
+                    color: AppColors.shadowDark.withValues(alpha: 0.10),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]),
+              ),
+              child: Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
             ),
-            child: Icon(Icons.menu_rounded, size: 18, color: AppColors.ink),
           ),
-        )),
-        title: Text(
-          isSuperAdmin ? 'Support Tickets' : 'Support',
-          style: TextStyle(color: cs.onSurface, fontSize: 17, fontWeight: FontWeight.w700),
+        ),
+        title: ModuleTitle(
+          title: isSuperAdmin ? 'Support Tickets' : 'Support',
+          subtitle: isSuperAdmin
+              ? 'Help requests from companies'
+              : 'Get help from our team',
         ),
         actions: [
-          if (isSuperAdmin)
-            DeletedItemsButton(
-              title: 'Deleted tickets',
-              listPath: ApiEndpoints.supportTickets,
-              restorePath: (t) => '${ApiEndpoints.supportTickets}/${t['id']}/restore',
-              labelOf: (t) => (t['subject'] ?? '').toString(),
-              subtitleOf: (t) => t['company_name'] as String?,
-              onRestored: () => ref.invalidate(supportTicketsProvider),
-            ),
           if (!isSuperAdmin &&
               ref.watch(moduleAccessProvider('Support Ticket')).create)
             GestureDetector(
@@ -96,10 +190,16 @@ class _SupportTicketsPageState extends ConsumerState<SupportTicketsPage> {
                 height: 38,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [AppColors.brand, AppColors.brandDeep]),
+                  gradient: const LinearGradient(
+                    colors: [AppColors.brand, AppColors.brandDeep],
+                  ),
                   borderRadius: BorderRadius.circular(13),
                 ),
-                child: const Icon(Icons.add_rounded, size: 20, color: AppColors.white),
+                child: const Icon(
+                  Icons.add_rounded,
+                  size: 20,
+                  color: AppColors.white,
+                ),
               ),
             ),
         ],
@@ -107,48 +207,56 @@ class _SupportTicketsPageState extends ConsumerState<SupportTicketsPage> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: SearchField(
-              controller: _searchCtrl,
-              hintText: 'Search tickets...',
-              onChanged: (_) => setState(() {}),
-            ),
-          ),
-          if (isSuperAdmin)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: SizedBox(
-              height: 34,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  _FilterChip(label: 'All', selected: _statusFilter == null, onTap: () => setState(() => _statusFilter = null)),
-                  for (final s in TicketStatus.values)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: _FilterChip(
-                        label: statusLabel(s),
-                        selected: _statusFilter == s,
-                        onTap: () => setState(() => _statusFilter = s),
-                      ),
-                    ),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SearchField(
+                    controller: _searchCtrl,
+                    hintText: 'Search tickets...',
+                    onChanged: _onSearchChanged,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                HeaderIconButton(
+                  tooltip: 'Filter tickets',
+                  icon: Icons.filter_list_rounded,
+                  active: _filtering,
+                  onTap: () => _openFilter(
+                    ref.read(supportTicketsProvider).valueOrNull ?? const [],
+                  ),
+                ),
+                // Restore deleted tickets — superadmin only.
+                if (isSuperAdmin) ...[
+                  const SizedBox(width: 10),
+                  DeletedItemsButton(
+                    inline: true,
+                    title: 'Deleted tickets',
+                    listPath: ApiEndpoints.supportTickets,
+                    restorePath: (t) =>
+                        '${ApiEndpoints.supportTickets}/${t['id']}/restore',
+                    labelOf: (t) => (t['subject'] ?? '').toString(),
+                    subtitleOf: (t) => t['company_name'] as String?,
+                    onRestored: () => ref.invalidate(supportTicketsProvider),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
           Expanded(
+            // reload() keeps the old list while loading — show the skeleton
+            // anyway so a search/filter visibly reloads.
             child: ticketsAsync.when(
+              skipLoadingOnRefresh: false,
+              skipLoadingOnReload: false,
               loading: () => const SkeletonListView(),
-              error: (e, _) => ErrorCard(error: e, onRetry: () => ref.invalidate(supportTicketsProvider)),
+              error: (e, _) => ErrorCard(
+                error: e,
+                onRetry: () => ref.invalidate(supportTicketsProvider),
+              ),
               data: (list) {
-                final query = _searchCtrl.text.trim().toLowerCase();
-                final filtered = list.where((t) {
-                  final matchesQuery = query.isEmpty ||
-                      t.subject.toLowerCase().contains(query) ||
-                      t.companyName.toLowerCase().contains(query);
-                  final matchesStatus = _statusFilter == null || t.status == _statusFilter;
-                  return matchesQuery && matchesStatus;
-                }).toList()
+                // Search and filters are done by the server; newest first.
+                final filtered = [...list]
                   ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
                 if (filtered.isEmpty) {
@@ -156,17 +264,35 @@ class _SupportTicketsPageState extends ConsumerState<SupportTicketsPage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.support_agent_rounded, size: 64, color: AppColors.brand.withValues(alpha: 0.5)),
+                        Icon(
+                          Icons.support_agent_rounded,
+                          size: 64,
+                          color: AppColors.brand.withValues(alpha: 0.5),
+                        ),
                         const SizedBox(height: 16),
                         Text(
-                          list.isEmpty ? 'No support tickets yet' : 'No results',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.ink),
+                          // The server already filtered, so check why it's empty.
+                          _filtering
+                              ? 'No tickets match these filters'
+                              : _searchCtrl.text.trim().isNotEmpty
+                              ? 'No results'
+                              : 'No support tickets yet',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink,
+                          ),
                         ),
-                        if (list.isEmpty && !isSuperAdmin) ...[
+                        if (!_filtering &&
+                            _searchCtrl.text.trim().isEmpty &&
+                            !isSuperAdmin) ...[
                           const SizedBox(height: 6),
                           Text(
                             'Need help? Raise a ticket and our team will reply.',
-                            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ],
                       ],
@@ -174,11 +300,25 @@ class _SupportTicketsPageState extends ConsumerState<SupportTicketsPage> {
                   );
                 }
 
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) => _TicketCard(index: i, ticket: filtered[i], showCompany: isSuperAdmin),
+                return Column(
+                  children: [
+                    ListCountBar(
+                      label: 'Total Tickets',
+                      count: filtered.length,
+                    ),
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (_, i) => _TicketCard(
+                          index: i,
+                          ticket: filtered[i],
+                          showCompany: isSuperAdmin,
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -188,44 +328,6 @@ class _SupportTicketsPageState extends ConsumerState<SupportTicketsPage> {
     );
   }
 }
-
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  const _FilterChip({required this.label, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? cs.primary : cs.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: selected ? AppColors.white : cs.onSurfaceVariant,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-Color _priorityColor(TicketPriority p) => switch (p) {
-      TicketPriority.low => AppColors.positive,
-      TicketPriority.medium => AppColors.brand,
-      TicketPriority.high => AppColors.brandDeep,
-      TicketPriority.urgent => AppColors.brandBlack,
-    };
 
 class _Tag extends StatelessWidget {
   final String label;
@@ -244,10 +346,21 @@ class _Tag extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (dot != null) ...[
-            Container(width: 7, height: 7, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+            ),
             const SizedBox(width: 5),
           ],
-          Text(label, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.ink)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.ink,
+            ),
+          ),
         ],
       ),
     );
@@ -258,72 +371,108 @@ class _TicketCard extends StatelessWidget {
   final SupportTicket ticket;
   final bool showCompany;
   final int index;
-  const _TicketCard({required this.index, required this.ticket, required this.showCompany});
+  const _TicketCard({
+    required this.index,
+    required this.ticket,
+    required this.showCompany,
+  });
 
   @override
   Widget build(BuildContext context) {
     final fmt = DateFormat('dd MMM, h:mm a');
-    final lastMessage = ticket.messages.isNotEmpty ? ticket.messages.last : null;
+    final lastMessage = ticket.messages.isNotEmpty
+        ? ticket.messages.last
+        : null;
     return GestureDetector(
       onTap: () => context.push(AppRouter.ticketDetail, extra: ticket),
-      child: RichCardShell.tinted(index: index, child: Padding(
+      child: RichCardShell.tinted(
+        index: index,
+        child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (showCompany) ...[
-                InitialsAvatar(seed: ticket.companyName, size: 44),
+                // Card's own accent, so each card's avatar matches its border.
+                InitialsAvatar(
+                  seed: ticket.companyName,
+                  size: 44,
+                  color: RichCardShell.accentFor(index),
+                ),
                 const SizedBox(width: 12),
               ],
-              Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      ticket.subject,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, height: 1.25),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            ticket.subject,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              height: 1.25,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        TicketStatusBadge(status: ticket.status),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      showCompany
+                          ? '${ticket.companyName} · ${fmt.format(ticket.updatedAt)}'
+                          : fmt.format(ticket.updatedAt),
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: AppColors.textHint,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      lastMessage?.text ?? ticket.description,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.35,
+                        color: AppColors.textSecondary,
+                      ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  TicketStatusBadge(status: ticket.status),
-                ],
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        _Tag(label: categoryLabel(ticket.category)),
+                        const SizedBox(width: 8),
+                        _Tag(
+                          label: priorityLabel(ticket.priority),
+                          dot: priorityColor(ticket.priority),
+                        ),
+                        const Spacer(),
+                        Icon(
+                          Icons.person_outline_rounded,
+                          size: 14,
+                          color: AppColors.textHint,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          ticket.assignedTo ?? 'Unassigned',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: AppColors.textHint,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                showCompany
-                    ? '${ticket.companyName} · ${fmt.format(ticket.updatedAt)}'
-                    : fmt.format(ticket.updatedAt),
-                style: TextStyle(fontSize: 11.5, color: AppColors.textHint),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                lastMessage?.text ?? ticket.description,
-                style: TextStyle(fontSize: 13, height: 1.35, color: AppColors.textSecondary),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  _Tag(label: categoryLabel(ticket.category)),
-                  const SizedBox(width: 8),
-                  _Tag(label: priorityLabel(ticket.priority), dot: _priorityColor(ticket.priority)),
-                  const Spacer(),
-                  Icon(Icons.person_outline_rounded, size: 14, color: AppColors.textHint),
-                  const SizedBox(width: 4),
-                  Text(
-                    ticket.assignedTo ?? 'Unassigned',
-                    style: TextStyle(fontSize: 11.5, color: AppColors.textHint),
-                  ),
-                ],
-              ),
-            ],
-          )),
             ],
           ),
         ),

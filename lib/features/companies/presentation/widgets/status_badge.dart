@@ -20,11 +20,21 @@ class StatusBadge extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: inverse
             ? null
-            : LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: AppColors.accentGradient(bg)),
+            : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: AppColors.accentGradient(bg),
+              ),
         color: inverse ? bg : null,
         borderRadius: BorderRadius.circular(20),
         boxShadow: inverse
-            ? AppColors.shadows([BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.12), blurRadius: 8, offset: const Offset(0, 3))])
+            ? AppColors.shadows([
+                BoxShadow(
+                  color: AppColors.shadowDark.withValues(alpha: 0.12),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ])
             : null,
       ),
       child: Row(
@@ -34,7 +44,10 @@ class StatusBadge extends StatelessWidget {
             width: 18,
             height: 18,
             alignment: Alignment.center,
-            decoration: BoxDecoration(color: fg.withValues(alpha: 0.15), shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: fg.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
             child: Icon(
               isActive ? Icons.check_rounded : Icons.close_rounded,
               size: 12,

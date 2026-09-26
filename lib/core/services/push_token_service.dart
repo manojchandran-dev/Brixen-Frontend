@@ -15,17 +15,22 @@ final _dio =
     Dio(
         BaseOptions(
           baseUrl: ApiEndpoints.baseUrl,
-          headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
         ),
       )
       ..interceptors.add(_AuthInterceptor())
       ..interceptors.add(TokenRefreshInterceptor())
       ..interceptors.add(CompanyScopeInterceptor())
-      ..interceptors.add(LogInterceptor(
-        requestBody: true,
-        responseBody: true,
-        logPrint: (o) => debugPrint(o.toString()),
-      ));
+      ..interceptors.add(
+        LogInterceptor(
+          requestBody: true,
+          responseBody: true,
+          logPrint: (o) => debugPrint(o.toString()),
+        ),
+      );
 
 class _AuthInterceptor extends Interceptor {
   @override
@@ -87,7 +92,11 @@ class PushTokenService {
     return switch (data['open_on_tap']) {
       null || 'none' => null,
       'support' => RouteNames.support,
-      'specificPage' when specific.startsWith('/') => specific,
+      // Pages now live under /dashboard; older pushes carry flat paths.
+      'specificPage' when specific.startsWith('/') =>
+        specific.startsWith(RouteNames.dashboard)
+            ? specific
+            : '${RouteNames.dashboard}$specific',
       _ => RouteNames.dashboard,
     };
   }
@@ -96,9 +105,9 @@ class PushTokenService {
   static void _onTap(Map<String, dynamic> data, {bool coldStart = false}) {
     final id = data['notification_id'];
     if (id != null) {
-      _dio
-          .post('${ApiEndpoints.pushNotifications}/$id/opened')
-          .catchError((Object e) {
+      _dio.post('${ApiEndpoints.pushNotifications}/$id/opened').catchError((
+        Object e,
+      ) {
         debugPrint('[PushTokenService] markOpened failed: $e');
         return Response(requestOptions: RequestOptions());
       });
@@ -125,11 +134,12 @@ class PushTokenService {
     // FCM only shows the system notification when the app is in the
     // background — while it's open the message arrives silently via
     // [FirebaseMessaging.onMessage]. iOS can display it itself:
-    await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    await FirebaseMessaging.instance
+        .setForegroundNotificationPresentationOptions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
     if (!Platform.isAndroid) return;
 
     // Android: nothing is shown in the foreground, so post a local one
@@ -148,7 +158,9 @@ class PushTokenService {
       _onTap(jsonDecode(launchPayload), coldStart: true);
     }
     final android = _local
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     await android?.createNotificationChannel(_highChannel);
     await android?.createNotificationChannel(_normalChannel);
 
@@ -178,16 +190,25 @@ class PushTokenService {
   static Future<void> register() async {
     try {
       final settings = await FirebaseMessaging.instance.requestPermission();
-      debugPrint('[PushTokenService] permission: ${settings.authorizationStatus}');
+      debugPrint(
+        '[PushTokenService] permission: ${settings.authorizationStatus}',
+      );
       final token = await FirebaseMessaging.instance.getToken();
       if (token == null) {
-        debugPrint('[PushTokenService] getToken() returned null — cannot register');
+        debugPrint(
+          '[PushTokenService] getToken() returned null — cannot register',
+        );
         return;
       }
-      await _dio.post(ApiEndpoints.pushDevices, data: {'token': token, 'platform': _platform});
+      await _dio.post(
+        ApiEndpoints.pushDevices,
+        data: {'token': token, 'platform': _platform},
+      );
       debugPrint('[PushTokenService] registered device token');
     } catch (e) {
-      debugPrint('[PushTokenService] register() failed: ${e is DioException ? mapDioError(e) : e}');
+      debugPrint(
+        '[PushTokenService] register() failed: ${e is DioException ? mapDioError(e) : e}',
+      );
     }
   }
 
@@ -199,7 +220,9 @@ class PushTokenService {
       await _dio.delete(ApiEndpoints.pushDevices, data: {'token': token});
       debugPrint('[PushTokenService] unregistered device token');
     } catch (e) {
-      debugPrint('[PushTokenService] unregister() failed: ${e is DioException ? mapDioError(e) : e}');
+      debugPrint(
+        '[PushTokenService] unregister() failed: ${e is DioException ? mapDioError(e) : e}',
+      );
     }
   }
 }

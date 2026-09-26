@@ -5,6 +5,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/brixen_button.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
+import '../../../../shared/widgets/image_upload_grid.dart';
+import '../../../masters/data/datasources/company_categories_remote_datasource.dart';
 import '../../domain/entities/company.dart';
 import '../providers/companies_provider.dart';
 
@@ -34,7 +36,6 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
   final _panCtrl = TextEditingController();
   final _foundedCtrl = TextEditingController();
   String? _industry;
-  String? _entityType;
   String? _size;
 
   // Step 2 — Contact & Owner
@@ -51,7 +52,6 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
   final _pincodeCtrl = TextEditingController();
   String? _country;
   String? _plan;
-  bool _isActive = true;
 
   static const List<String> _countries = [
     'India',
@@ -65,28 +65,13 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
     'UAE',
     'Other',
   ];
-  static const List<String> _industries = [
-    'Technology',
-    'Healthcare',
-    'Finance',
-    'Retail',
-    'Manufacturing',
-    'Education',
-    'Real Estate',
-    'Hospitality',
-    'Transportation',
-    'Other',
-  ];
-  static const List<String> _entityTypes = [
-    'Sole Proprietorship',
-    'Partnership',
-    'LLP',
-    'Private Limited',
-    'Public Limited',
-    'One Person Company',
-    'Trust / NGO',
-    'Other',
-  ];
+  // Company Category masters (active ones). The chosen name is saved as the
+  // company's industry_type, which the list's Industry filter reads.
+  List<String> _industries = const [];
+  final _logo = ImageUploadController(max: 1);
+  final _pictures = ImageUploadController(max: 3);
+  // Category name → id, for the payload's company_category_id.
+  Map<String, String> _categoryIds = const {};
   static const List<String> _plans = [
     'Basic',
     'Standard',
@@ -104,6 +89,7 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
   @override
   void initState() {
     super.initState();
+    _loadCategories();
     _edit = widget.editCompany;
     if (_edit == null) return;
     _createdId = _edit!.id;
@@ -135,13 +121,34 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
     });
   }
 
+  Future<void> _loadCategories() async {
+    try {
+      final items = await companyCategoriesRemoteDatasource.getAll(limit: 50);
+      if (!mounted) return;
+      setState(() {
+        final active = items.where((c) => c.isActive);
+        _industries = [for (final c in active) c.name];
+        _categoryIds = {for (final c in active) c.name: c.id};
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not load company categories: $e'),
+          backgroundColor: AppColors.dangerFill,
+        ),
+      );
+    }
+  }
+
   void _fill(Company e) {
     // Step 1 — Identity
+    _logo.setUrls([?e.logoUrl]);
+    _pictures.setUrls(e.galleryUrls);
     _nameCtrl.text = e.name;
     if (e.gstNumber != null) _gstCtrl.text = e.gstNumber!;
     if (e.panNumber != null) _panCtrl.text = e.panNumber!;
     _industry = e.industryType;
-    _entityType = e.entityType;
     // Step 2 — Contact
     _ownerCtrl.text = e.ownerName;
     if (e.email != null) _emailCtrl.text = e.email!;
@@ -155,11 +162,12 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
     if (e.pincode != null) _pincodeCtrl.text = e.pincode!;
     _country = e.country;
     _plan = e.subscriptionPlan;
-    _isActive = e.isActive;
   }
 
   @override
   void dispose() {
+    _logo.dispose();
+    _pictures.dispose();
     _nameCtrl.dispose();
     _gstCtrl.dispose();
     _panCtrl.dispose();
@@ -185,6 +193,20 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
 
   Future<void> _handleNext() async {
     if (!_currentFormKey.currentState!.validate()) return;
+    if (_currentStep == 0) {
+      final uploads = [_logo, _pictures];
+      final msg = uploads.any((c) => c.busy)
+          ? 'Please wait for the images to finish uploading'
+          : uploads.any((c) => c.hasFailed)
+          ? 'Remove or retry the image(s) that failed to upload'
+          : null;
+      if (msg != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: AppColors.dangerFill),
+        );
+        return;
+      }
+    }
     setState(() => _submitting = true);
     try {
       switch (_currentStep) {
@@ -202,7 +224,10 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
                         ? null
                         : _panCtrl.text.trim().toUpperCase(),
                     industryType: _industry,
-                    entityType: _entityType,
+                    companyCategoryId: _categoryIds[_industry],
+                    // '' not null: copyWith keeps the old logo on null.
+                    logoUrl: _logo.urls.firstOrNull ?? '',
+                    galleryUrls: _pictures.urls,
                   ),
                 );
             setState(() => _currentStep = 1);
@@ -221,7 +246,10 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
                         ? null
                         : _panCtrl.text.trim().toUpperCase(),
                     industryType: _industry,
-                    entityType: _entityType,
+                    companyCategoryId: _categoryIds[_industry],
+                    // '' not null: copyWith keeps the old logo on null.
+                    logoUrl: _logo.urls.firstOrNull ?? '',
+                    galleryUrls: _pictures.urls,
                     createdAt: DateTime.now(),
                   ),
                 );
@@ -276,16 +304,13 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
               createdAt: DateTime.now(),
             ),
           );
-          // /step3 only takes address fields — country & plan go via PUT /:id,
-          // status via its own endpoint.
+          // /step3 only takes address fields — country & plan go via PUT /:id.
+          // Status isn't set here: a new company stays INACTIVE (server
+          // default) until activated from the Companies list.
           if (_country != saved.country || _plan != saved.subscriptionPlan) {
             await notifier.updateCompany(
               saved.copyWith(country: _country, subscriptionPlan: _plan),
             );
-          }
-          if (_isActive != saved.isActive) {
-            final err = await notifier.toggleStatus(saved.id);
-            if (err != null) throw err;
           }
           if (!mounted) return;
           context.pop();
@@ -468,15 +493,18 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
           panCtrl: _panCtrl,
           foundedCtrl: _foundedCtrl,
           industry: _industry,
-          entityType: _entityType,
           size: _size,
-          industries: _industries,
-          entityTypes: _entityTypes,
+          industries: [
+            ..._industries,
+            if (_industry != null && !_industries.contains(_industry))
+              _industry!,
+          ],
           sizes: _sizes,
           onIndustryChanged: (v) => setState(() => _industry = v),
-          onEntityTypeChanged: (v) => setState(() => _entityType = v),
           onSizeChanged: (v) => setState(() => _size = v),
           isCreate: _edit == null,
+          logo: _logo,
+          pictures: _pictures,
         );
       case 1:
         return _Step2(
@@ -498,10 +526,8 @@ class _CreateCompanyPageState extends ConsumerState<CreateCompanyPage> {
           plan: _plan,
           countries: _countries,
           plans: _plans,
-          isActive: _isActive,
           onCountryChanged: (v) => setState(() => _country = v),
           onPlanChanged: (v) => setState(() => _plan = v),
-          onStatusChanged: (v) => setState(() => _isActive = v),
         );
     }
   }
@@ -657,28 +683,27 @@ class _StepIndicator extends StatelessWidget {
 class _Step1 extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController nameCtrl, gstCtrl, panCtrl, foundedCtrl;
-  final String? industry, entityType, size;
-  final List<String> industries, entityTypes, sizes;
+  final String? industry, size;
+  final List<String> industries, sizes;
   final void Function(String?) onIndustryChanged;
-  final void Function(String?) onEntityTypeChanged;
   final void Function(String?) onSizeChanged;
   final bool isCreate;
+  final ImageUploadController logo, pictures;
 
   const _Step1({
     required this.isCreate,
+    required this.logo,
+    required this.pictures,
     required this.formKey,
     required this.nameCtrl,
     required this.gstCtrl,
     required this.panCtrl,
     required this.foundedCtrl,
     required this.industry,
-    required this.entityType,
     required this.size,
     required this.industries,
-    required this.entityTypes,
     required this.sizes,
     required this.onIndustryChanged,
-    required this.onEntityTypeChanged,
     required this.onSizeChanged,
   });
 
@@ -689,6 +714,14 @@ class _Step1 extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
         children: [
+          ImageUploadGrid(
+            controller: logo,
+            title: 'Company logo',
+            subtitle: 'Optional — one image',
+            folder: 'companies',
+          ),
+          const SizedBox(height: 22),
+
           BrixenTextField(
             label: 'GST Number',
             hint: 'e.g. 22AAAAA0000A1Z5',
@@ -706,19 +739,6 @@ class _Step1 extends StatelessWidget {
             prefixIcon: const Icon(Icons.business_outlined),
             validator: (v) =>
                 (v == null || v.trim().isEmpty) ? 'Required' : null,
-          ),
-          const SizedBox(height: 22),
-
-          _RequiredSelect(
-            value: entityType,
-            child: BrixenDropdown<String>(
-              hint: 'Entity type',
-              value: entityType,
-              items: entityTypes,
-              labelOf: (s) => s,
-              icon: Icons.account_balance_outlined,
-              onChanged: onEntityTypeChanged,
-            ),
           ),
           const SizedBox(height: 22),
 
@@ -744,11 +764,11 @@ class _Step1 extends StatelessWidget {
           _RequiredSelect(
             value: industry,
             child: BrixenDropdown<String>(
-              hint: 'Select industry type',
+              hint: 'Select company category',
               value: industry,
               items: industries,
               labelOf: (s) => s,
-              icon: Icons.work_outline,
+              icon: Icons.category_outlined,
               onChanged: onIndustryChanged,
             ),
           ),
@@ -776,6 +796,14 @@ class _Step1 extends StatelessWidget {
             textInputAction: TextInputAction.done,
             prefixIcon: const Icon(Icons.calendar_today_outlined),
             validator: isCreate ? _required : null,
+          ),
+          const SizedBox(height: 22),
+
+          ImageUploadGrid(
+            controller: pictures,
+            title: 'Company pictures',
+            subtitle: 'Optional — up to 3 photos',
+            folder: 'companies',
           ),
           const SizedBox(height: 22),
         ],
@@ -888,10 +916,8 @@ class _Step3 extends StatelessWidget {
   final TextEditingController addressCtrl, cityCtrl, stateCtrl, pincodeCtrl;
   final String? country, plan;
   final List<String> countries, plans;
-  final bool isActive;
   final void Function(String?) onCountryChanged;
   final void Function(String?) onPlanChanged;
-  final void Function(bool) onStatusChanged;
 
   const _Step3({
     required this.formKey,
@@ -903,15 +929,12 @@ class _Step3 extends StatelessWidget {
     required this.plan,
     required this.countries,
     required this.plans,
-    required this.isActive,
     required this.onCountryChanged,
     required this.onPlanChanged,
-    required this.onStatusChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Form(
       key: formKey,
       child: ListView(
@@ -975,38 +998,6 @@ class _Step3 extends StatelessWidget {
               onChanged: onPlanChanged,
             ),
           ),
-          const SizedBox(height: 20),
-
-          Text(
-            'Company Status',
-            style: TextStyle(
-              color: cs.onSurfaceVariant,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _StatusBtn(
-                  label: 'Active',
-                  selected: isActive,
-                  isActive: true,
-                  onTap: () => onStatusChanged(true),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _StatusBtn(
-                  label: 'Inactive',
-                  selected: !isActive,
-                  isActive: false,
-                  onTap: () => onStatusChanged(false),
-                ),
-              ),
-            ],
-          ),
           const SizedBox(height: 22),
         ],
       ),
@@ -1050,62 +1041,6 @@ class _RequiredSelect extends StatelessWidget {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _StatusBtn extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  const _StatusBtn({
-    required this.label,
-    required this.selected,
-    required this.isActive,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: selected
-              ? Theme.of(context).colorScheme.surfaceContainerHighest
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: selected ? AppColors.silver : Theme.of(context).dividerColor,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.circle,
-              size: 8,
-              color: isActive
-                  ? AppColors.accentEmerald
-                  : Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: selected
-                    ? Theme.of(context).colorScheme.onSurface
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -102,6 +102,16 @@ class RichCardShell extends StatelessWidget {
     required this.child,
   });
 
+  /// The accent a [RichCardShell.tinted] card at [index] uses — for
+  /// matching an avatar/icon inside the card to its border and tint.
+  static Color accentFor(int index) => const [
+    AppColors.brand,
+    AppColors.positive,
+    AppColors.brandDeep,
+    AppColors.brandLight,
+    AppColors.brandBlack,
+  ][index % 5];
+
   /// The tinted, rotating-accent look the Companies/Products cards use —
   /// [index] picks the accent so consecutive cards alternate.
   factory RichCardShell.tinted({
@@ -110,14 +120,7 @@ class RichCardShell extends StatelessWidget {
     VoidCallback? onTap,
     required Widget child,
   }) {
-    final accents = [
-      AppColors.brand,
-      AppColors.positive,
-      AppColors.brandDeep,
-      AppColors.brandLight,
-      AppColors.brandBlack,
-    ];
-    final accent = accents[index % accents.length];
+    final accent = accentFor(index);
     return RichCardShell(
       key: key,
       accentColor: accent,

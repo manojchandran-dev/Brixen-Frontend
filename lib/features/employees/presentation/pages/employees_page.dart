@@ -18,6 +18,8 @@ import 'package:intl/intl.dart';
 import '../../../permissions/presentation/providers/module_access_provider.dart';
 import '../../domain/entities/employee.dart';
 import '../providers/employees_provider.dart';
+import '../../../../shared/widgets/list_count_bar.dart';
+import '../../../../shared/widgets/module_title.dart';
 
 class EmployeesPage extends ConsumerStatefulWidget {
   final bool fromMasters;
@@ -174,74 +176,56 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
                   ],
                 ),
               )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Employees',
-                    style: TextStyle(
-                      color: cs.onSurface,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  employeesAsync.whenOrNull(
-                        data: (list) => Text(
-                          '${list.length} records',
-                          style: TextStyle(
-                            color: cs.onSurfaceVariant,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ) ??
-                      const SizedBox.shrink(),
-                ],
-              ),
+            : ModuleTitle(title: 'Employees', subtitle: 'Manage your staff'),
         actions: [
-          if (ref.watch(moduleAccessProvider('Employees')).delete) DeletedItemsButton(
-            title: 'Deleted employees',
-            listPath: ApiEndpoints.employees,
-            restorePath: (e) => '${ApiEndpoints.employees}/${e['id']}/restore',
-            labelOf: (e) => '${e['first_name'] ?? ''} ${e['last_name'] ?? ''}'.trim(),
-            subtitleOf: (e) => e['employee_code'] as String?,
-            onRestored: () => ref.invalidate(employeesProvider),
-          ),
-          if (ref.watch(moduleAccessProvider('Employees')).create) GestureDetector(
-            onTap: () => context.push(
-              AppRouter.createEmployee,
-              extra: widget.fromMasters ? 'masters' : null,
+          if (ref.watch(moduleAccessProvider('Employees')).delete)
+            DeletedItemsButton(
+              title: 'Deleted employees',
+              listPath: ApiEndpoints.employees,
+              restorePath: (e) =>
+                  '${ApiEndpoints.employees}/${e['id']}/restore',
+              labelOf: (e) =>
+                  '${e['first_name'] ?? ''} ${e['last_name'] ?? ''}'.trim(),
+              subtitleOf: (e) => e['employee_code'] as String?,
+              onRestored: () => ref.invalidate(employeesProvider),
             ),
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
-              width: 38,
-              height: 38,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                gradient: isDark
-                    ? AppColors.silverGradient
-                    : const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [AppColors.brand, AppColors.brandDeep],
+          if (ref.watch(moduleAccessProvider('Employees')).create)
+            GestureDetector(
+              onTap: () => context.push(
+                AppRouter.createEmployee,
+                extra: widget.fromMasters ? 'masters' : null,
+              ),
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
+                width: 38,
+                height: 38,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  gradient: isDark
+                      ? AppColors.silverGradient
+                      : const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [AppColors.brand, AppColors.brandDeep],
+                        ),
+                  borderRadius: BorderRadius.circular(13),
+                  boxShadow: AppColors.shadows([
+                    BoxShadow(
+                      color: AppColors.brand.withValues(
+                        alpha: isDark ? 0.0 : 0.4,
                       ),
-                borderRadius: BorderRadius.circular(13),
-                boxShadow: AppColors.shadows([
-                  BoxShadow(
-                    color: AppColors.brand.withValues(
-                      alpha: isDark ? 0.0 : 0.4,
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ]),
-              ),
-              child: Icon(
-                Icons.add_rounded,
-                size: 20,
-                color: isDark ? AppColors.black : AppColors.white,
+                  ]),
+                ),
+                child: Icon(
+                  Icons.add_rounded,
+                  size: 20,
+                  color: isDark ? AppColors.black : AppColors.white,
+                ),
               ),
             ),
-          ),
         ],
       ),
       body: Column(
@@ -345,12 +329,22 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
                   );
                 }
 
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) =>
-                      _EmployeeCard(employee: filtered[i], index: i),
+                return Column(
+                  children: [
+                    ListCountBar(
+                      label: 'Total Employees',
+                      count: filtered.length,
+                    ),
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (_, i) =>
+                            _EmployeeCard(employee: filtered[i], index: i),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -465,24 +459,28 @@ class _EmployeeCard extends ConsumerWidget {
     return SwipeActions(
       onTap: () => _showEmployeeDetail(context, ref, employee, accent),
       actions: [
-        if (ref.watch(moduleAccessProvider('Employees')).edit) SwipeAction(
-          icon: Icons.sync_alt_rounded,
-          label: 'Status',
-          color: AppColors.accentGold,
-          onTap: () => _openStatusPicker(context, ref),
-        ),
-        if (ref.watch(moduleAccessProvider('Employees')).edit) SwipeAction(
-          icon: Icons.edit_outlined,
-          label: 'Edit',
-          color: AppColors.accentIndigo,
-          onTap: () => context.push(AppRouter.createEmployee, extra: employee),
-        ),
-        if (ref.watch(moduleAccessProvider('Employees')).delete) SwipeAction(
-          icon: Icons.delete_outline,
-          label: 'Delete',
-          color: AppColors.brandBlack,
-          onTap: () => _confirmDelete(context, ref),
-        ),
+        if (ref.watch(moduleAccessProvider('Employees')).edit)
+          SwipeAction(
+            icon: Icons.sync_alt_rounded,
+            label: 'Status',
+            color: AppColors.accentGold,
+            onTap: () => _openStatusPicker(context, ref),
+          ),
+        if (ref.watch(moduleAccessProvider('Employees')).edit)
+          SwipeAction(
+            icon: Icons.edit_outlined,
+            label: 'Edit',
+            color: AppColors.accentIndigo,
+            onTap: () =>
+                context.push(AppRouter.createEmployee, extra: employee),
+          ),
+        if (ref.watch(moduleAccessProvider('Employees')).delete)
+          SwipeAction(
+            icon: Icons.delete_outline,
+            label: 'Delete',
+            color: AppColors.brandBlack,
+            onTap: () => _confirmDelete(context, ref),
+          ),
       ],
       child: RichCardShell(
         accentColor: accent,
@@ -596,7 +594,9 @@ class _EmployeeCard extends ConsumerWidget {
                     .read(employeesProvider.notifier)
                     .deleteEmployee(
                       employee.id,
-                      companyId: Session.isSuperAdmin ? employee.companyId : null,
+                      companyId: Session.isSuperAdmin
+                          ? employee.companyId
+                          : null,
                     );
               } catch (e) {
                 if (context.mounted) {
@@ -612,7 +612,7 @@ class _EmployeeCard extends ConsumerWidget {
             child: Text(
               'Delete',
               style: TextStyle(
-                color: AppColors.accentRose,
+                color: AppColors.ink,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -659,7 +659,9 @@ void _openEmployeeStatusPicker(
                     .read(employeesProvider.notifier)
                     .updateEmployee(
                       employee.copyWith(status: s),
-                      companyId: Session.isSuperAdmin ? employee.companyId : null,
+                      companyId: Session.isSuperAdmin
+                          ? employee.companyId
+                          : null,
                     );
               } catch (e) {
                 if (context.mounted) {
@@ -694,71 +696,80 @@ void _showEmployeeDetail(
       avatarGradient: AppColors.accentGradient(accent),
       title: employee.fullName,
       subtitle: employee.designation ?? employee.department,
-      onEdit: !ref.read(moduleAccessProvider('Employees')).edit ? null : () {
-        Navigator.of(ctx).pop();
-        ctx.push(AppRouter.createEmployee, extra: employee);
-      },
-      onDelete: !ref.read(moduleAccessProvider('Employees')).delete ? null : () async {
-        final confirmed = await showDialog<bool>(
-          context: ctx,
-          builder: (dCtx) => AlertDialog(
-            backgroundColor: Theme.of(dCtx).scaffoldBackgroundColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: Text(
-              'Delete Employee',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.ink,
-              ),
-            ),
-            content: Text(
-              'Delete "${employee.fullName}"? This cannot be undone.',
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dCtx).pop(false),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(dCtx).pop(true),
-                child: Text(
-                  'Delete',
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    fontWeight: FontWeight.w700,
+      onEdit: !ref.read(moduleAccessProvider('Employees')).edit
+          ? null
+          : () {
+              Navigator.of(ctx).pop();
+              ctx.push(AppRouter.createEmployee, extra: employee);
+            },
+      onDelete: !ref.read(moduleAccessProvider('Employees')).delete
+          ? null
+          : () async {
+              final confirmed = await showDialog<bool>(
+                context: ctx,
+                builder: (dCtx) => AlertDialog(
+                  backgroundColor: Theme.of(dCtx).scaffoldBackgroundColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
+                  title: Text(
+                    'Delete Employee',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  content: Text(
+                    'Delete "${employee.fullName}"? This cannot be undone.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(dCtx).pop(false),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(dCtx).pop(true),
+                      child: Text(
+                        'Delete',
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-        );
-        if (confirmed != true) return;
-        try {
-          await ref
-              .read(employeesProvider.notifier)
-              .deleteEmployee(
-                employee.id,
-                companyId: Session.isSuperAdmin ? employee.companyId : null,
               );
-          if (ctx.mounted) Navigator.of(ctx).pop();
-        } catch (e) {
-          if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(
-              SnackBar(
-                content: Text(e.toString()),
-                backgroundColor: AppColors.dangerFill,
-              ),
-            );
-          }
-        }
-      },
+              if (confirmed != true) return;
+              try {
+                await ref
+                    .read(employeesProvider.notifier)
+                    .deleteEmployee(
+                      employee.id,
+                      companyId: Session.isSuperAdmin
+                          ? employee.companyId
+                          : null,
+                    );
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              } catch (e) {
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(
+                      content: Text(e.toString()),
+                      backgroundColor: AppColors.dangerFill,
+                    ),
+                  );
+                }
+              }
+            },
       statusRow: GestureDetector(
         onTap: !ref.read(moduleAccessProvider('Employees')).edit
             ? null

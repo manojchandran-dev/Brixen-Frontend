@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/company.dart';
+import '../../domain/entities/company_page.dart';
 import '../../domain/repositories/companies_repository.dart';
 import '../datasources/companies_remote_datasource.dart';
 
@@ -12,8 +13,36 @@ class CompaniesRepositoryImpl implements CompaniesRepository {
   const CompaniesRepositoryImpl(this._ds);
 
   @override
-  Future<List<Company>> getCompanies({int page = 1, int limit = 50, String? search, bool deleted = false}) =>
-      _ds.getCompanies(page: page, limit: limit, search: search, deleted: deleted);
+  Future<List<Company>> getCompanies({
+    int page = 1,
+    int limit = 50,
+    String? search,
+    bool deleted = false,
+  }) => _ds.getCompanies(
+    page: page,
+    limit: limit,
+    search: search,
+    deleted: deleted,
+  );
+
+  @override
+  Future<CompanyPage> getCompanyPage({
+    String? search,
+    String? status,
+    String? plan,
+    String? industry,
+    int page = 1,
+    int limit = 50,
+    bool withAccess = false,
+  }) => _ds.getCompanyPage(
+    search: search,
+    status: status,
+    plan: plan,
+    industry: industry,
+    page: page,
+    limit: limit,
+    withAccess: withAccess,
+  );
 
   @override
   Future<Company> getCompanyById(String id) => _ds.getCompanyById(id);
@@ -23,8 +52,16 @@ class CompaniesRepositoryImpl implements CompaniesRepository {
     // Step 1: identity fields only — server auto-generates company_code
     final body = <String, dynamic>{
       'company_name': company.name,
-      if (company.entityType != null) 'entity_type': company.entityType,
       if (company.industryType != null) 'industry_type': company.industryType,
+      // Company Category chosen in step 1: its id and name. industry_type
+      // keeps the name too, for the list's Industry filter.
+      if (company.companyCategoryId != null)
+        'company_category_id': company.companyCategoryId,
+      if (company.industryType != null)
+        'company_category_name': company.industryType,
+      // Always sent so removing the logo clears it ('' = removed).
+      'logo_url': company.logoUrl?.isNotEmpty == true ? company.logoUrl : null,
+      'gallery_urls': company.galleryUrls,
       if (company.gstNumber != null && company.gstNumber!.isNotEmpty)
         'gst_number': company.gstNumber,
       if (company.panNumber != null && company.panNumber!.isNotEmpty)
@@ -37,11 +74,14 @@ class CompaniesRepositoryImpl implements CompaniesRepository {
   Future<Company> updateCompanyStep2(String id, Company company) {
     final body = <String, dynamic>{
       'owner_name': company.ownerName,
-      if (company.email != null && company.email!.isNotEmpty) 'email': company.email,
-      if (company.phone != null && company.phone!.isNotEmpty) 'phone': company.phone,
+      if (company.email != null && company.email!.isNotEmpty)
+        'email': company.email,
+      if (company.phone != null && company.phone!.isNotEmpty)
+        'phone': company.phone,
       if (company.secondaryEmail != null && company.secondaryEmail!.isNotEmpty)
         'secondary_email': company.secondaryEmail,
-      if (company.website != null && company.website!.isNotEmpty) 'website': company.website,
+      if (company.website != null && company.website!.isNotEmpty)
+        'website': company.website,
     };
     return _ds.updateCompanyStep2(id, body);
   }
@@ -66,11 +106,14 @@ class CompaniesRepositoryImpl implements CompaniesRepository {
     final body = <String, dynamic>{
       'company_name': company.name,
       'owner_name': company.ownerName,
-      if (company.email != null && company.email!.isNotEmpty) 'email': company.email,
-      if (company.phone != null && company.phone!.isNotEmpty) 'phone': company.phone,
+      if (company.email != null && company.email!.isNotEmpty)
+        'email': company.email,
+      if (company.phone != null && company.phone!.isNotEmpty)
+        'phone': company.phone,
       if (company.secondaryEmail != null && company.secondaryEmail!.isNotEmpty)
         'secondary_email': company.secondaryEmail,
-      if (company.website != null && company.website!.isNotEmpty) 'website': company.website,
+      if (company.website != null && company.website!.isNotEmpty)
+        'website': company.website,
       if (company.gstNumber != null && company.gstNumber!.isNotEmpty)
         'gst_number': company.gstNumber,
       if (company.panNumber != null && company.panNumber!.isNotEmpty)
@@ -81,8 +124,17 @@ class CompaniesRepositoryImpl implements CompaniesRepository {
       if (company.country != null) 'country': company.country,
       if (company.pincode != null) 'pincode': company.pincode,
       if (company.industryType != null) 'industry_type': company.industryType,
-      if (company.entityType != null) 'entity_type': company.entityType,
-      if (company.subscriptionPlan != null) 'subscription_plan': company.subscriptionPlan,
+      // Company Category chosen in step 1: its id and name. industry_type
+      // keeps the name too, for the list's Industry filter.
+      if (company.companyCategoryId != null)
+        'company_category_id': company.companyCategoryId,
+      if (company.industryType != null)
+        'company_category_name': company.industryType,
+      // Always sent so removing the logo clears it ('' = removed).
+      'logo_url': company.logoUrl?.isNotEmpty == true ? company.logoUrl : null,
+      'gallery_urls': company.galleryUrls,
+      if (company.subscriptionPlan != null)
+        'subscription_plan': company.subscriptionPlan,
     };
     return _ds.updateCompany(id, body);
   }

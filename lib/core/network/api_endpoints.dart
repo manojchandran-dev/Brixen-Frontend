@@ -9,6 +9,11 @@ class ApiEndpoints {
   static const String login = '/api/v1/auth/login';
   static const String authPin = '/api/v1/auth/pin';
   static const String authPinVerify = '/api/v1/auth/pin/verify';
+
+  /// Forgot PIN: email an OTP → verify it (reset token) → set a new PIN.
+  static const String authPinForgot = '/api/v1/auth/pin/forgot';
+  static const String authPinForgotVerify = '/api/v1/auth/pin/forgot/verify';
+  static const String authPinReset = '/api/v1/auth/pin/reset';
   static const String forgotPassword = '/api/v1/auth/forgot-password';
   static const String verifyOtp = '/api/v1/auth/verify-otp';
   static const String resetPassword = '/api/v1/auth/reset-password';
@@ -27,7 +32,13 @@ class ApiEndpoints {
   static const String sales = '/api/v1/sales';
   static const String products = '/api/v1/products';
   static const String dashboardSummary = '/api/v1/dashboard/summary';
+
+  /// Superadmin dashboard: every count, recent activity and health in one call.
+  static const String superadminDashboard = '/api/v1/dashboard/superadmin';
   static const String reportsSummary = '/api/v1/reports/summary';
+
+  /// Superadmin report tab: append company | users | notifications | support | chatbot | activity.
+  static const String superadminReports = '/api/v1/reports/superadmin';
   static const String modules = '/api/v1/modules';
   static const String uploads = '/api/v1/uploads';
   static const String pushNotifications = '/api/v1/notifications/push';
@@ -57,6 +68,9 @@ class ApiEndpoints {
       '/api/v1/chat/conversations/$companyId/messages';
   static const String permissions = '/api/v1/permissions';
   static const String permissionsBulk = '/api/v1/permissions/bulk';
+
+  /// Companies list for the Permissions screen, each with its access counts.
+  static const String permissionCompanies = '/api/v1/permissions/companies';
   static String permissionById(String id) => '/api/v1/permissions/$id';
 
   static String companyById(String id) => '/api/v1/companies/$id';

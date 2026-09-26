@@ -20,7 +20,20 @@ class _BrixenAppState extends State<BrixenApp> {
   void initState() {
     super.initState();
     _themeSub = themeCubit.stream.listen((_) {
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      // Widgets that read AppColors getters directly (not Theme.of) don't
+      // depend on the theme, so Flutter won't rebuild them on a toggle —
+      // they'd keep light colours in dark mode. Mark the whole tree dirty.
+      AppColors.setBrightness(
+        themeCubit.isDark ? Brightness.dark : Brightness.light,
+      );
+      void rebuild(Element e) {
+        e.markNeedsBuild();
+        e.visitChildren(rebuild);
+      }
+
+      (context as Element).visitChildren(rebuild);
+      setState(() {});
     });
   }
 
@@ -34,11 +47,15 @@ class _BrixenAppState extends State<BrixenApp> {
   Widget build(BuildContext context) {
     // AppColors' surface/text tokens are runtime getters, not consts, so
     // they need this set before anything below reads them this frame.
-    AppColors.setBrightness(themeCubit.isDark ? Brightness.dark : Brightness.light);
+    AppColors.setBrightness(
+      themeCubit.isDark ? Brightness.dark : Brightness.light,
+    );
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: themeCubit.isDark ? Brightness.light : Brightness.dark,
+        statusBarIconBrightness: themeCubit.isDark
+            ? Brightness.light
+            : Brightness.dark,
       ),
     );
     return MaterialApp.router(

@@ -18,12 +18,11 @@ class ReportsRepositoryImpl implements ReportsRepository {
     DateTime? to,
     int topCategoriesLimit = 5,
     int topCustomersLimit = 5,
-  }) =>
-      _ds.getSummary(
-        period: period,
-        from: from,
-        to: to,
-        topCategoriesLimit: topCategoriesLimit,
-        topCustomersLimit: topCustomersLimit,
-      );
+  }) => _ds.getSummary(
+    period: period,
+    from: from,
+    to: to,
+    topCategoriesLimit: topCategoriesLimit,
+    topCustomersLimit: topCustomersLimit,
+  );
 }

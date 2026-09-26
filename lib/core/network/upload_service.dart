@@ -23,7 +23,13 @@ class UploadService {
     required String folder,
     void Function(int sent, int total)? onProgress,
   }) async {
-    return _upload(file.name, await file.readAsBytes(), folder, null, onProgress);
+    return _upload(
+      file.name,
+      await file.readAsBytes(),
+      folder,
+      null,
+      onProgress,
+    );
   }
 
   /// A recorded voice note. Browsers record opus/webm, mobile records AAC/m4a;
@@ -51,7 +57,11 @@ class UploadService {
           contentType: mime == null ? null : DioMediaType.parse(mime),
         ),
       });
-      final resp = await _dio.post(ApiEndpoints.uploads, data: formData, onSendProgress: onProgress);
+      final resp = await _dio.post(
+        ApiEndpoints.uploads,
+        data: formData,
+        onSendProgress: onProgress,
+      );
       final data = resp.data['data'] as Map<String, dynamic>;
       return data['url'] as String;
     } on DioException catch (e) {

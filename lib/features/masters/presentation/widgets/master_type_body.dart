@@ -15,6 +15,8 @@ import '../../domain/entities/master_type.dart';
 import '../cubit/master_cubit.dart';
 import '../cubit/master_state.dart';
 import '../../../permissions/presentation/providers/module_access_provider.dart';
+import '../../../../shared/widgets/list_count_bar.dart';
+import '../../../../shared/widgets/search_field.dart';
 
 /// Public **duplicate** of `companies_page.dart`'s private master-type list/
 /// create/edit widgets — kept as a copy (not an extraction) so the original,
@@ -81,23 +83,42 @@ class _MasterItemsBodyState extends ConsumerState<MasterItemsBody> {
 
   @override
   Widget build(BuildContext context) {
-    final access = ref.watch(moduleAccessProvider(masterModuleName(widget.typeKey)));
+    final access = ref.watch(
+      moduleAccessProvider(masterModuleName(widget.typeKey)),
+    );
     final cs = Theme.of(context).colorScheme;
     final typeCfg = masterTypeFor(widget.typeKey);
     return BlocBuilder<MasterCubit, MasterState>(
       bloc: masterCubit,
       builder: (context, state) {
-        if (state is MasterError) {
-          return Center(
-            child: Text(
-              state.message,
-              style: TextStyle(color: cs.onSurfaceVariant),
-            ),
-          );
-        }
+        // Search bar stays put while loading / on error — only the list
+        // area below it changes.
+        final searchBar = Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+          // Shared search box — includes the ✕ that clears the query.
+          child: SearchField(
+            controller: _searchCtrl,
+            hintText: 'Search ${typeCfg?.name ?? 'items'}...',
+            onChanged: masterCubit.search,
+          ),
+        );
         if (state is! MasterLoaded) {
-          return const SkeletonListView(
-            padding: EdgeInsets.fromLTRB(14, 70, 14, 100),
+          return Column(
+            children: [
+              searchBar,
+              Expanded(
+                child: state is MasterError
+                    ? Center(
+                        child: Text(
+                          state.message,
+                          style: TextStyle(color: cs.onSurfaceVariant),
+                        ),
+                      )
+                    : const SkeletonListView(
+                        padding: EdgeInsets.fromLTRB(14, 4, 14, 100),
+                      ),
+              ),
+            ],
           );
         }
 
@@ -129,48 +150,7 @@ class _MasterItemsBodyState extends ConsumerState<MasterItemsBody> {
 
         return Column(
           children: [
-            // Search bar
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
-              child: Container(
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: AppColors.shadows([
-                    BoxShadow(
-                      color: AppColors.shadowDark.withValues(alpha: 0.06),
-                      blurRadius: 14,
-                      offset: const Offset(0, 6),
-                    ),
-                    BoxShadow(
-                      color: AppColors.highlightShadow(0.85),
-                      blurRadius: 6,
-                      offset: const Offset(-3, -3),
-                    ),
-                  ]),
-                ),
-                child: TextField(
-                  controller: _searchCtrl,
-                  style: TextStyle(color: AppColors.ink, fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: 'Search ${typeCfg?.name ?? 'items'}...',
-                    hintStyle: TextStyle(
-                      color: AppColors.textHint,
-                      fontSize: 14,
-                    ),
-                    prefixIcon: Icon(
-                      Icons.search_rounded,
-                      color: AppColors.textHint,
-                      size: 20,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 13),
-                  ),
-                  onChanged: masterCubit.search,
-                ),
-              ),
-            ),
+            searchBar,
 
             // Category filter chips (only for assignable types)
             if (_hasCategories && categoryMap.isNotEmpty)
@@ -210,85 +190,110 @@ class _MasterItemsBodyState extends ConsumerState<MasterItemsBody> {
                         style: TextStyle(color: cs.onSurfaceVariant),
                       ),
                     )
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(14, 4, 14, 100),
-                      itemCount: items.length,
-                      itemBuilder: (_, i) {
-                        final itemColor =
-                            masterCardAccentColors[i %
-                                masterCardAccentColors.length];
-                        return MasterCard(
-                          item: items[i],
-                          icon: typeCfg?.icon ?? Icons.list_alt_outlined,
-                          color: itemColor,
-                          onView: () => showMasterDetail(
-                            context,
-                            items[i],
-                            typeCfg?.icon ?? Icons.list_alt_outlined,
-                            itemColor,
+                  : Column(
+                      children: [
+                        ListCountBar(
+                          label: 'Total ${_plural(typeCfg?.name ?? 'Item')}',
+                          count: items.length,
+                        ),
+                        Expanded(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(14, 4, 14, 100),
+                            itemCount: items.length,
+                            itemBuilder: (_, i) {
+                              final itemColor =
+                                  masterCardAccentColors[i %
+                                      masterCardAccentColors.length];
+                              return MasterCard(
+                                item: items[i],
+                                icon: typeCfg?.icon ?? Icons.list_alt_outlined,
+                                color: itemColor,
+                                onView: () => showMasterDetail(
+                                  context,
+                                  items[i],
+                                  typeCfg?.icon ?? Icons.list_alt_outlined,
+                                  itemColor,
+                                ),
+                                onEdit: !access.edit
+                                    ? null
+                                    : () => widget.onEdit(items[i].id),
+                                onDelete: !access.delete
+                                    ? null
+                                    : () async {
+                                        final confirmed = await showDialog<bool>(
+                                          context: context,
+                                          builder: (ctx) => AlertDialog(
+                                            backgroundColor: Theme.of(ctx)
+                                                .colorScheme
+                                                .surfaceContainerHighest,
+                                            title: Text(
+                                              'Delete ${typeCfg?.name ?? 'item'}?',
+                                              style: TextStyle(
+                                                color: Theme.of(
+                                                  ctx,
+                                                ).colorScheme.onSurface,
+                                              ),
+                                            ),
+                                            content: Text(
+                                              'This will permanently delete "${items[i].name}". This action cannot be undone.',
+                                              style: TextStyle(
+                                                color: Theme.of(
+                                                  ctx,
+                                                ).colorScheme.onSurfaceVariant,
+                                              ),
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.of(
+                                                  ctx,
+                                                ).pop(false),
+                                                child: Text(
+                                                  'Cancel',
+                                                  style: TextStyle(
+                                                    color: Theme.of(ctx)
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
+                                                  ),
+                                                ),
+                                              ),
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.of(ctx).pop(true),
+                                                child: Text(
+                                                  'Delete',
+                                                  style: TextStyle(
+                                                    color: AppColors.error,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (confirmed != true ||
+                                            !context.mounted) {
+                                          return;
+                                        }
+                                        masterCubit.delete(items[i].id).then((
+                                          err,
+                                        ) {
+                                          if (err != null && context.mounted) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(err),
+                                                backgroundColor:
+                                                    AppColors.dangerFill,
+                                              ),
+                                            );
+                                          }
+                                        });
+                                      },
+                              );
+                            },
                           ),
-                          onEdit: !access.edit
-                              ? null
-                              : () => widget.onEdit(items[i].id),
-                          onDelete: !access.delete ? null : () async {
-                            final confirmed = await showDialog<bool>(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                backgroundColor: Theme.of(
-                                  ctx,
-                                ).colorScheme.surfaceContainerHighest,
-                                title: Text(
-                                  'Delete ${typeCfg?.name ?? 'item'}?',
-                                  style: TextStyle(
-                                    color: Theme.of(ctx).colorScheme.onSurface,
-                                  ),
-                                ),
-                                content: Text(
-                                  'This will permanently delete "${items[i].name}". This action cannot be undone.',
-                                  style: TextStyle(
-                                    color: Theme.of(
-                                      ctx,
-                                    ).colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(ctx).pop(false),
-                                    child: Text(
-                                      'Cancel',
-                                      style: TextStyle(
-                                        color: Theme.of(
-                                          ctx,
-                                        ).colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ),
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(ctx).pop(true),
-                                    child: Text(
-                                      'Delete',
-                                      style: TextStyle(color: AppColors.error),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (confirmed != true || !context.mounted) return;
-                            masterCubit.delete(items[i].id).then((err) {
-                              if (err != null && context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(err),
-                                    backgroundColor: AppColors.dangerFill,
-                                  ),
-                                );
-                              }
-                            });
-                          },
-                        );
-                      },
+                        ),
+                      ],
                     ),
             ),
           ],
@@ -693,7 +698,12 @@ class _MasterFormBodyState extends State<MasterFormBody> {
   String? _loadError;
   String? _selectedCategoryId;
   String? _selectedCategoryName;
-  Company? _selectedCompany; // superAdmin only — companyAdmin/employee use Session.companyId
+  Company?
+  _selectedCompany; // superAdmin only — companyAdmin/employee use Session.companyId
+
+  /// Company Category is one global list (picked when creating a company),
+  /// so it has no owning company; every other master belongs to one.
+  bool get _perCompany => widget.typeKey != 'companyCategory';
 
   bool get _isEdit => widget.editId != null;
   bool get _needsCategory =>
@@ -740,7 +750,10 @@ class _MasterFormBodyState extends State<MasterFormBody> {
   Future<void> _loadItemFromApi() async {
     setState(() => _loadingItem = true);
     try {
-      final item = await masterCubit.fetchByIdRemote(widget.typeKey, widget.editId!);
+      final item = await masterCubit.fetchByIdRemote(
+        widget.typeKey,
+        widget.editId!,
+      );
       if (!mounted) return;
       setState(() => _fillFrom(item));
     } catch (e) {
@@ -766,9 +779,15 @@ class _MasterFormBodyState extends State<MasterFormBody> {
       );
       return;
     }
-    if (!_isEdit && Session.isSuperAdmin && _selectedCompany == null) {
+    if (!_isEdit &&
+        _perCompany &&
+        Session.isSuperAdmin &&
+        _selectedCompany == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a company'), backgroundColor: AppColors.dangerFill),
+        const SnackBar(
+          content: Text('Please select a company'),
+          backgroundColor: AppColors.dangerFill,
+        ),
       );
       return;
     }
@@ -808,7 +827,11 @@ class _MasterFormBodyState extends State<MasterFormBody> {
             assignedCategoryId: _selectedCategoryId,
             assignedCategoryName: _selectedCategoryName,
           ),
-          companyId: (Session.isSuperAdmin ? _selectedCompany!.id : Session.companyId)!,
+          companyId: !_perCompany
+              ? null
+              : (Session.isSuperAdmin
+                    ? _selectedCompany!.id
+                    : Session.companyId)!,
         );
       }
       if (mounted) widget.onSaved();
@@ -851,7 +874,7 @@ class _MasterFormBodyState extends State<MasterFormBody> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
               children: [
-                if (!_isEdit && Session.isSuperAdmin) ...[
+                if (!_isEdit && _perCompany && Session.isSuperAdmin) ...[
                   CompanySelectorField(
                     value: _selectedCompany,
                     onChanged: (c) => setState(() => _selectedCompany = c),
@@ -970,3 +993,8 @@ class MasterCategoryDropdown extends StatelessWidget {
     );
   }
 }
+
+/// "Unit" → "Units", "Expense Category" → "Expense Categories".
+String _plural(String name) => name.endsWith('y')
+    ? '${name.substring(0, name.length - 1)}ies'
+    : '${name}s';

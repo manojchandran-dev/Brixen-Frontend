@@ -2,9 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/announcements_repository_impl.dart';
 import '../../domain/entities/announcement.dart';
 
-final announcementsProvider = AsyncNotifierProvider<AnnouncementsNotifier, List<Announcement>>(
-  AnnouncementsNotifier.new,
-);
+final announcementsProvider =
+    AsyncNotifierProvider<AnnouncementsNotifier, List<Announcement>>(
+      AnnouncementsNotifier.new,
+    );
 
 class AnnouncementsNotifier extends AsyncNotifier<List<Announcement>> {
   List<Announcement> _all = [];
@@ -16,7 +17,9 @@ class AnnouncementsNotifier extends AsyncNotifier<List<Announcement>> {
   }
 
   Future<Announcement> create(Announcement announcement) async {
-    final created = await ref.read(announcementsRepositoryProvider).create(announcement);
+    final created = await ref
+        .read(announcementsRepositoryProvider)
+        .create(announcement);
     _all = [created, ..._all];
     state = AsyncData(List.from(_all));
     return created;
@@ -25,7 +28,9 @@ class AnnouncementsNotifier extends AsyncNotifier<List<Announcement>> {
   // Named `edit` (not `update`) — `AsyncNotifier` already defines a
   // built-in `update` with an incompatible signature.
   Future<Announcement> edit(Announcement announcement) async {
-    final updated = await ref.read(announcementsRepositoryProvider).update(announcement);
+    final updated = await ref
+        .read(announcementsRepositoryProvider)
+        .update(announcement);
     _replace(updated);
     return updated;
   }
@@ -44,7 +49,9 @@ class AnnouncementsNotifier extends AsyncNotifier<List<Announcement>> {
   }
 
   Future<Announcement> unpublish(String id) async {
-    final updated = await ref.read(announcementsRepositoryProvider).unpublish(id);
+    final updated = await ref
+        .read(announcementsRepositoryProvider)
+        .unpublish(id);
     _replace(updated);
     return updated;
   }
