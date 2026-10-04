@@ -14,7 +14,44 @@ import 'skeleton.dart';
 /// their menu. Superadmin keeps it here (their More page doesn't have it).
 bool _supportInMore(NavModule m) =>
     !Session.isSuperAdmin &&
-    m.name.toLowerCase().replaceAll(RegExp(r's+'), '').startsWith('support');
+    m.name.toLowerCase().replaceAll(RegExp(r'\s+'), '').startsWith('support');
+
+/// Chat has its own tab in the bottom nav (see AppBottomNav), so it's left
+/// out of the menu for everyone.
+bool isChatModule(NavModule m) => const {
+  'chat',
+  'chatbot',
+}.contains(m.name.toLowerCase().replaceAll(RegExp(r'\s+'), ''));
+
+/// Company users read notifications from the dashboard bell (their inbox),
+/// so the Notifications/Announcements modules — superadmin sending tools —
+/// are left out of their menu.
+bool _notificationsInBell(NavModule m) =>
+    !Session.isSuperAdmin &&
+    const {
+      'notifications',
+      'pushnotifications',
+      'announcements',
+    }.contains(m.name.toLowerCase().replaceAll(RegExp(r'\s+'), ''));
+
+/// Inventory is its own menu item, right after Products. The backend grants
+/// it through the Products permission (there's no separate module row), so
+/// anyone with Products gets it — unless the API already sends Inventory.
+Iterable<NavModule> _withInventory(Iterable<NavModule> modules) sync* {
+  String key(NavModule m) =>
+      m.name.toLowerCase().replaceAll(RegExp(r'\s+'), '');
+  final hasInventory = modules.any((m) => key(m) == 'inventory');
+  for (final m in modules) {
+    yield m;
+    if (!hasInventory && key(m) == 'products') {
+      yield const NavModule(
+        id: 'inventory',
+        name: 'Inventory',
+        description: 'Stock levels and movements',
+      );
+    }
+  }
+}
 
 /// Slide-out navigation drawer used across module pages (Employees, Sales,
 /// Customers, Expenses, Purchases, Companies) — opened via the hamburger
@@ -128,8 +165,14 @@ class AppDrawer extends ConsumerWidget {
                   children: [
                     // Groups (Masters) always last, whatever order the API returns.
                     for (final m in [
-                      ...modules.where(
-                        (m) => m.children.isEmpty && !_supportInMore(m),
+                      ..._withInventory(
+                        modules.where(
+                          (m) =>
+                              m.children.isEmpty &&
+                              !_supportInMore(m) &&
+                              !_notificationsInBell(m) &&
+                              !isChatModule(m),
+                        ),
                       ),
                       ...modules.where((m) => m.children.isNotEmpty),
                     ])
@@ -180,6 +223,9 @@ void Function(BuildContext context) _destinationFor(NavModule module) {
       return (context) => context.go(AppRouter.expenses);
     case 'products':
       return (context) => context.go(AppRouter.products);
+    case 'inventory':
+    case 'stock':
+      return (context) => context.go(AppRouter.inventory);
     case 'companycategory':
       return (context) => context.go(
         AppRouter.companies,

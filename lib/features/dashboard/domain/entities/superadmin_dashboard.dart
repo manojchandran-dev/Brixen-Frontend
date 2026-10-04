@@ -49,7 +49,12 @@ class ActivityEntry {
   final String title;
   final String detail;
   final DateTime at;
-  const ActivityEntry({required this.type, required this.title, required this.detail, required this.at});
+  const ActivityEntry({
+    required this.type,
+    required this.title,
+    required this.detail,
+    required this.at,
+  });
 }
 
 enum HealthStatus { ok, slow, down, notConfigured }

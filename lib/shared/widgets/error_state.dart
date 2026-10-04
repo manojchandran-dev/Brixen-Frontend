@@ -25,7 +25,9 @@ class ErrorCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppColors.brandBlack.withValues(alpha: 0.15)),
+            border: Border.all(
+              color: AppColors.brandBlack.withValues(alpha: 0.15),
+            ),
             boxShadow: AppColors.shadows([
               BoxShadow(
                 color: AppColors.shadowDark.withValues(alpha: 0.08),
@@ -64,7 +66,11 @@ class ErrorCard extends StatelessWidget {
               Text(
                 errorMessage(error),
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textHint, fontSize: 12.5, height: 1.4),
+                style: TextStyle(
+                  color: AppColors.textHint,
+                  fontSize: 12.5,
+                  height: 1.4,
+                ),
               ),
               if (onRetry != null) ...[
                 const SizedBox(height: 16),
@@ -72,7 +78,10 @@ class ErrorCard extends StatelessWidget {
                   onPressed: onRetry,
                   child: Text(
                     'Retry',
-                    style: TextStyle(color: AppColors.brand, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      color: AppColors.brand,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
@@ -99,7 +108,11 @@ Future<void> showErrorDialog(BuildContext context, Object error) {
           const SizedBox(width: 8),
           Text(
             'Something went wrong',
-            style: TextStyle(color: AppColors.ink, fontSize: 15, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              color: AppColors.ink,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -110,7 +123,13 @@ Future<void> showErrorDialog(BuildContext context, Object error) {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(),
-          child: Text('OK', style: TextStyle(color: AppColors.brand, fontWeight: FontWeight.w700)),
+          child: Text(
+            'OK',
+            style: TextStyle(
+              color: AppColors.brand,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
       ],
     ),

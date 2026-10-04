@@ -110,3 +110,38 @@ ApiException mapDioError(DioException e) {
   final msg = e.response?.data?['message'] ?? e.message ?? 'Unknown error';
   return ApiException(msg.toString(), statusCode: status);
 }
+
+/// GETs every page of a list endpoint — the API caps a page at 100 rows.
+/// [query] carries the list's search/filter params. Throws [DioException].
+/// ponytail: stops at 50 pages (5,000 rows); switch the screen to paging if
+/// a company's list ever gets that long.
+Future<List<Map<String, dynamic>>> fetchAllPages(
+  Dio dio,
+  String path,
+  Map<String, dynamic> query,
+) async {
+  const limit = 100;
+  final rows = <Map<String, dynamic>>[];
+  for (var page = 1; page <= 50; page++) {
+    final resp = await dio.get(
+      path,
+      queryParameters: {...query, 'page': page, 'limit': limit},
+    );
+    final body = resp.data;
+    final data = body is Map ? (body['data'] ?? body) : body;
+    final list = data is List
+        ? data
+        : (data as Map).values.firstWhere(
+                (v) => v is List,
+                orElse: () => const [],
+              )
+              as List;
+    rows.addAll([for (final r in list) Map<String, dynamic>.from(r as Map)]);
+    final meta =
+        (body is Map ? body['meta'] : null) ??
+        (data is Map ? data['meta'] : null);
+    final pages = (meta is Map ? meta['pages'] as num? : null)?.toInt();
+    if (list.length < limit || (pages != null && page >= pages)) break;
+  }
+  return rows;
+}

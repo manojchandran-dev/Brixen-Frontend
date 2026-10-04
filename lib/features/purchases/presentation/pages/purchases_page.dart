@@ -239,7 +239,7 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
                 onChanged: (_) => setState(() {}),
                 style: TextStyle(color: cs.onSurface, fontSize: 14),
                 decoration: InputDecoration(
-                  hintText: 'Search by supplier or status…',
+                  hintText: 'Search',
                   hintStyle: TextStyle(
                     color: cs.onSurfaceVariant,
                     fontSize: 14,
@@ -555,9 +555,7 @@ class _PurchaseCard extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(context);
               try {
-                await ref
-                    .read(purchasesProvider.notifier)
-                    .deletePurchase(purchase.id);
+                await ref.read(purchasesProvider.notifier).delete(purchase.id);
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -667,9 +665,7 @@ void _showPurchaseDetail(
         );
         if (confirmed != true) return;
         try {
-          await ref
-              .read(purchasesProvider.notifier)
-              .deletePurchase(purchase.id);
+          await ref.read(purchasesProvider.notifier).delete(purchase.id);
           if (ctx.mounted) Navigator.of(ctx).pop();
         } catch (e) {
           if (ctx.mounted) {

@@ -20,11 +20,41 @@ import '../widgets/voice_bubble.dart';
 /// One company's conversation with support. [isRoot] = reached straight from
 /// the drawer (company users), so it gets the drawer/hamburger; superAdmin
 /// opens it from the list and gets a normal back arrow.
+/// Company users' chat with support as a tall bottom sheet over the current
+/// page (from the chat button beside the bottom nav), not a separate page.
+Future<void> showChatSheet(BuildContext context) => showModalBottomSheet(
+  context: context,
+  isScrollControlled: true,
+  useSafeArea: true,
+  backgroundColor: Colors.transparent,
+  builder: (_) => FractionallySizedBox(
+    heightFactor: 0.92,
+    child: ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: ChatRoomPage(
+        companyId: Session.companyId ?? '',
+        companyName: Session.companyName ?? '',
+        asSheet: true,
+      ),
+    ),
+  ),
+);
+
 class ChatRoomPage extends ConsumerStatefulWidget {
   final String companyId;
   final String companyName;
   final bool isRoot;
-  const ChatRoomPage({super.key, required this.companyId, required this.companyName, this.isRoot = false});
+
+  /// Shown in [showChatSheet]: sheet header (handle, support avatar, close)
+  /// instead of an app bar.
+  final bool asSheet;
+  const ChatRoomPage({
+    super.key,
+    required this.companyId,
+    required this.companyName,
+    this.isRoot = false,
+    this.asSheet = false,
+  });
 
   @override
   ConsumerState<ChatRoomPage> createState() => _ChatRoomPageState();
@@ -49,7 +79,9 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     _textCtrl.addListener(() => setState(() {}));
     // No socket yet — refresh every 5s (previous messages stay on screen while it reloads).
     _poll = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (mounted && !_sending) ref.invalidate(chatMessagesProvider(widget.companyId));
+      if (mounted && !_sending) {
+        ref.invalidate(chatMessagesProvider(widget.companyId));
+      }
     });
   }
 
@@ -66,7 +98,10 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
   void _snack(Object e) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(e.toString()), backgroundColor: AppColors.dangerFill),
+      SnackBar(
+        content: Text(e.toString()),
+        backgroundColor: AppColors.dangerFill,
+      ),
     );
   }
 
@@ -90,7 +125,9 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
   }) async {
     setState(() => _sending = true);
     try {
-      await ref.read(chatMessagesProvider(widget.companyId).notifier).send(
+      await ref
+          .read(chatMessagesProvider(widget.companyId).notifier)
+          .send(
             type: type,
             text: text,
             attachmentUrl: url,
@@ -137,7 +174,9 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     if (file == null) return;
     setState(() => _sending = true);
     try {
-      final url = await ref.read(uploadServiceProvider).uploadImage(file, folder: 'support');
+      final url = await ref
+          .read(uploadServiceProvider)
+          .uploadImage(file, folder: 'support');
       await _post(type: MessageType.image, url: url);
     } catch (e) {
       _snack(e);
@@ -151,7 +190,9 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
         _snack('Microphone permission is needed to record a voice message');
         return;
       }
-      final path = kIsWeb ? '' : '${Directory.systemTemp.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final path = kIsWeb
+          ? ''
+          : '${Directory.systemTemp.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
       // Browsers can't encode AAC; opus is what MediaRecorder actually produces.
       await _recorder.start(
         RecordConfig(encoder: kIsWeb ? AudioEncoder.opus : AudioEncoder.aacLc),
@@ -160,7 +201,10 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
       _recordWatch
         ..reset()
         ..start();
-      _recordTicker = Timer.periodic(const Duration(milliseconds: 250), (_) => setState(() {}));
+      _recordTicker = Timer.periodic(
+        const Duration(milliseconds: 250),
+        (_) => setState(() {}),
+      );
       setState(() => _recording = true);
     } catch (e) {
       _snack(e);
@@ -180,7 +224,9 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     if (path == null || durationMs < 500) return;
     setState(() => _sending = true);
     try {
-      final url = await ref.read(uploadServiceProvider).uploadAudio(XFile(path), folder: 'support');
+      final url = await ref
+          .read(uploadServiceProvider)
+          .uploadAudio(XFile(path), folder: 'support');
       await _post(type: MessageType.voice, url: url, durationMs: durationMs);
     } catch (e) {
       _snack(e);
@@ -193,7 +239,11 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
     return '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
   }
 
-  Widget _circleButton(IconData icon, VoidCallback? onTap, {bool loading = false}) {
+  Widget _circleButton(
+    IconData icon,
+    VoidCallback? onTap, {
+    bool loading = false,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -201,11 +251,20 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
         height: 44,
         alignment: Alignment.center,
         decoration: const BoxDecoration(
-          gradient: LinearGradient(colors: [AppColors.brand, AppColors.brandDeep]),
+          gradient: LinearGradient(
+            colors: [AppColors.brand, AppColors.brandDeep],
+          ),
           shape: BoxShape.circle,
         ),
         child: loading
-            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
             : Icon(icon, color: Colors.white, size: 20),
       ),
     );
@@ -219,23 +278,40 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
         ? Row(
             children: [
               IconButton(
-                icon: Icon(Icons.delete_outline_rounded, color: AppColors.textSecondary),
+                icon: Icon(
+                  Icons.delete_outline_rounded,
+                  color: AppColors.textSecondary,
+                ),
                 onPressed: () => _stopRecording(send: false),
               ),
-              Icon(Icons.fiber_manual_record_rounded, size: 14, color: AppColors.brandBlack),
+              Icon(
+                Icons.fiber_manual_record_rounded,
+                size: 14,
+                color: AppColors.brandBlack,
+              ),
               const SizedBox(width: 6),
               Text(
                 _mmss(_recordWatch.elapsedMilliseconds),
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ink),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ink,
+                ),
               ),
               const Spacer(),
-              _circleButton(Icons.send_rounded, () => _stopRecording(send: true)),
+              _circleButton(
+                Icons.send_rounded,
+                () => _stopRecording(send: true),
+              ),
             ],
           )
         : Row(
             children: [
               IconButton(
-                icon: Icon(Icons.attach_file_rounded, color: AppColors.textSecondary),
+                icon: Icon(
+                  Icons.attach_file_rounded,
+                  color: AppColors.textSecondary,
+                ),
                 onPressed: _sending ? null : _openAttachSheet,
               ),
               Expanded(
@@ -249,14 +325,25 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                     controller: _textCtrl,
                     minLines: 1,
                     maxLines: 4,
-                    decoration: const InputDecoration(hintText: 'Message', border: InputBorder.none),
+                    decoration: const InputDecoration(
+                      hintText: 'Message',
+                      border: InputBorder.none,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               hasText
-                  ? _circleButton(Icons.send_rounded, _sending ? null : _sendText, loading: _sending)
-                  : _circleButton(Icons.mic_rounded, _sending ? null : _startRecording, loading: _sending),
+                  ? _circleButton(
+                      Icons.send_rounded,
+                      _sending ? null : _sendText,
+                      loading: _sending,
+                    )
+                  : _circleButton(
+                      Icons.mic_rounded,
+                      _sending ? null : _startRecording,
+                      loading: _sending,
+                    ),
             ],
           );
 
@@ -266,7 +353,11 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
         decoration: BoxDecoration(
           color: Theme.of(context).scaffoldBackgroundColor,
           boxShadow: AppColors.shadows([
-            BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, -4)),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 12,
+              offset: const Offset(0, -4),
+            ),
           ]),
         ),
         child: row,
@@ -291,7 +382,10 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
           onDark: _isMine(m),
         );
       case MessageType.text:
-        return Text(m.text, style: const TextStyle(fontSize: 14.5, height: 1.3));
+        return Text(
+          m.text,
+          style: const TextStyle(fontSize: 14.5, height: 1.3),
+        );
     }
   }
 
@@ -317,20 +411,31 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                 padding: const EdgeInsets.all(8),
                 child: Row(
                   children: [
-                    IconButton.filledTonal(
-                      tooltip: 'Close',
-                      icon: const Icon(Icons.close_rounded),
-                      onPressed: () => Navigator.of(dCtx).pop(),
-                    ),
-                    const Spacer(),
                     if (url.startsWith('http'))
                       IconButton.filledTonal(
                         tooltip: 'Download',
                         icon: const Icon(Icons.download_rounded),
                         onPressed: () async {
-                          if (!await downloadAttachment(url)) _snack('Could not open image for download');
+                          if (!await downloadAttachment(url)) {
+                            _snack('Could not open image for download');
+                          }
                         },
                       ),
+                    const Spacer(),
+                    // Clear on any photo: white disc, dark ✕ (as the shared viewer).
+                    Material(
+                      color: Colors.white,
+                      shape: const CircleBorder(),
+                      elevation: 4,
+                      child: IconButton(
+                        tooltip: 'Close',
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: Colors.black87,
+                        ),
+                        onPressed: () => Navigator.of(dCtx).pop(),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -351,14 +456,23 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
 
     return Scaffold(
       drawer: widget.isRoot ? const AppDrawer() : null,
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        elevation: 0,
-        title: Text(
-          Session.isSuperAdmin ? widget.companyName : 'Chat with Support',
-          style: TextStyle(color: cs.onSurface, fontSize: 17, fontWeight: FontWeight.w700),
-        ),
-      ),
+      appBar: widget.asSheet
+          ? const PreferredSize(
+              preferredSize: Size.fromHeight(86),
+              child: _SupportSheetHeader(),
+            )
+          : AppBar(
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              elevation: 0,
+              title: Text(
+                Session.isSuperAdmin ? widget.companyName : 'Chat with Support',
+                style: TextStyle(
+                  color: cs.onSurface,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
       body: Column(
         children: [
           Expanded(
@@ -367,7 +481,9 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                     child: messagesAsync.isLoading
                         ? const CircularProgressIndicator(strokeWidth: 2)
                         : Text(
-                            messagesAsync.hasError ? messagesAsync.error.toString() : 'No messages yet — say hello',
+                            messagesAsync.hasError
+                                ? messagesAsync.error.toString()
+                                : 'No messages yet — say hello',
                             style: TextStyle(color: cs.onSurfaceVariant),
                           ),
                   )
@@ -381,8 +497,12 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                     itemBuilder: (_, i) {
                       final idx = messages.length - 1 - i;
                       final m = messages[idx];
-                      final newDay = idx == 0 ||
-                          !DateUtils.isSameDay(messages[idx - 1].sentAt, m.sentAt);
+                      final newDay =
+                          idx == 0 ||
+                          !DateUtils.isSameDay(
+                            messages[idx - 1].sentAt,
+                            m.sentAt,
+                          );
                       final bubble = ChatBubble(
                         senderName: m.senderName,
                         isMine: _isMine(m),
@@ -392,7 +512,10 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                       );
                       if (!newDay) return bubble;
                       return Column(
-                        children: [ChatDateDivider(date: m.sentAt), bubble],
+                        children: [
+                          ChatDateDivider(date: m.sentAt),
+                          bubble,
+                        ],
                       );
                     },
                   ),
@@ -412,6 +535,129 @@ class _ChatRoomPageState extends ConsumerState<ChatRoomPage> {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Header of the chat sheet: drag handle, Brixen Support avatar with an
+/// online dot, a friendly subtitle, and a close button.
+class _SupportSheetHeader extends StatelessWidget {
+  const _SupportSheetHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(top: 10, bottom: 10),
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 8, 12),
+            child: Row(
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [AppColors.brand, AppColors.positive],
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.support_agent_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    Positioned(
+                      right: -1,
+                      bottom: -1,
+                      child: Container(
+                        width: 13,
+                        height: 13,
+                        decoration: BoxDecoration(
+                          color: AppColors.positive,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.surface,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Brixen Support',
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Ask anything — we reply right here',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Close',
+                  // Compact, so the header row stays the avatar's 44px.
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 44,
+                    height: 44,
+                  ),
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceElevated,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

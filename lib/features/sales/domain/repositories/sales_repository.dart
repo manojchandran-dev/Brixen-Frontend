@@ -3,8 +3,7 @@ import '../entities/sale_item.dart';
 
 abstract class SalesRepository {
   Future<List<Sale>> getSales({
-    int page = 1,
-    int limit = 200,
+    Map<String, String> filters = const {},
     String? search,
     String? customerId,
     String? paymentStatus,

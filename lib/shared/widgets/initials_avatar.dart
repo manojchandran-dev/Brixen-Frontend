@@ -16,7 +16,10 @@ List<Color> get _avatarPalette => [
 /// names are spread across the palette.
 Color avatarColorFor(String seed) {
   if (seed.isEmpty) return _avatarPalette.last;
-  final hash = seed.trim().toLowerCase().codeUnits.fold<int>(0, (acc, c) => acc + c);
+  final hash = seed.trim().toLowerCase().codeUnits.fold<int>(
+    0,
+    (acc, c) => acc + c,
+  );
   return _avatarPalette[hash % _avatarPalette.length];
 }
 
@@ -29,7 +32,12 @@ class InitialsAvatar extends StatelessWidget {
   /// Overrides the colour picked from [seed] — e.g. to match the card's
   /// accent (RichCardShell.accentFor).
   final Color? color;
-  const InitialsAvatar({super.key, required this.seed, this.size = 42, this.color});
+  const InitialsAvatar({
+    super.key,
+    required this.seed,
+    this.size = 42,
+    this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +50,11 @@ class InitialsAvatar extends StatelessWidget {
       child: Center(
         child: Text(
           letter,
-          style: TextStyle(fontSize: size * 0.4, fontWeight: FontWeight.w700, color: Colors.white),
+          style: TextStyle(
+            fontSize: size * 0.4,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
         ),
       ),
     );

@@ -13,36 +13,52 @@ class ProductsRepositoryImpl implements ProductsRepository {
 
   @override
   Future<List<Product>> getProducts({
-    int page = 1,
-    int limit = 200,
+    Map<String, String> filters = const {},
     String? search,
     String? category,
     String? unitId,
-  }) =>
-      _ds.getProducts(page: page, limit: limit, search: search, category: category, unitId: unitId);
+  }) => _ds.getProducts(
+    filters: filters,
+    search: search,
+    category: category,
+    unitId: unitId,
+  );
 
   @override
   Future<Product> getProductById(String id, {String? companyId}) =>
       _ds.getProductById(id, companyId: companyId);
 
   @override
-  Future<Product> createProduct(Map<String, dynamic> body) => _ds.createProduct(body);
+  Future<Product> createProduct(Map<String, dynamic> body) =>
+      _ds.createProduct(body);
 
   @override
-  Future<Product> updateProduct(String id, Map<String, dynamic> body, {String? companyId}) =>
-      _ds.updateProduct(id, body, companyId: companyId);
+  Future<Product> updateProduct(
+    String id,
+    Map<String, dynamic> body, {
+    String? companyId,
+  }) => _ds.updateProduct(id, body, companyId: companyId);
 
   @override
-  Future<Product> updateStep2(String id, Map<String, dynamic> body, {String? companyId}) =>
-      _ds.updateStep2(id, body, companyId: companyId);
+  Future<Product> updateStep2(
+    String id,
+    Map<String, dynamic> body, {
+    String? companyId,
+  }) => _ds.updateStep2(id, body, companyId: companyId);
 
   @override
-  Future<Product> updateStep3(String id, Map<String, dynamic> body, {String? companyId}) =>
-      _ds.updateStep3(id, body, companyId: companyId);
+  Future<Product> updateStep3(
+    String id,
+    Map<String, dynamic> body, {
+    String? companyId,
+  }) => _ds.updateStep3(id, body, companyId: companyId);
 
   @override
-  Future<Product> updateStep4(String id, Map<String, dynamic> body, {String? companyId}) =>
-      _ds.updateStep4(id, body, companyId: companyId);
+  Future<Product> updateStep4(
+    String id,
+    Map<String, dynamic> body, {
+    String? companyId,
+  }) => _ds.updateStep4(id, body, companyId: companyId);
 
   @override
   Future<void> deleteProduct(String id, {String? companyId}) =>

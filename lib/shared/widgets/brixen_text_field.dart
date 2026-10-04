@@ -85,7 +85,10 @@ class _BrixenTextFieldState extends State<BrixenTextField> {
         alignLabelWithHint: multiline,
         prefixIcon: multiline || widget.prefixIcon == null
             ? null
-            : BrixenPrefixIcon(icon: widget.prefixIcon!, color: widget.iconColor),
+            : BrixenPrefixIcon(
+                icon: widget.prefixIcon!,
+                color: widget.iconColor,
+              ),
         prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
         suffixIcon: widget.isPassword
             ? IconButton(
@@ -107,7 +110,11 @@ class _BrixenTextFieldState extends State<BrixenTextField> {
 class BrixenPrefixIcon extends StatelessWidget {
   final Widget icon;
   final Color color;
-  const BrixenPrefixIcon({super.key, required this.icon, this.color = AppColors.brand});
+  const BrixenPrefixIcon({
+    super.key,
+    required this.icon,
+    this.color = AppColors.brand,
+  });
 
   @override
   Widget build(BuildContext context) {

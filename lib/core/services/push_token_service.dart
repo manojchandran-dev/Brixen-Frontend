@@ -87,7 +87,7 @@ class PushTokenService {
 
   /// `open_on_tap` (sent by the backend in the push's data) → app route.
   /// Targets with no page of their own yet land on the dashboard.
-  static String? _routeFor(Map<String, dynamic> data) {
+  static String? routeFor(Map<String, dynamic> data) {
     final specific = data['specific_page_route'] as String? ?? '';
     return switch (data['open_on_tap']) {
       null || 'none' => null,
@@ -112,7 +112,7 @@ class PushTokenService {
         return Response(requestOptions: RequestOptions());
       });
     }
-    final route = _routeFor(data);
+    final route = routeFor(data);
     if (route == null) return;
     if (coldStart) {
       _pendingRoute = route;

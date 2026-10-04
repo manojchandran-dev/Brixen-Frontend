@@ -15,8 +15,7 @@ class SalesRemoteDatasource {
   const SalesRemoteDatasource(this._dio);
 
   Future<List<SaleModel>> getSales({
-    int page = 1,
-    int limit = 200,
+    Map<String, String> filters = const {},
     String? search,
     String? customerId,
     String? paymentStatus,
@@ -24,25 +23,18 @@ class SalesRemoteDatasource {
     DateTime? to,
   }) async {
     try {
-      final resp = await _dio.get(
-        ApiEndpoints.sales,
-        queryParameters: {
-          'page': page,
-          'limit': limit,
-          if (search != null && search.isNotEmpty) 'search': search,
-          if (customerId != null && customerId.isNotEmpty)
-            'customer_id': customerId,
-          if (paymentStatus != null && paymentStatus.isNotEmpty)
-            'payment_status': paymentStatus,
-          if (from != null) 'from': toIsoDateOnly(from),
-          if (to != null) 'to': toIsoDateOnly(to),
-        },
-      );
-      final data = resp.data['data'] ?? resp.data;
-      final list = (data is List) ? data : (data['items'] ?? []);
-      return (list as List)
-          .map((e) => SaleModel.fromJson(e as Map<String, dynamic>))
-          .toList();
+      final rows = await fetchAllPages(_dio, ApiEndpoints.sales, {
+        if (search != null && search.isNotEmpty) 'search': search,
+        if (customerId != null && customerId.isNotEmpty)
+          'customer_id': customerId,
+        if (paymentStatus != null && paymentStatus.isNotEmpty)
+          'payment_status': paymentStatus,
+        if (from != null) 'from': toIsoDateOnly(from),
+        if (to != null) 'to': toIsoDateOnly(to),
+
+        ...filters,
+      });
+      return rows.map(SaleModel.fromJson).toList();
     } on DioException catch (e) {
       throw mapDioError(e);
     }

@@ -18,6 +18,7 @@ class SaleModel extends Sale {
     super.notes,
     super.billImagePath,
     super.items,
+    super.amountPaid,
     required super.createdAt,
   });
 
@@ -34,16 +35,21 @@ class SaleModel extends Sale {
       invoiceType: json['invoice_type'],
       subtotal: _num(json['subtotal']),
       taxAmount: _num(json['tax_amount']),
-      taxPercentage: json['tax_percentage'] != null ? _num(json['tax_percentage']) : null,
+      taxPercentage: json['tax_percentage'] != null
+          ? _num(json['tax_percentage'])
+          : null,
       totalAmount: _num(json['total_amount']),
       paymentType: json['payment_type'],
       paymentStatus: (json['payment_status'] ?? 'Pending').toString(),
+      amountPaid: json['amount_paid'] == null
+          ? null
+          : _num(json['amount_paid']),
       notes: json['notes'],
       billImagePath: json['bill_image_url'],
       items: json['sale_items'] is List
           ? (json['sale_items'] as List)
-              .map((e) => SaleItem.fromJson(e as Map<String, dynamic>))
-              .toList()
+                .map((e) => SaleItem.fromJson(e as Map<String, dynamic>))
+                .toList()
           : const [],
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
@@ -58,23 +64,31 @@ class SaleModel extends Sale {
   /// value here would only ever be stale. `companyId` is only needed on
   /// create — see `Session.companyId`.
   static Map<String, dynamic> toBody(Sale s, {String? companyId}) => {
-        if (companyId != null) 'company_id': int.parse(companyId),
-        if (s.customerId != null && s.customerId!.isNotEmpty) 'customer_id': s.customerId,
-        'bill_date': s.billDate.toIso8601String(),
-        if (s.invoiceType != null && s.invoiceType!.isNotEmpty) 'invoice_type': s.invoiceType,
-        if (s.paymentType != null && s.paymentType!.isNotEmpty) 'payment_type': s.paymentType,
-        'payment_status': s.paymentStatus,
-        if (s.notes != null && s.notes!.isNotEmpty) 'notes': s.notes,
-        // Always sent (null clears it on PUT). Must be a hosted URL — the
-        // page uploads a picked bill image via `POST /uploads` first.
-        'bill_image_url': s.billImagePath,
-      };
+    if (companyId != null) 'company_id': int.parse(companyId),
+    if (s.customerId != null && s.customerId!.isNotEmpty)
+      'customer_id': s.customerId,
+    'bill_date': s.billDate.toIso8601String(),
+    if (s.invoiceType != null && s.invoiceType!.isNotEmpty)
+      'invoice_type': s.invoiceType,
+    if (s.paymentType != null && s.paymentType!.isNotEmpty)
+      'payment_type': s.paymentType,
+    'payment_status': s.paymentStatus,
+    // Partial payments carry the amount; Paid is filled in by the server.
+    if (s.amountPaid != null) 'amount_paid': s.amountPaid,
+    if (s.notes != null && s.notes!.isNotEmpty) 'notes': s.notes,
+    // Always sent (null clears it on PUT). Must be a hosted URL — the
+    // page uploads a picked bill image via `POST /uploads` first.
+    'bill_image_url': s.billImagePath,
+  };
 
   /// `PUT /sales/:id/step2` — replaces the sale's entire line-item list and
   /// tax percentage; the backend computes subtotal/tax_amount/total_amount
   /// from these and returns the updated sale.
-  static Map<String, dynamic> toStep2Body(List<SaleItem> items, double taxPercentage) => {
-        'items': items.map((i) => i.toBody()).toList(),
-        'tax_percentage': taxPercentage,
-      };
+  static Map<String, dynamic> toStep2Body(
+    List<SaleItem> items,
+    double taxPercentage,
+  ) => {
+    'items': items.map((i) => i.toBody()).toList(),
+    'tax_percentage': taxPercentage,
+  };
 }

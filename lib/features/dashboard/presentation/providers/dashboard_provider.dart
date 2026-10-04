@@ -4,9 +4,10 @@ import '../../data/repositories/dashboard_repository_impl.dart';
 import '../../domain/entities/dashboard_summary.dart';
 import '../../domain/entities/superadmin_dashboard.dart';
 
-final dashboardSummaryProvider = AsyncNotifierProvider<DashboardSummaryNotifier, DashboardSummary>(
-  DashboardSummaryNotifier.new,
-);
+final dashboardSummaryProvider =
+    AsyncNotifierProvider<DashboardSummaryNotifier, DashboardSummary>(
+      DashboardSummaryNotifier.new,
+    );
 
 class DashboardSummaryNotifier extends AsyncNotifier<DashboardSummary> {
   @override
@@ -22,7 +23,9 @@ class DashboardSummaryNotifier extends AsyncNotifier<DashboardSummary> {
 
   Future<void> refresh() async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() => ref.read(dashboardRepositoryProvider).getSummary());
+    state = await AsyncValue.guard(
+      () => ref.read(dashboardRepositoryProvider).getSummary(),
+    );
   }
 }
 

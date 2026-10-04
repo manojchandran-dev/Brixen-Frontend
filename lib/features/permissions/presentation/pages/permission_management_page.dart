@@ -116,7 +116,7 @@ class _PermissionManagementPageState
                       },
                       style: TextStyle(color: AppColors.ink, fontSize: 14),
                       decoration: InputDecoration(
-                        hintText: 'Search company…',
+                        hintText: 'Search',
                         hintStyle: TextStyle(
                           color: AppColors.textHint,
                           fontSize: 14,
@@ -188,7 +188,7 @@ class _PermissionManagementPageState
                       : const SkeletonListView())
                 // A search/filter/refresh in flight: skeleton; the search
                 // box above stays usable.
-                : resultsAsync.isLoading
+                : resultsAsync.isLoading && !resultsAsync.isRefreshing
                 ? const SkeletonListView()
                 : page.items.isEmpty
                 ? Center(

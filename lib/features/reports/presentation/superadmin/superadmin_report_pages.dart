@@ -34,7 +34,9 @@ class _ReportTabState extends ConsumerState<_ReportTab> {
     return ReportPage(
       range: period,
       onRange: (p) => setState(() => period = p),
-      loading: async.isLoading,
+      // Skeleton only with nothing to show; a background refresh keeps
+      // the current numbers up until the new ones arrive.
+      loading: async.isLoading && !async.hasValue,
       error: async.error,
       onRetry: () => ref.invalidate(provider),
       body: () => widget.body(async.value ?? const {}, period),

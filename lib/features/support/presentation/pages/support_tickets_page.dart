@@ -213,7 +213,7 @@ class _SupportTicketsPageState extends ConsumerState<SupportTicketsPage> {
                 Expanded(
                   child: SearchField(
                     controller: _searchCtrl,
-                    hintText: 'Search tickets...',
+                    hintText: 'Search',
                     onChanged: _onSearchChanged,
                   ),
                 ),

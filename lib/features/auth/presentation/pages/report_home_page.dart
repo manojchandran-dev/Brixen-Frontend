@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/services/session_service.dart';
 import '../../../../core/theme/theme_cubit.dart';
-import '../../../../features/reports/presentation/pages/company_reports_body.dart';
+import '../../../../features/reports/presentation/company/company_reports_hub.dart';
 import '../../../../features/reports/presentation/superadmin/superadmin_reports_hub.dart';
 import '../../../../shared/widgets/app_shell.dart';
 import '../../../../shared/widgets/coming_soon_view.dart';
@@ -11,8 +11,8 @@ import '../../domain/entities/user_role.dart';
 
 /// The shared Report tab (index 2) — same route for every role, each
 /// rendering its own role-appropriate body inside the common [AppShell].
-/// [ReportsBody] (superAdmin) and [CompanyReportsBody] (companyAdmin) share
-/// the same design but are independently-editable components, matching the
+/// [SuperadminReportsHub] (superAdmin) and [CompanyReportsHub] (companyAdmin,
+/// lib/features/reports/presentation/company/) are separate components, matching the
 /// Dashboard tab's per-role split. Neither carries its own header, so this
 /// page provides one — the hamburger + "Reports" title — uniformly for
 /// every role.
@@ -53,12 +53,12 @@ class _ReportHomePageState extends State<ReportHomePage> {
           Expanded(
             child: switch (Session.role) {
               UserRole.superAdmin => const SuperadminReportsHub(),
-              UserRole.companyAdmin => CompanyReportsBody(),
+              UserRole.companyAdmin => const CompanyReportsHub(),
               UserRole.employee => ComingSoonView(
-                  icon: Icons.bar_chart_rounded,
-                  title: 'Reports',
-                  subtitle: 'Reports are on the way.',
-                ),
+                icon: Icons.bar_chart_rounded,
+                title: 'Reports',
+                subtitle: 'Reports are on the way.',
+              ),
             },
           ),
         ],

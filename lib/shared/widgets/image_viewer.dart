@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'picked_image.dart';
 
-/// Full-screen viewer for hosted images: swipe between [urls], pinch to
-/// zoom, ✕ to close, "2 / 3" counter when there's more than one.
+/// Full-screen image viewer: swipe between [urls] (hosted links or picked
+/// local files), pinch to zoom, ✕ (top-right) or back to close, "2 / 3"
+/// counter when there's more than one.
 void showImageViewer(
   BuildContext context,
   List<String> urls, {
@@ -28,8 +30,26 @@ class _ImageViewerState extends State<_ImageViewer> {
   late final _pages = PageController(initialPage: widget.initialIndex);
   late int _index = widget.initialIndex;
 
+  // Zoom of the photo on screen. Unzoomed, drags swipe between photos;
+  // zoomed, they pan the photo (InteractiveViewer would otherwise swallow
+  // every horizontal drag and block the swipe).
+  final _zoom = TransformationController();
+  bool _zoomed = false;
+
+  void _onZoom() {
+    final z = _zoom.value.getMaxScaleOnAxis() > 1.01;
+    if (z != _zoomed) setState(() => _zoomed = z);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _zoom.addListener(_onZoom);
+  }
+
   @override
   void dispose() {
+    _zoom.dispose();
     _pages.dispose();
     super.dispose();
   }
@@ -43,25 +63,17 @@ class _ImageViewerState extends State<_ImageViewer> {
           PageView.builder(
             controller: _pages,
             itemCount: widget.urls.length,
-            onPageChanged: (i) => setState(() => _index = i),
+            physics: _zoomed ? const NeverScrollableScrollPhysics() : null,
+            onPageChanged: (i) {
+              _zoom.value = Matrix4.identity(); // next photo starts unzoomed
+              setState(() => _index = i);
+            },
             itemBuilder: (_, i) => InteractiveViewer(
               maxScale: 5,
+              transformationController: i == _index ? _zoom : null,
+              panEnabled: _zoomed,
               child: Center(
-                child: Image.network(
-                  widget.urls[i],
-                  fit: BoxFit.contain,
-                  loadingBuilder: (_, child, progress) => progress == null
-                      ? child
-                      : const CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                  errorBuilder: (_, _, _) => const Icon(
-                    Icons.broken_image_outlined,
-                    color: Colors.white54,
-                    size: 48,
-                  ),
-                ),
+                child: pickedImage(widget.urls[i], fit: BoxFit.contain),
               ),
             ),
           ),
@@ -70,12 +82,6 @@ class _ImageViewerState extends State<_ImageViewer> {
               padding: const EdgeInsets.all(8),
               child: Row(
                 children: [
-                  IconButton.filledTonal(
-                    tooltip: 'Close',
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                  const Spacer(),
                   if (widget.urls.length > 1)
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -94,6 +100,21 @@ class _ImageViewerState extends State<_ImageViewer> {
                         ),
                       ),
                     ),
+                  const Spacer(),
+                  // Clear on any photo: white disc, dark ✕.
+                  Material(
+                    color: Colors.white,
+                    shape: const CircleBorder(),
+                    elevation: 4,
+                    child: IconButton(
+                      tooltip: 'Close',
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.black87,
+                      ),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ),
                 ],
               ),
             ),

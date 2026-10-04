@@ -163,7 +163,7 @@ class _ChatListState extends ConsumerState<_ChatList> {
                 Expanded(
                   child: SearchField(
                     controller: _searchCtrl,
-                    hintText: 'Search companies...',
+                    hintText: 'Search',
                     onChanged: (_) => setState(() {}),
                   ),
                 ),

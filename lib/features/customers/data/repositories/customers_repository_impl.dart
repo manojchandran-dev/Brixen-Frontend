@@ -12,14 +12,17 @@ class CustomersRepositoryImpl implements CustomersRepository {
   const CustomersRepositoryImpl(this._ds);
 
   @override
-  Future<List<Customer>> getCustomers({int page = 1, int limit = 200, String? search}) =>
-      _ds.getCustomers(page: page, limit: limit, search: search);
+  Future<List<Customer>> getCustomers({
+    Map<String, String> filters = const {},
+    String? search,
+  }) => _ds.getCustomers(filters: filters, search: search);
 
   @override
   Future<Customer> getCustomerById(String id) => _ds.getCustomerById(id);
 
   @override
-  Future<Customer> createCustomer(Map<String, dynamic> body) => _ds.createCustomer(body);
+  Future<Customer> createCustomer(Map<String, dynamic> body) =>
+      _ds.createCustomer(body);
 
   @override
   Future<Customer> updateCustomer(String id, Map<String, dynamic> body) =>

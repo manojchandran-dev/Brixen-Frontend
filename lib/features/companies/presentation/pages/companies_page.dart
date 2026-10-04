@@ -32,6 +32,7 @@ import '../../../masters/presentation/cubit/master_cubit.dart';
 import '../../../masters/presentation/cubit/master_state.dart';
 import '../../../../shared/widgets/list_count_bar.dart';
 import '../../../../shared/widgets/module_title.dart';
+import '../../../../shared/widgets/chip_filter_sheet.dart';
 import '../../../../shared/widgets/search_field.dart';
 import '../../../../shared/widgets/confirm_dialog.dart';
 // Attendance module disabled for now — uncomment to re-enable.
@@ -525,7 +526,7 @@ class _CompaniesListBody extends ConsumerWidget {
                       controller: searchCtrl,
                       style: TextStyle(color: AppColors.ink, fontSize: 13),
                       decoration: InputDecoration(
-                        hintText: 'Search companies...',
+                        hintText: 'Search',
                         hintStyle: TextStyle(
                           color: AppColors.textHint,
                           fontSize: 13,
@@ -592,7 +593,11 @@ class _CompaniesListBody extends ConsumerWidget {
                     error: resultsAsync.error!,
                     onRetry: () => ref.invalidate(companyResultsProvider),
                   )
-                : page == null || resultsAsync.isLoading
+                // Not on a background refresh (page change / pull): the
+                // current list stays up until the new one arrives.
+                : page == null ||
+                      ref.watch(companyStatusPendingProvider) ||
+                      (resultsAsync.isLoading && !resultsAsync.isRefreshing)
                 ? const SkeletonListView(
                     padding: EdgeInsets.fromLTRB(14, 0, 14, 100),
                   )
@@ -1979,6 +1984,7 @@ class _MasterItemsBody extends StatefulWidget {
 class _MasterItemsBodyState extends State<_MasterItemsBody> {
   final _searchCtrl = TextEditingController();
   String? _selectedCategory; // null = All
+  bool? _status; // filter sheet: true = Active, false = Inactive, null = All
 
   bool get _hasCategories =>
       masterTypeFor(widget.typeKey)?.hasParentAssignment ?? false;
@@ -2007,6 +2013,21 @@ class _MasterItemsBodyState extends State<_MasterItemsBody> {
     super.dispose();
   }
 
+  void _openStatusFilter() => showChipFilterSheet(
+    context,
+    title: 'Filter',
+    sections: const [
+      FilterSection(
+        key: 'status',
+        title: 'Status',
+        options: [(true, 'Active'), (false, 'Inactive')],
+      ),
+    ],
+    selected: {'status': _status},
+    onApply: (v) => setState(() => _status = v['status'] as bool?),
+    onClear: () => setState(() => _status = null),
+  );
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -2016,14 +2037,14 @@ class _MasterItemsBodyState extends State<_MasterItemsBody> {
       builder: (context, state) {
         // Search bar stays put while loading / on error — only the list
         // area below it changes.
-        final searchBar = Padding(
+        // Shared search box (with its ✕) + status filter button.
+        final searchBar = SearchFilterBar(
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
-          // Shared search box — includes the ✕ that clears the query.
-          child: SearchField(
-            controller: _searchCtrl,
-            hintText: 'Search ${typeCfg?.name ?? 'items'}...',
-            onChanged: masterCubit.search,
-          ),
+          controller: _searchCtrl,
+          hintText: 'Search',
+          onChanged: masterCubit.search,
+          filterActive: _status != null,
+          onFilter: _openStatusFilter,
         );
         if (state is! MasterLoaded) {
           return Column(
@@ -2058,6 +2079,7 @@ class _MasterItemsBodyState extends State<_MasterItemsBody> {
         // Apply category filter: prop-level filter takes priority over chip selection
         final items = state.filtered.where((item) {
           final catFilter = widget.filterCategoryId ?? _selectedCategory;
+          if (_status != null && item.isActive != _status) return false;
           if (catFilter == null) return true;
           return item.assignedCategoryId == catFilter;
         }).toList();

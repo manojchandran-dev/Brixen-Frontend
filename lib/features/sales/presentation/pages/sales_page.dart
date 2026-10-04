@@ -1,3 +1,6 @@
+import 'dart:async';
+import '../../../../core/network/api_endpoints.dart';
+import '../../../../shared/providers/list_filter_options_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,9 +16,12 @@ import '../../../../shared/widgets/skeleton.dart';
 import '../../../../shared/widgets/detail_sheet.dart';
 import '../../../../shared/widgets/error_state.dart';
 import '../../../../shared/widgets/picked_image.dart';
+import '../../../../shared/widgets/image_viewer.dart';
 import '../../../../shared/widgets/super_admin_company_filter_bar.dart';
 import '../../data/repositories/sales_repository_impl.dart';
 import '../../domain/entities/sale.dart';
+import '../../../../shared/widgets/chip_filter_sheet.dart';
+import '../../../../shared/widgets/search_field.dart';
 import '../../domain/entities/sale_item.dart';
 import '../providers/sales_provider.dart';
 import '../../../../shared/widgets/list_count_bar.dart';
@@ -35,14 +41,101 @@ class _SalesPageState extends ConsumerState<SalesPage> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _debounce?.cancel();
     super.dispose();
+  }
+
+  // Filter sheet choices (null = All) and the search text — both go to the
+  // API (see saleResultsProvider).
+  Map<String, Object?> _filters = {};
+  String _search = '';
+  Timer? _debounce;
+
+  /// Search + filters as API params, as a stable query string (the results
+  /// provider's key). '' = neither → the full list. "days" → from/to.
+  String _query() {
+    final days = _filters['days'] as int?;
+    final now = DateTime.now();
+    final day = DateFormat('yyyy-MM-dd');
+    final p = <String, String>{
+      if (_search.isNotEmpty) 'search': _search,
+      for (final e in _filters.entries)
+        if (e.key != 'days' && e.value != null) e.key: '${e.value}',
+      if (days != null) ...{
+        'from': day.format(now.subtract(Duration(days: days - 1))),
+        'to': day.format(now),
+      },
+    };
+    final keys = p.keys.toList()..sort();
+    return Uri(queryParameters: {for (final k in keys) k: p[k]!}).query;
+  }
+
+  void _onSearch(String v) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (mounted) setState(() => _search = v.trim());
+    });
+  }
+
+  void _openFilter(List<Sale> all) {
+    final server =
+        ref.read(listFilterOptionsProvider(ApiEndpoints.sales)).valueOrNull ??
+        const {};
+    List<(Object, String)> opts(String key, List<(Object, String)> fallback) {
+      final o = serverOptions(server, key);
+      return o.isEmpty ? fallback : o;
+    }
+
+    showChipFilterSheet(
+      context,
+      title: 'Filter sales',
+      sections: [
+        FilterSection(
+          key: 'payment_status',
+          title: 'Payment status',
+          options: opts(
+            'payment_status',
+            distinctOptions(all, (e) => e.paymentStatus),
+          ),
+        ),
+        FilterSection(
+          key: 'payment_type',
+          title: 'Payment type',
+          options: opts(
+            'payment_type',
+            distinctOptions(all, (e) => e.paymentType),
+          ),
+        ),
+        FilterSection(
+          key: 'invoice_type',
+          title: 'Invoice type',
+          options: opts(
+            'invoice_type',
+            distinctOptions(all, (e) => e.invoiceType),
+          ),
+        ),
+        FilterSection(
+          key: 'days',
+          title: 'Bill date',
+          options: const [(7, 'Last 7 days'), (30, 'Last 30 days')],
+        ),
+      ],
+      selected: _filters,
+      onApply: (v) => setState(() => _filters = v),
+      onClear: () => setState(() => _filters = {}),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final salesAsync = ref.watch(salesProvider);
+    final query = _query();
+    final salesAsync = query.isEmpty
+        ? ref.watch(salesProvider)
+        : ref.watch(saleResultsProvider(query));
+    // Loads the filter choices ahead of the sheet opening.
+    ref.watch(listFilterOptionsProvider(ApiEndpoints.sales));
 
     return Scaffold(
       extendBody: true,
@@ -221,48 +314,12 @@ class _SalesPageState extends ConsumerState<SalesPage> {
       body: Column(
         children: [
           // Search bar
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: Container(
-              height: 48,
-              decoration: BoxDecoration(
-                color: isDark ? cs.surfaceContainerHighest : AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: isDark
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: AppColors.shadowDark.withValues(alpha: 0.06),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
-                        ),
-                        BoxShadow(
-                          color: AppColors.highlightShadow(0.85),
-                          blurRadius: 6,
-                          offset: const Offset(-3, -3),
-                        ),
-                      ],
-              ),
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (_) => setState(() {}),
-                style: TextStyle(color: cs.onSurface, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Search by customer, invoice type or status…',
-                  hintStyle: TextStyle(
-                    color: cs.onSurfaceVariant,
-                    fontSize: 14,
-                  ),
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    color: cs.onSurfaceVariant,
-                    size: 20,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 13),
-                ),
-              ),
-            ),
+          SearchFilterBar(
+            controller: _searchCtrl,
+            hintText: 'Search',
+            onChanged: _onSearch,
+            filterActive: _filters.values.any((v) => v != null),
+            onFilter: () => _openFilter(salesAsync.valueOrNull ?? const []),
           ),
           const SuperAdminCompanyFilterBar(),
 
@@ -274,22 +331,8 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                 error: e,
                 onRetry: () => ref.invalidate(salesProvider),
               ),
-              data: (list) {
-                final q = _searchCtrl.text.trim().toLowerCase();
-                final filtered = q.isEmpty
-                    ? list
-                    : list
-                          .where(
-                            (s) =>
-                                (s.customerName ?? '').toLowerCase().contains(
-                                  q,
-                                ) ||
-                                (s.invoiceType ?? '').toLowerCase().contains(
-                                  q,
-                                ) ||
-                                s.paymentStatus.toLowerCase().contains(q),
-                          )
-                          .toList();
+              data: (all) {
+                final filtered = all;
 
                 if (filtered.isEmpty) {
                   return Center(
@@ -303,14 +346,14 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          list.isEmpty ? 'No sales yet' : 'No results',
+                          query.isEmpty ? 'No sales yet' : 'No results',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                             color: cs.onSurfaceVariant,
                           ),
                         ),
-                        if (list.isEmpty) ...[
+                        if (query.isEmpty) ...[
                           const SizedBox(height: 6),
                           Text(
                             'Tap + to create your first sale',
@@ -375,6 +418,14 @@ class _SaleCard extends ConsumerWidget {
 
     final fg = AppColors.ink;
     final fgMuted = AppColors.ink.withValues(alpha: 0.6);
+    // "₹9,450" — paise only when there are some.
+    String money(double v) => v % 1 == 0
+        ? '₹${NumberFormat('#,##,##0', 'en_IN').format(v)}'
+        : '₹${fmt.format(v)}';
+    final meta = [
+      DateFormat('d MMM yyyy').format(sale.billDate),
+      if (sale.paymentType?.isNotEmpty == true) sale.paymentType!,
+    ].join(' · ');
 
     return SwipeActions(
       onTap: () => _showSaleDetail(context, ref, sale, accent),
@@ -424,7 +475,7 @@ class _SaleCard extends ConsumerWidget {
             children: [
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
@@ -432,160 +483,144 @@ class _SaleCard extends ConsumerWidget {
                     colors: AppColors.cardTintGradient(accent),
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                // Compact: avatar · customer / date · method / status · total pill.
+                child: Row(
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: AppColors.accentGradient(accent),
-                            ),
-                            shape: BoxShape.circle,
-                            boxShadow: AppColors.shadows([
-                              BoxShadow(
-                                color: accent.withValues(alpha: 0.35),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              ),
-                            ]),
+                    Container(
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: AppColors.accentGradient(accent),
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: AppColors.shadows([
+                          BoxShadow(
+                            color: accent.withValues(alpha: 0.35),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
                           ),
-                          child: Text(
-                            title.trim().isNotEmpty
-                                ? title.trim()[0].toUpperCase()
-                                : '?',
-                            style: const TextStyle(
+                        ]),
+                      ),
+                      child: Text(
+                        title.trim().isNotEmpty
+                            ? title.trim()[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
                               fontSize: 14.5,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.white,
+                              color: fg,
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                title,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: fg,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 2),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.calendar_today_rounded,
-                                    size: 11,
-                                    color: fgMuted,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    DateFormat(
-                                      'dd MMM yyyy',
-                                    ).format(sale.billDate),
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      color: fgMuted,
-                                    ),
-                                  ),
-                                  if (sale.invoiceType != null) ...[
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      '•',
-                                      style: TextStyle(
-                                        color: fgMuted,
-                                        fontSize: 11.5,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        sale.invoiceType!,
-                                        style: TextStyle(
-                                          fontSize: 11.5,
-                                          color: fgMuted,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              '₹${fmt.format(sale.totalAmount)}',
-                              style: TextStyle(
-                                fontSize: 15.5,
-                                fontWeight: FontWeight.w800,
-                                color: fg,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            _StatusChip(
-                              status: sale.paymentStatus,
-                              color: statusColor,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Container(height: 1, color: AppColors.border),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        _MiniStat(
-                          label: 'Subtotal',
-                          value: '₹${fmt.format(sale.subtotal)}',
-                          color: fgMuted,
-                          valueColor: fg,
-                        ),
-                        const SizedBox(width: 18),
-                        _MiniStat(
-                          label: 'Tax',
-                          value: '₹${fmt.format(sale.taxAmount)}',
-                          color: fgMuted,
-                          valueColor: fg,
-                        ),
-                        const Spacer(),
-                        if (sale.paymentType != null)
+                          const SizedBox(height: 3),
                           Row(
                             children: [
                               Icon(
-                                Icons.payments_outlined,
-                                size: 13,
+                                Icons.calendar_today_rounded,
+                                size: 11,
                                 color: fgMuted,
                               ),
                               const SizedBox(width: 4),
-                              Text(
-                                sale.paymentType!,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: fgMuted,
-                                  fontWeight: FontWeight.w600,
+                              Flexible(
+                                child: Text(
+                                  meta,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: fgMuted,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                      ],
+                          const SizedBox(height: 7),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              _StatusChip(
+                                status: sale.paymentStatus,
+                                color: statusColor,
+                              ),
+                              // Partial: what's still owed.
+                              if (sale.balance > 0 &&
+                                  sale.paymentStatus.toLowerCase() == 'partial')
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surface.withValues(
+                                      alpha: 0.7,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '${money(sale.balance)} due',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: fg,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    // The total is what you look for — a solid pill.
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [AppColors.brand, AppColors.brandDeep],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: AppColors.shadows([
+                          BoxShadow(
+                            color: AppColors.brand.withValues(alpha: 0.35),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]),
+                      ),
+                      child: Text(
+                        money(sale.totalAmount),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -853,6 +888,18 @@ void _showSaleDetail(
               label: 'Total',
               value: '₹${fmt.format(sale.totalAmount)}',
             ),
+            DetailRow(
+              icon: Icons.payments_outlined,
+              label: 'Paid',
+              value: '₹${fmt.format(sale.totalAmount - sale.balance)}',
+              iconColor: AppColors.positive,
+            ),
+            if (sale.balance > 0)
+              DetailRow(
+                icon: Icons.pending_actions_rounded,
+                label: 'Balance due',
+                value: '₹${fmt.format(sale.balance)}',
+              ),
           ],
         ),
         if (sale.notes != null && sale.notes!.isNotEmpty)
@@ -930,9 +977,12 @@ class _SaleBillImageState extends ConsumerState<_SaleBillImage> {
     }
     final url = _url;
     if (url == null || url.isEmpty) return const SizedBox.shrink();
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: pickedImage(url, width: double.infinity, height: 180),
+    return GestureDetector(
+      onTap: () => showImageViewer(context, [url]),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: pickedImage(url, width: double.infinity, height: 180),
+      ),
     );
   }
 }
@@ -1038,38 +1088,6 @@ class _StatusChip extends StatelessWidget {
           color: AppColors.white,
         ),
       ),
-    );
-  }
-}
-
-class _MiniStat extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  final Color valueColor;
-  const _MiniStat({
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.valueColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(fontSize: 10, color: color)),
-        const SizedBox(height: 1),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: valueColor,
-          ),
-        ),
-      ],
     );
   }
 }

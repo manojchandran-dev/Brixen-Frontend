@@ -3,7 +3,7 @@ import '../../../../core/theme/app_colors.dart';
 import 'superadmin_report_pages.dart';
 
 /// Superadmin → Reports: every report on one page, one tab each — tap a tab
-/// or swipe sideways. (Company admins have their own CompanyReportsBody.)
+/// or swipe sideways. (Company admins have CompanyReportsHub.)
 class SuperadminReportsHub extends StatelessWidget {
   const SuperadminReportsHub({super.key});
 

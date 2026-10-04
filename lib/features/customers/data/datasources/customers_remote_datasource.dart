@@ -4,7 +4,9 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../models/customer_model.dart';
 
-final customersRemoteDatasourceProvider = Provider<CustomersRemoteDatasource>((ref) {
+final customersRemoteDatasourceProvider = Provider<CustomersRemoteDatasource>((
+  ref,
+) {
   return CustomersRemoteDatasource(ref.read(dioProvider));
 });
 
@@ -13,21 +15,16 @@ class CustomersRemoteDatasource {
   const CustomersRemoteDatasource(this._dio);
 
   Future<List<CustomerModel>> getCustomers({
-    int page = 1,
-    int limit = 200,
+    Map<String, String> filters = const {},
     String? search,
   }) async {
     try {
-      final resp = await _dio.get(ApiEndpoints.customers, queryParameters: {
-        'page': page,
-        'limit': limit,
+      final rows = await fetchAllPages(_dio, ApiEndpoints.customers, {
         if (search != null && search.isNotEmpty) 'search': search,
+
+        ...filters,
       });
-      final data = resp.data['data'] ?? resp.data;
-      final list = (data is List) ? data : (data['items'] ?? []);
-      return (list as List)
-          .map((e) => CustomerModel.fromJson(e as Map<String, dynamic>))
-          .toList();
+      return rows.map(CustomerModel.fromJson).toList();
     } on DioException catch (e) {
       throw mapDioError(e);
     }
@@ -53,7 +50,10 @@ class CustomersRemoteDatasource {
     }
   }
 
-  Future<CustomerModel> updateCustomer(String id, Map<String, dynamic> body) async {
+  Future<CustomerModel> updateCustomer(
+    String id,
+    Map<String, dynamic> body,
+  ) async {
     try {
       final resp = await _dio.put(ApiEndpoints.customerById(id), data: body);
       final data = resp.data['data'] ?? resp.data;

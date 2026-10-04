@@ -10,6 +10,10 @@ import '../../../../shared/widgets/brixen_date_field.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
 import '../../../../shared/widgets/picked_image.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
+import '../../../../core/network/upload_service.dart';
+import '../../../../core/services/session_service.dart';
+import '../../../products/domain/entities/product.dart';
+import '../../../products/presentation/providers/products_provider.dart';
 import '../../domain/entities/purchase.dart';
 import '../providers/purchases_provider.dart';
 
@@ -36,17 +40,24 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
 
   // Step 1
   final _supplierCtrl = TextEditingController();
+  final _billNoCtrl = TextEditingController();
   DateTime _billDate = DateTime.now();
   String? _invoiceType;
   XFile? _billImage;
   final _picker = ImagePicker();
 
-  // Step 2
-  final _subtotalCtrl = TextEditingController();
-  final _taxAmountCtrl = TextEditingController();
-  final _totalAmountCtrl = TextEditingController();
+  // Step 2 — items (they're what add stock) and payment
+  final List<_Line> _lines = [];
+  bool _loadingLines = false;
+  final _taxPercentCtrl = TextEditingController(text: '0');
+  final _amountPaidCtrl = TextEditingController();
   String? _paymentType;
   String? _paymentStatus;
+
+  double get _subtotal => _lines.fold(0, (a, l) => a + l.total);
+  double get _taxAmount =>
+      _subtotal * (double.tryParse(_taxPercentCtrl.text) ?? 0) / 100;
+  double get _total => _subtotal + _taxAmount;
 
   // Step 3
   final _notesCtrl = TextEditingController();
@@ -76,12 +87,27 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
     final p = widget.editPurchase;
     if (p != null) {
       _supplierCtrl.text = p.supplierName;
+      _billNoCtrl.text = p.billNo;
+      _taxPercentCtrl.text = _trim(p.taxPercentage);
+      if (p.amountPaid != null) _amountPaidCtrl.text = _trim(p.amountPaid!);
+      _setLines(p.items);
+      // The list may not carry the lines — load the full purchase.
+      if (p.items.isEmpty) {
+        _loadingLines = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          try {
+            final full = await ref.read(purchasesProvider.notifier).fetch(p.id);
+            if (mounted) setState(() => _setLines(full.items));
+          } catch (_) {
+            // Leave it empty; the user can add lines.
+          } finally {
+            if (mounted) setState(() => _loadingLines = false);
+          }
+        });
+      }
       _billDate = p.billDate;
       _invoiceType = p.invoiceType;
       if (p.billImagePath != null) _billImage = XFile(p.billImagePath!);
-      _subtotalCtrl.text = p.subtotal.toString();
-      _taxAmountCtrl.text = p.taxAmount.toString();
-      _totalAmountCtrl.text = p.totalAmount.toString();
       _paymentType = p.paymentType;
       _paymentStatus = p.paymentStatus;
       _notesCtrl.text = p.notes ?? '';
@@ -91,9 +117,12 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
   @override
   void dispose() {
     _supplierCtrl.dispose();
-    _subtotalCtrl.dispose();
-    _taxAmountCtrl.dispose();
-    _totalAmountCtrl.dispose();
+    _billNoCtrl.dispose();
+    _taxPercentCtrl.dispose();
+    _amountPaidCtrl.dispose();
+    for (final l in _lines) {
+      l.dispose();
+    }
     _notesCtrl.dispose();
     super.dispose();
   }
@@ -101,19 +130,51 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
   GlobalKey<FormState> get _currentFormKey =>
       [_step1Key, _step2Key, _step3Key][_currentStep];
 
+  static String _trim(double v) =>
+      v % 1 == 0 ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
+
+  void _setLines(List<PurchaseItem> items) {
+    for (final l in _lines) {
+      l.dispose();
+    }
+    _lines
+      ..clear()
+      ..addAll([
+        for (final it in items)
+          _Line(it.productId, it.productName, it.quantity, it.unitCost),
+      ]);
+  }
+
+  bool _hasLines() {
+    if (_lines.isNotEmpty) return true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Add at least one product'),
+        backgroundColor: AppColors.dangerFill,
+      ),
+    );
+    return false;
+  }
+
+  void _addProduct(Product p) {
+    final existing = _lines.where((l) => l.productId == p.id).firstOrNull;
+    setState(() {
+      if (existing != null) {
+        existing.qty.text = '${(int.tryParse(existing.qty.text) ?? 0) + 1}';
+      } else {
+        _lines.add(_Line(p.id, p.productName, 1, p.costPrice));
+      }
+    });
+  }
+
   void _next() {
     if (!_currentFormKey.currentState!.validate()) return;
+    if (_currentStep == 1 && !_hasLines()) return;
     if (_currentStep < 2) setState(() => _currentStep++);
   }
 
   void _back() {
     if (_currentStep > 0) setState(() => _currentStep--);
-  }
-
-  void _recalcTotal() {
-    final sub = double.tryParse(_subtotalCtrl.text) ?? 0;
-    final tax = double.tryParse(_taxAmountCtrl.text) ?? 0;
-    _totalAmountCtrl.text = (sub + tax).toStringAsFixed(2);
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -177,36 +238,76 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
   }
 
   Future<void> _submit() async {
-    if (!_currentFormKey.currentState!.validate()) return;
-    setState(() => _submitting = true);
-    await Future.delayed(const Duration(milliseconds: 400));
-    final purchase = Purchase(
-      id: _isEditing
-          ? widget.editPurchase!.id
-          : DateTime.now().millisecondsSinceEpoch.toString(),
-      supplierName: _supplierCtrl.text.trim(),
-      billNo: _isEditing ? widget.editPurchase!.billNo : '',
-      billDate: _billDate,
-      invoiceType: _invoiceType,
-      subtotal: double.tryParse(_subtotalCtrl.text) ?? 0,
-      taxAmount: double.tryParse(_taxAmountCtrl.text) ?? 0,
-      totalAmount: double.tryParse(_totalAmountCtrl.text) ?? 0,
-      paymentType: _paymentType,
-      paymentStatus: _paymentStatus ?? 'Pending',
-      notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-      billImagePath: _billImage?.path,
-      createdAt: _isEditing ? widget.editPurchase!.createdAt : DateTime.now(),
-    );
-    if (_isEditing) {
-      ref.read(purchasesProvider.notifier).updatePurchase(purchase);
-    } else {
-      ref.read(purchasesProvider.notifier).addPurchase(purchase);
+    if (!_currentFormKey.currentState!.validate() || !_hasLines()) return;
+    final companyId = _isEditing
+        ? widget.editPurchase!.companyId
+        : Session.companyId;
+    if (!_isEditing && companyId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Purchases are recorded from a company account'),
+          backgroundColor: AppColors.dangerFill,
+        ),
+      );
+      return;
     }
-    if (!mounted) return;
-    if (widget.fromMasters) {
-      context.pop();
-    } else {
-      context.go(AppRouter.purchases);
+    setState(() => _submitting = true);
+    try {
+      // A newly picked bill photo is a local path — host it first.
+      final bill = _billImage;
+      final billUrl = bill == null || bill.path.startsWith('http')
+          ? bill?.path
+          : await ref
+                .read(uploadServiceProvider)
+                .uploadImage(bill, folder: 'purchases');
+      final purchase = Purchase(
+        id: _isEditing ? widget.editPurchase!.id : '',
+        supplierName: _supplierCtrl.text.trim(),
+        billNo: _billNoCtrl.text.trim(),
+        billDate: _billDate,
+        invoiceType: _invoiceType,
+        subtotal: _subtotal,
+        taxPercentage: double.tryParse(_taxPercentCtrl.text) ?? 0,
+        taxAmount: _taxAmount,
+        totalAmount: _total,
+        amountPaid: _paymentStatus == 'Partial'
+            ? double.tryParse(_amountPaidCtrl.text.trim())
+            : null,
+        paymentType: _paymentType,
+        paymentStatus: _paymentStatus ?? 'Pending',
+        notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+        billImagePath: billUrl,
+        items: [
+          for (final l in _lines)
+            PurchaseItem(
+              productId: l.productId,
+              productName: l.name,
+              quantity: int.tryParse(l.qty.text) ?? 0,
+              unitCost: double.tryParse(l.cost.text) ?? 0,
+            ),
+        ],
+        createdAt: _isEditing ? widget.editPurchase!.createdAt : DateTime.now(),
+      );
+      final notifier = ref.read(purchasesProvider.notifier);
+      if (_isEditing) {
+        await notifier.edit(purchase);
+      } else {
+        await notifier.add(purchase, companyId: companyId!);
+      }
+      if (!mounted) return;
+      if (widget.fromMasters) {
+        context.pop();
+      } else {
+        context.go(AppRouter.purchases);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$e'), backgroundColor: AppColors.dangerFill),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
@@ -339,7 +440,7 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
                 ),
               ),
             Text(
-              'Step ${_currentStep + 1} of 3 — ${['Supplier Info', 'Amounts', 'Notes'][_currentStep]}',
+              'Step ${_currentStep + 1} of 3 — ${['Supplier Info', 'Items & Payment', 'Notes'][_currentStep]}',
               style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
             ),
           ],
@@ -349,7 +450,7 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
         children: [
           _StepIndicator(
             currentStep: _currentStep,
-            labels: const ['Supplier', 'Amounts', 'Notes'],
+            labels: const ['Supplier', 'Items', 'Notes'],
             accentColor: AppColors.accentTeal,
           ),
           Expanded(
@@ -384,12 +485,24 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
     );
   }
 
+  Future<void> _pickProduct(BuildContext context) async {
+    final picked = await showModalBottomSheet<Product>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _ProductPickerSheet(),
+    );
+    if (picked != null) _addProduct(picked);
+  }
+
   Widget _buildStep() {
     switch (_currentStep) {
       case 0:
         return _Step1(
           formKey: _step1Key,
           supplierCtrl: _supplierCtrl,
+          billNoCtrl: _billNoCtrl,
           billDate: _billDate,
           invoiceType: _invoiceType,
           invoiceTypes: _invoiceTypes,
@@ -400,18 +513,27 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
           onRemoveImage: () => setState(() => _billImage = null),
         );
       case 1:
-        return _Step2(
+        return _ItemsStep(
           formKey: _step2Key,
-          subtotalCtrl: _subtotalCtrl,
-          taxAmountCtrl: _taxAmountCtrl,
-          totalAmountCtrl: _totalAmountCtrl,
+          lines: _lines,
+          loading: _loadingLines,
+          onAdd: () => _pickProduct(context),
+          onRemove: (l) => setState(() {
+            _lines.remove(l);
+            l.dispose();
+          }),
+          onChanged: () => setState(() {}),
+          taxPercentCtrl: _taxPercentCtrl,
+          subtotal: _subtotal,
+          taxAmount: _taxAmount,
+          total: _total,
           paymentType: _paymentType,
           paymentStatus: _paymentStatus,
           paymentTypes: _paymentTypes,
           paymentStatuses: _paymentStatuses,
           onPaymentTypeChanged: (v) => setState(() => _paymentType = v),
           onPaymentStatusChanged: (v) => setState(() => _paymentStatus = v),
-          onRecalc: _recalcTotal,
+          amountPaidCtrl: _amountPaidCtrl,
         );
       default:
         return _Step3(
@@ -423,12 +545,15 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
                 : _supplierCtrl.text.trim(),
             'Date': DateFormat('dd MMM yyyy').format(_billDate),
             'Invoice Type': _invoiceType ?? '—',
-            'Subtotal':
-                '₹${_subtotalCtrl.text.isEmpty ? '0.00' : _subtotalCtrl.text}',
-            'Tax':
-                '₹${_taxAmountCtrl.text.isEmpty ? '0.00' : _taxAmountCtrl.text}',
-            'Total':
-                '₹${_totalAmountCtrl.text.isEmpty ? '0.00' : _totalAmountCtrl.text}',
+            'Bill No': _billNoCtrl.text.trim().isEmpty
+                ? '—'
+                : _billNoCtrl.text.trim(),
+            'Items':
+                '${_lines.length} product${_lines.length == 1 ? '' : 's'} · '
+                '${_lines.fold<int>(0, (a, l) => a + (int.tryParse(l.qty.text) ?? 0))} units',
+            'Subtotal': '₹${_subtotal.toStringAsFixed(2)}',
+            'Tax': '₹${_taxAmount.toStringAsFixed(2)}',
+            'Total': '₹${_total.toStringAsFixed(2)}',
             'Payment Type': _paymentType ?? '—',
             'Status': _paymentStatus ?? 'Pending',
           },
@@ -601,7 +726,7 @@ class _NavBar extends StatelessWidget {
 
 class _Step1 extends StatelessWidget {
   final GlobalKey<FormState> formKey;
-  final TextEditingController supplierCtrl;
+  final TextEditingController supplierCtrl, billNoCtrl;
   final DateTime billDate;
   final String? invoiceType;
   final List<String> invoiceTypes;
@@ -613,6 +738,7 @@ class _Step1 extends StatelessWidget {
   const _Step1({
     required this.formKey,
     required this.supplierCtrl,
+    required this.billNoCtrl,
     required this.billDate,
     required this.invoiceType,
     required this.invoiceTypes,
@@ -640,6 +766,14 @@ class _Step1 extends StatelessWidget {
                 (v == null || v.trim().isEmpty) ? 'Required' : null,
           ),
           const SizedBox(height: 22),
+          BrixenTextField(
+            label: 'Bill No',
+            hint: "Supplier's bill number",
+            controller: billNoCtrl,
+            textInputAction: TextInputAction.next,
+            prefixIcon: const Icon(Icons.tag_rounded),
+          ),
+          const SizedBox(height: 22),
           BrixenDateField(value: billDate, onChanged: onDateChanged),
           const SizedBox(height: 22),
           BrixenDropdown<String>(
@@ -663,68 +797,200 @@ class _Step1 extends StatelessWidget {
   }
 }
 
-// ── Step 2: Amounts ────────────────────────────────────────────────────────
+// ── Step 2: Items & payment ────────────────────────────────────────────────
 
-class _Step2 extends StatelessWidget {
+/// One product line being edited: quantity and unit cost fields.
+class _Line {
+  final String productId;
+  final String name;
+  final TextEditingController qty;
+  final TextEditingController cost;
+
+  _Line(this.productId, this.name, int quantity, double unitCost)
+    : qty = TextEditingController(text: '$quantity'),
+      cost = TextEditingController(
+        text: unitCost % 1 == 0
+            ? unitCost.toStringAsFixed(0)
+            : unitCost.toStringAsFixed(2),
+      );
+
+  double get total =>
+      (int.tryParse(qty.text) ?? 0) * (double.tryParse(cost.text) ?? 0);
+
+  void dispose() {
+    qty.dispose();
+    cost.dispose();
+  }
+}
+
+class _ItemsStep extends StatelessWidget {
   final GlobalKey<FormState> formKey;
-  final TextEditingController subtotalCtrl, taxAmountCtrl, totalAmountCtrl;
+  final List<_Line> lines;
+  final bool loading;
+  final VoidCallback onAdd;
+  final void Function(_Line) onRemove;
+  final VoidCallback onChanged;
+  final TextEditingController taxPercentCtrl, amountPaidCtrl;
+  final double subtotal, taxAmount, total;
   final String? paymentType, paymentStatus;
   final List<String> paymentTypes, paymentStatuses;
   final void Function(String?) onPaymentTypeChanged, onPaymentStatusChanged;
-  final VoidCallback onRecalc;
 
-  const _Step2({
+  const _ItemsStep({
     required this.formKey,
-    required this.subtotalCtrl,
-    required this.taxAmountCtrl,
-    required this.totalAmountCtrl,
+    required this.lines,
+    required this.loading,
+    required this.onAdd,
+    required this.onRemove,
+    required this.onChanged,
+    required this.taxPercentCtrl,
+    required this.subtotal,
+    required this.taxAmount,
+    required this.total,
     required this.paymentType,
     required this.paymentStatus,
     required this.paymentTypes,
     required this.paymentStatuses,
     required this.onPaymentTypeChanged,
     required this.onPaymentStatusChanged,
-    required this.onRecalc,
+    required this.amountPaidCtrl,
   });
+
+  static final _money = NumberFormat('#,##,##0.00', 'en_IN');
 
   @override
   Widget build(BuildContext context) {
     return Form(
       key: formKey,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
         children: [
-          BrixenTextField(
-            label: 'Subtotal *',
-            hint: '0.00',
-            controller: subtotalCtrl,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textInputAction: TextInputAction.next,
-            prefixIcon: const Icon(Icons.currency_rupee_rounded),
-            onFieldSubmitted: (_) => onRecalc(),
-            validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Required' : null,
+          Row(
+            children: [
+              Text(
+                'Products bought',
+                style: TextStyle(
+                  color: AppColors.ink,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: onAdd,
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Add product'),
+              ),
+            ],
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 6),
+          if (loading)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else if (lines.isEmpty)
+            GestureDetector(
+              onTap: onAdd,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 22),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.add_shopping_cart_rounded,
+                      color: AppColors.brand,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Add the products on this bill',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                    Text(
+                      'Their quantities are added to stock',
+                      style: TextStyle(
+                        color: AppColors.textHint,
+                        fontSize: 11.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            for (final l in lines) ...[
+              _LineCard(
+                line: l,
+                onRemove: () => onRemove(l),
+                onChanged: onChanged,
+              ),
+              const SizedBox(height: 10),
+            ],
+          const SizedBox(height: 12),
           BrixenTextField(
-            label: 'Tax Amount',
-            hint: '0.00',
-            controller: taxAmountCtrl,
+            label: 'Tax %',
+            hint: '0',
+            controller: taxPercentCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textInputAction: TextInputAction.next,
             prefixIcon: const Icon(Icons.percent_rounded),
-            onFieldSubmitted: (_) => onRecalc(),
+            onChanged: (_) => onChanged(),
+            validator: (v) {
+              final n = double.tryParse(v?.trim() ?? '');
+              return v == null || v.trim().isEmpty || (n != null && n >= 0)
+                  ? null
+                  : 'Enter a valid %';
+            },
           ),
-          const SizedBox(height: 8),
-          _RecalcButton(onTap: onRecalc),
-          const SizedBox(height: 22),
-          BrixenTextField(
-            label: 'Total Amount',
-            hint: '0.00',
-            controller: totalAmountCtrl,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textInputAction: TextInputAction.next,
-            prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
+          const SizedBox(height: 14),
+          // Totals, worked out from the lines.
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.brand.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                for (final (label, v, bold) in [
+                  ('Subtotal', subtotal, false),
+                  ('Tax', taxAmount, false),
+                  ('Total', total, true),
+                ])
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(
+                      children: [
+                        Text(
+                          label,
+                          style: TextStyle(
+                            color: bold
+                                ? AppColors.ink
+                                : AppColors.textSecondary,
+                            fontWeight: bold
+                                ? FontWeight.w800
+                                : FontWeight.w500,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '₹${_money.format(v)}',
+                          style: TextStyle(
+                            color: AppColors.ink,
+                            fontSize: bold ? 16 : 13.5,
+                            fontWeight: bold
+                                ? FontWeight.w800
+                                : FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
           const SizedBox(height: 22),
           BrixenDropdown<String>(
@@ -745,6 +1011,243 @@ class _Step2 extends StatelessWidget {
             onChanged: onPaymentStatusChanged,
           ),
           const SizedBox(height: 22),
+          if (paymentStatus == 'Partial') ...[
+            BrixenTextField(
+              label: 'Amount paid *',
+              hint: '0.00',
+              controller: amountPaidCtrl,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              prefixIcon: const Icon(Icons.payments_outlined),
+              validator: (v) {
+                final paid = double.tryParse(v?.trim() ?? '');
+                if (paid == null) return 'Enter the amount paid';
+                if (paid < 0) return "Can't be negative";
+                if (paid > total) return 'More than the total';
+                return null;
+              },
+            ),
+            const SizedBox(height: 22),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _LineCard extends StatelessWidget {
+  final _Line line;
+  final VoidCallback onRemove;
+  final VoidCallback onChanged;
+  const _LineCard({
+    required this.line,
+    required this.onRemove,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    InputDecoration box(String label, {String? prefix}) => InputDecoration(
+      labelText: label,
+      prefixText: prefix,
+      isDense: true,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+    );
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 6, 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.checkroom_rounded,
+                size: 18,
+                color: AppColors.brand,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  line.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Remove',
+                onPressed: onRemove,
+                icon: Icon(
+                  Icons.close_rounded,
+                  size: 18,
+                  color: AppColors.textHint,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: line.qty,
+                    keyboardType: TextInputType.number,
+                    decoration: box('Qty'),
+                    onChanged: (_) => onChanged(),
+                    validator: (v) => (int.tryParse(v?.trim() ?? '') ?? 0) < 1
+                        ? 'At least 1'
+                        : null,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextFormField(
+                    controller: line.cost,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: box('Unit cost', prefix: '₹'),
+                    onChanged: (_) => onChanged(),
+                    validator: (v) =>
+                        (double.tryParse(v?.trim() ?? '') ?? -1) < 0
+                        ? 'Enter a cost'
+                        : null,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 78,
+                  child: Text(
+                    '₹${_ItemsStep._money.format(line.total)}',
+                    textAlign: TextAlign.right,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.ink,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Pick a product for a purchase line (searchable).
+class _ProductPickerSheet extends ConsumerStatefulWidget {
+  const _ProductPickerSheet();
+
+  @override
+  ConsumerState<_ProductPickerSheet> createState() =>
+      _ProductPickerSheetState();
+}
+
+class _ProductPickerSheetState extends ConsumerState<_ProductPickerSheet> {
+  String _q = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final async = ref.watch(productsProvider);
+    final all = async.valueOrNull ?? const <Product>[];
+    final q = _q.toLowerCase();
+    final shown = [
+      for (final p in all)
+        if (q.isEmpty ||
+            '${p.productName} ${p.productCode} ${p.category}'
+                .toLowerCase()
+                .contains(q))
+          p,
+    ];
+    return Container(
+      height: MediaQuery.sizeOf(context).height * 0.8,
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: TextField(
+              autofocus: true,
+              onChanged: (v) => setState(() => _q = v.trim()),
+              decoration: InputDecoration(
+                hintText: 'Search',
+                prefixIcon: const Icon(Icons.search_rounded),
+                filled: true,
+                fillColor: AppColors.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: async.isLoading && all.isEmpty
+                ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                : shown.isEmpty
+                ? Center(
+                    child: Text(
+                      'No products found',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 24),
+                    itemCount: shown.length,
+                    itemBuilder: (_, i) {
+                      final p = shown[i];
+                      return ListTile(
+                        leading: const CircleAvatar(
+                          backgroundColor: AppColors.brand,
+                          child: Icon(
+                            Icons.checkroom_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                        title: Text(
+                          p.productName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          '${p.category.isEmpty ? 'Uncategorised' : p.category} · ${p.stockQuantity} in stock',
+                        ),
+                        trailing: Text(
+                          '₹${p.costPrice.toStringAsFixed(0)}',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        onTap: () => Navigator.of(context).pop(p),
+                      );
+                    },
+                  ),
+          ),
         ],
       ),
     );
@@ -840,46 +1343,6 @@ class _Step3 extends StatelessWidget {
 
 // ── Shared Widgets ─────────────────────────────────────────────────────────
 // (date picker moved to shared/widgets/brixen_date_field.dart)
-
-class _RecalcButton extends StatelessWidget {
-  final VoidCallback onTap;
-  const _RecalcButton({required this.onTap});
-  @override
-  Widget build(BuildContext context) => Align(
-    alignment: Alignment.centerRight,
-    child: GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: AppColors.accentTeal.withValues(alpha: 0.4),
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.calculate_outlined,
-              size: 14,
-              color: AppColors.accentTeal,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              'Auto-calculate total',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.accentTeal,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
 
 class _ImagePicker extends StatelessWidget {
   final XFile? image;

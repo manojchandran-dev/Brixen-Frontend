@@ -57,7 +57,8 @@ class Employee {
     required this.createdAt,
   });
 
-  String get fullName => [firstName, lastName].where((s) => s != null && s.isNotEmpty).join(' ');
+  String get fullName =>
+      [firstName, lastName].where((s) => s != null && s.isNotEmpty).join(' ');
 
   Employee copyWith({
     String? id,
@@ -112,7 +113,8 @@ class Employee {
       accountNumber: accountNumber ?? this.accountNumber,
       ifscCode: ifscCode ?? this.ifscCode,
       emergencyContactName: emergencyContactName ?? this.emergencyContactName,
-      emergencyContactPhone: emergencyContactPhone ?? this.emergencyContactPhone,
+      emergencyContactPhone:
+          emergencyContactPhone ?? this.emergencyContactPhone,
       status: status ?? this.status,
       onboardingStatus: onboardingStatus ?? this.onboardingStatus,
       createdAt: createdAt ?? this.createdAt,

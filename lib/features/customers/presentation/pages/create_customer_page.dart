@@ -14,7 +14,11 @@ import '../providers/customers_provider.dart';
 class CreateCustomerPage extends ConsumerStatefulWidget {
   final Customer? editCustomer;
   final bool fromMasters;
-  const CreateCustomerPage({super.key, this.editCustomer, this.fromMasters = false});
+  const CreateCustomerPage({
+    super.key,
+    this.editCustomer,
+    this.fromMasters = false,
+  });
 
   @override
   ConsumerState<CreateCustomerPage> createState() => _CreateCustomerPageState();
@@ -23,14 +27,15 @@ class CreateCustomerPage extends ConsumerStatefulWidget {
 class _CreateCustomerPageState extends ConsumerState<CreateCustomerPage> {
   final _formKey = GlobalKey<FormState>();
   bool _submitting = false;
-  Company? _selectedCompany; // superAdmin only — companyAdmin/employee use Session.companyId
+  Company?
+  _selectedCompany; // superAdmin only — companyAdmin/employee use Session.companyId
 
-  final _nameCtrl     = TextEditingController();
+  final _nameCtrl = TextEditingController();
   final _shopNameCtrl = TextEditingController();
-  final _phoneCtrl    = TextEditingController();
-  final _emailCtrl    = TextEditingController();
-  final _addressCtrl  = TextEditingController();
-  final _gstCtrl      = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _addressCtrl = TextEditingController();
+  final _gstCtrl = TextEditingController();
 
   bool get _isEditing => widget.editCustomer != null;
 
@@ -49,12 +54,12 @@ class _CreateCustomerPageState extends ConsumerState<CreateCustomerPage> {
     super.initState();
     final c = widget.editCustomer;
     if (c != null) {
-      _nameCtrl.text     = c.name;
+      _nameCtrl.text = c.name;
       _shopNameCtrl.text = c.shopName ?? '';
-      _phoneCtrl.text    = c.phone ?? '';
-      _emailCtrl.text    = c.email ?? '';
-      _addressCtrl.text  = c.address ?? '';
-      _gstCtrl.text      = c.gstNumber ?? '';
+      _phoneCtrl.text = c.phone ?? '';
+      _emailCtrl.text = c.email ?? '';
+      _addressCtrl.text = c.address ?? '';
+      _gstCtrl.text = c.gstNumber ?? '';
     }
   }
 
@@ -73,7 +78,10 @@ class _CreateCustomerPageState extends ConsumerState<CreateCustomerPage> {
     if (!_formKey.currentState!.validate()) return;
     if (!_isEditing && Session.isSuperAdmin && _selectedCompany == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a company'), backgroundColor: AppColors.dangerFill),
+        const SnackBar(
+          content: Text('Please select a company'),
+          backgroundColor: AppColors.dangerFill,
+        ),
       );
       return;
     }
@@ -81,11 +89,15 @@ class _CreateCustomerPageState extends ConsumerState<CreateCustomerPage> {
 
     final customer = Customer(
       id: _isEditing ? widget.editCustomer!.id : '',
-      name:      _nameCtrl.text.trim(),
-      shopName:  _shopNameCtrl.text.trim().isEmpty ? null : _shopNameCtrl.text.trim(),
-      phone:     _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
-      email:     _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
-      address:   _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim(),
+      name: _nameCtrl.text.trim(),
+      shopName: _shopNameCtrl.text.trim().isEmpty
+          ? null
+          : _shopNameCtrl.text.trim(),
+      phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+      email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
+      address: _addressCtrl.text.trim().isEmpty
+          ? null
+          : _addressCtrl.text.trim(),
       gstNumber: _gstCtrl.text.trim().isEmpty ? null : _gstCtrl.text.trim(),
       createdAt: _isEditing ? widget.editCustomer!.createdAt : DateTime.now(),
     );
@@ -96,16 +108,23 @@ class _CreateCustomerPageState extends ConsumerState<CreateCustomerPage> {
             .read(customersProvider.notifier)
             .updateCustomer(customer, companyId: _effectiveCompanyId);
       } else {
-        await ref.read(customersProvider.notifier).addCustomer(
+        await ref
+            .read(customersProvider.notifier)
+            .addCustomer(
               customer,
-              companyId: (Session.isSuperAdmin ? _selectedCompany!.id : Session.companyId)!,
+              companyId: (Session.isSuperAdmin
+                  ? _selectedCompany!.id
+                  : Session.companyId)!,
             );
       }
       if (mounted) context.pop();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.dangerFill),
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: AppColors.dangerFill,
+          ),
         );
       }
     } finally {
@@ -139,12 +158,16 @@ class _CreateCustomerPageState extends ConsumerState<CreateCustomerPage> {
               boxShadow: AppColors.shadows([
                 BoxShadow(
                   color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.2),
-                  blurRadius: 6, offset: const Offset(0, 2),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
                 ),
               ]),
             ),
-            child: Icon(Icons.arrow_back_ios_new_rounded, size: 16,
-                color: isDark ? AppColors.black : AppColors.white),
+            child: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 16,
+              color: isDark ? AppColors.black : AppColors.white,
+            ),
           ),
         ),
         title: Column(
@@ -157,42 +180,78 @@ class _CreateCustomerPageState extends ConsumerState<CreateCustomerPage> {
                   children: [
                     GestureDetector(
                       onTap: () => context.go(AppRouter.more),
-                      child: Text('Menu', style: TextStyle(
-                          color: cs.onSurfaceVariant.withValues(alpha: 0.6), fontSize: 11)),
+                      child: Text(
+                        'Menu',
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                          fontSize: 11,
+                        ),
+                      ),
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: Icon(Icons.chevron_right_rounded, size: 13,
-                          color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        size: 13,
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                      ),
                     ),
                     GestureDetector(
                       onTap: () => context.pop(),
-                      child: Text('Masters', style: TextStyle(
-                          color: cs.onSurfaceVariant.withValues(alpha: 0.6), fontSize: 11)),
+                      child: Text(
+                        'Masters',
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                          fontSize: 11,
+                        ),
+                      ),
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: Icon(Icons.chevron_right_rounded, size: 13,
-                          color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        size: 13,
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                      ),
                     ),
                     GestureDetector(
                       onTap: () => context.pop(),
-                      child: Text('Customers', style: TextStyle(
-                          color: cs.onSurfaceVariant.withValues(alpha: 0.6), fontSize: 11)),
+                      child: Text(
+                        'Customers',
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                          fontSize: 11,
+                        ),
+                      ),
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: Icon(Icons.chevron_right_rounded, size: 13,
-                          color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        size: 13,
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                      ),
                     ),
-                    Text(_isEditing ? 'Edit' : 'Create',
-                        style: TextStyle(color: cs.onSurface, fontSize: 11, fontWeight: FontWeight.w600)),
+                    Text(
+                      _isEditing ? 'Edit' : 'Create',
+                      style: TextStyle(
+                        color: cs.onSurface,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               )
             else
-              Text(_isEditing ? 'Edit Customer' : 'New Customer',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: cs.onSurface)),
+              Text(
+                _isEditing ? 'Edit Customer' : 'New Customer',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: cs.onSurface,
+                ),
+              ),
           ],
         ),
       ),
@@ -215,7 +274,8 @@ class _CreateCustomerPageState extends ConsumerState<CreateCustomerPage> {
               controller: _nameCtrl,
               textInputAction: TextInputAction.next,
               prefixIcon: const Icon(Icons.person_outline_rounded),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Required' : null,
             ),
             const SizedBox(height: 20),
 
@@ -329,8 +389,11 @@ class _AddressFieldState extends State<_AddressField> {
             children: [
               Padding(
                 padding: const EdgeInsets.only(left: 14, top: 14),
-                child: Icon(Icons.location_on_outlined,
-                    color: cs.onSurfaceVariant, size: 20),
+                child: Icon(
+                  Icons.location_on_outlined,
+                  color: cs.onSurfaceVariant,
+                  size: 20,
+                ),
               ),
               Expanded(
                 child: TextFormField(
@@ -339,8 +402,13 @@ class _AddressFieldState extends State<_AddressField> {
                   maxLines: 3,
                   style: TextStyle(color: cs.onSurface, fontSize: 15),
                   decoration: InputDecoration(
-                    hintText: showLabel ? 'Street, City, State, PIN' : 'Address',
-                    hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
+                    hintText: showLabel
+                        ? 'Street, City, State, PIN'
+                        : 'Address',
+                    hintStyle: TextStyle(
+                      color: cs.onSurfaceVariant,
+                      fontSize: 14,
+                    ),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
@@ -353,15 +421,18 @@ class _AddressFieldState extends State<_AddressField> {
         ),
         if (showLabel)
           Positioned(
-            top: -9, left: 12,
+            top: -9,
+            left: 12,
             child: Container(
               color: cs.surfaceContainerHighest,
               padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text('Address',
-                  style: TextStyle(
-                    color: _focused ? AppColors.silver : cs.onSurfaceVariant,
-                    fontSize: 12,
-                  )),
+              child: Text(
+                'Address',
+                style: TextStyle(
+                  color: _focused ? AppColors.silver : cs.onSurfaceVariant,
+                  fontSize: 12,
+                ),
+              ),
             ),
           ),
       ],

@@ -13,29 +13,27 @@ class ExpensesRepositoryImpl implements ExpensesRepository {
 
   @override
   Future<List<Expense>> getExpenses({
-    int page = 1,
-    int limit = 200,
+    Map<String, String> filters = const {},
     String? search,
     String? categoryId,
     String? unitId,
     DateTime? from,
     DateTime? to,
-  }) =>
-      _ds.getExpenses(
-        page: page,
-        limit: limit,
-        search: search,
-        categoryId: categoryId,
-        unitId: unitId,
-        from: from,
-        to: to,
-      );
+  }) => _ds.getExpenses(
+    filters: filters,
+    search: search,
+    categoryId: categoryId,
+    unitId: unitId,
+    from: from,
+    to: to,
+  );
 
   @override
   Future<Expense> getExpenseById(String id) => _ds.getExpenseById(id);
 
   @override
-  Future<Expense> createExpense(Map<String, dynamic> body) => _ds.createExpense(body);
+  Future<Expense> createExpense(Map<String, dynamic> body) =>
+      _ds.createExpense(body);
 
   @override
   Future<Expense> updateExpense(String id, Map<String, dynamic> body) =>

@@ -8,6 +8,10 @@ final companiesProvider =
       CompaniesNotifier.new,
     );
 
+/// True while a company's active/inactive change is saving and the list
+/// reloads with it — the Companies list shows its skeleton meanwhile.
+final companyStatusPendingProvider = StateProvider<bool>((ref) => false);
+
 // Companies page search + status filter. Kept out of [companiesProvider] so
 // other screens (Permissions, notification audience) always get every
 // company. autoDispose: reset when the page closes, like its search box.
@@ -265,6 +269,8 @@ class CompaniesNotifier extends AsyncNotifier<List<Company>> {
   /// Takes the company itself: the Companies page lists API results, which
   /// may not be in this shared list yet.
   Future<String?> toggleStatus(Company company) async {
+    final pending = ref.read(companyStatusPendingProvider.notifier);
+    pending.state = true;
     final idx = _all.indexWhere((c) => c.id == company.id);
     final original = idx == -1 ? null : _all[idx];
     // Optimistic update of the shared list (not published to the page's
@@ -279,6 +285,10 @@ class CompaniesNotifier extends AsyncNotifier<List<Company>> {
           .read(companiesRepositoryProvider)
           .updateCompanyStatus(company.id, !company.isActive);
       _replace(updated);
+      // Keep the skeleton until the list shows the new status.
+      try {
+        await ref.read(companyResultsProvider.future);
+      } catch (_) {}
       return null;
     } catch (e) {
       // Revert on failure (includes 400 from backend when onboarding incomplete)
@@ -287,6 +297,8 @@ class CompaniesNotifier extends AsyncNotifier<List<Company>> {
         state = AsyncData(List.from(_all));
       }
       return e.toString();
+    } finally {
+      pending.state = false;
     }
   }
 

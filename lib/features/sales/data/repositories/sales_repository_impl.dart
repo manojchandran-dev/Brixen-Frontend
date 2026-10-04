@@ -14,16 +14,14 @@ class SalesRepositoryImpl implements SalesRepository {
 
   @override
   Future<List<Sale>> getSales({
-    int page = 1,
-    int limit = 200,
+    Map<String, String> filters = const {},
     String? search,
     String? customerId,
     String? paymentStatus,
     DateTime? from,
     DateTime? to,
   }) => _ds.getSales(
-    page: page,
-    limit: limit,
+    filters: filters,
     search: search,
     customerId: customerId,
     paymentStatus: paymentStatus,

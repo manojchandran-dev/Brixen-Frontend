@@ -15,7 +15,8 @@ class ChatRepositoryImpl implements ChatRepository {
   Future<List<ChatConversation>> conversations() => _ds.conversations();
 
   @override
-  Future<List<ChatMessage>> messages(String companyId) => _ds.messages(companyId);
+  Future<List<ChatMessage>> messages(String companyId) =>
+      _ds.messages(companyId);
 
   @override
   Future<void> send(
@@ -24,6 +25,11 @@ class ChatRepositoryImpl implements ChatRepository {
     String text = '',
     String? attachmentUrl,
     int durationMs = 0,
-  }) =>
-      _ds.send(companyId, type: type, text: text, attachmentUrl: attachmentUrl, durationMs: durationMs);
+  }) => _ds.send(
+    companyId,
+    type: type,
+    text: text,
+    attachmentUrl: attachmentUrl,
+    durationMs: durationMs,
+  );
 }

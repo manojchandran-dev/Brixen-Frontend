@@ -20,6 +20,8 @@ class ProductModel extends Product {
     super.galleryPaths,
     super.status,
     super.onboardingStatus,
+    super.stockQuantity,
+    super.lowStockThreshold,
     required super.createdAt,
   });
 
@@ -47,6 +49,9 @@ class ProductModel extends Product {
           ? (json['gallery_urls'] as List).map((e) => e.toString()).toList()
           : const [],
       onboardingStatus: json['onboarding_status']?.toString(),
+      stockQuantity: int.tryParse('${json['stock_quantity'] ?? 0}') ?? 0,
+      lowStockThreshold:
+          int.tryParse('${json['low_stock_threshold'] ?? 5}') ?? 5,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
@@ -56,7 +61,10 @@ class ProductModel extends Product {
   /// Step 1 (Basic) — POST /products. Only `product_name`/`gender` are
   /// required; `category_id`/`design_pattern` are optional. `companyId` is
   /// required — see `Session.companyId`.
-  static Map<String, dynamic> toStep1Body(Product p, {required String companyId}) => {
+  static Map<String, dynamic> toStep1Body(
+    Product p, {
+    required String companyId,
+  }) => {
     'company_id': int.parse(companyId),
     'product_name': p.productName,
     'gender': p.gender,
@@ -85,9 +93,20 @@ class ProductModel extends Product {
   /// (the wizard uploads each picked photo as soon as it's added, before
   /// this step ever fires) — never a local file path.
   static Map<String, dynamic> toStep4Body(Product p) => {
-        'status': p.status,
-        if (p.galleryPaths.isNotEmpty) 'gallery_urls': p.galleryPaths,
-      };
+    'status': p.status,
+    if (p.galleryPaths.isNotEmpty) 'gallery_urls': p.galleryPaths,
+  };
+
+  /// Stock only (PUT /products/:id). Kept out of [toBody] on purpose: a
+  /// status toggle or edit would otherwise send the card's (possibly stale)
+  /// count and overwrite a change a sale just made.
+  static Map<String, dynamic> toStockBody({
+    required int stockQuantity,
+    required int lowStockThreshold,
+  }) => {
+    'stock_quantity': stockQuantity,
+    'low_stock_threshold': lowStockThreshold,
+  };
 
   /// Generic full update (PUT /products/:id) — used for editing an existing
   /// product's basic info and for one-off changes like a status toggle.

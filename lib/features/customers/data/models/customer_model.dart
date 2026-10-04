@@ -32,12 +32,13 @@ class CustomerModel extends Customer {
   /// Request body for create/update — server generates `id`, so it's never
   /// sent. `companyId` is only needed on create — see `Session.companyId`.
   static Map<String, dynamic> toBody(Customer c, {String? companyId}) => {
-        if (companyId != null) 'company_id': int.parse(companyId),
-        'name': c.name,
-        if (c.shopName != null && c.shopName!.isNotEmpty) 'shop_name': c.shopName,
-        if (c.phone != null && c.phone!.isNotEmpty) 'phone': c.phone,
-        if (c.email != null && c.email!.isNotEmpty) 'email': c.email,
-        if (c.gstNumber != null && c.gstNumber!.isNotEmpty) 'gst_number': c.gstNumber,
-        if (c.address != null && c.address!.isNotEmpty) 'address': c.address,
-      };
+    if (companyId != null) 'company_id': int.parse(companyId),
+    'name': c.name,
+    if (c.shopName != null && c.shopName!.isNotEmpty) 'shop_name': c.shopName,
+    if (c.phone != null && c.phone!.isNotEmpty) 'phone': c.phone,
+    if (c.email != null && c.email!.isNotEmpty) 'email': c.email,
+    if (c.gstNumber != null && c.gstNumber!.isNotEmpty)
+      'gst_number': c.gstNumber,
+    if (c.address != null && c.address!.isNotEmpty) 'address': c.address,
+  };
 }

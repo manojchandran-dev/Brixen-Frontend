@@ -1,3 +1,5 @@
+import 'dart:async';
+import '../../../../shared/providers/list_filter_options_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_endpoints.dart';
@@ -17,6 +19,8 @@ import '../../../../shared/widgets/super_admin_company_filter_bar.dart';
 import 'package:intl/intl.dart';
 import '../../../permissions/presentation/providers/module_access_provider.dart';
 import '../../domain/entities/employee.dart';
+import '../../../../shared/widgets/chip_filter_sheet.dart';
+import '../../../../shared/widgets/search_field.dart';
 import '../providers/employees_provider.dart';
 import '../../../../shared/widgets/list_count_bar.dart';
 import '../../../../shared/widgets/module_title.dart';
@@ -35,14 +39,95 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _debounce?.cancel();
     super.dispose();
+  }
+
+  // Filter sheet choices (null = All) and the search text — both go to the
+  // API (see employeeResultsProvider).
+  Map<String, Object?> _filters = {};
+  String _search = '';
+  Timer? _debounce;
+
+  /// Search + filters as API params, as a stable query string (the results
+  /// provider's key). '' = neither → the full list. "days" → from/to.
+  String _query() {
+    final days = _filters['days'] as int?;
+    final now = DateTime.now();
+    final day = DateFormat('yyyy-MM-dd');
+    final p = <String, String>{
+      if (_search.isNotEmpty) 'search': _search,
+      for (final e in _filters.entries)
+        if (e.key != 'days' && e.value != null) e.key: '${e.value}',
+      if (days != null) ...{
+        'from': day.format(now.subtract(Duration(days: days - 1))),
+        'to': day.format(now),
+      },
+    };
+    final keys = p.keys.toList()..sort();
+    return Uri(queryParameters: {for (final k in keys) k: p[k]!}).query;
+  }
+
+  void _onSearch(String v) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (mounted) setState(() => _search = v.trim());
+    });
+  }
+
+  void _openFilter(List<Employee> all) {
+    final server =
+        ref
+            .read(listFilterOptionsProvider(ApiEndpoints.employees))
+            .valueOrNull ??
+        const {};
+    List<(Object, String)> opts(String key, List<(Object, String)> fallback) {
+      final o = serverOptions(server, key);
+      return o.isEmpty ? fallback : o;
+    }
+
+    showChipFilterSheet(
+      context,
+      title: 'Filter employees',
+      sections: [
+        FilterSection(
+          key: 'status',
+          title: 'Status',
+          options: opts('status', distinctOptions(all, (e) => e.status)),
+        ),
+        FilterSection(
+          key: 'department',
+          title: 'Department',
+          options: opts(
+            'department',
+            distinctOptions(all, (e) => e.department),
+          ),
+        ),
+        FilterSection(
+          key: 'employment_type',
+          title: 'Employment type',
+          options: opts(
+            'employment_type',
+            distinctOptions(all, (e) => e.employmentType),
+          ),
+        ),
+      ],
+      selected: _filters,
+      onApply: (v) => setState(() => _filters = v),
+      onClear: () => setState(() => _filters = {}),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final employeesAsync = ref.watch(employeesProvider);
+    final query = _query();
+    final employeesAsync = query.isEmpty
+        ? ref.watch(employeesProvider)
+        : ref.watch(employeeResultsProvider(query));
+    // Loads the filter choices ahead of the sheet opening.
+    ref.watch(listFilterOptionsProvider(ApiEndpoints.employees));
 
     return Scaffold(
       extendBody: true,
@@ -178,17 +263,6 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
               )
             : ModuleTitle(title: 'Employees', subtitle: 'Manage your staff'),
         actions: [
-          if (ref.watch(moduleAccessProvider('Employees')).delete)
-            DeletedItemsButton(
-              title: 'Deleted employees',
-              listPath: ApiEndpoints.employees,
-              restorePath: (e) =>
-                  '${ApiEndpoints.employees}/${e['id']}/restore',
-              labelOf: (e) =>
-                  '${e['first_name'] ?? ''} ${e['last_name'] ?? ''}'.trim(),
-              subtitleOf: (e) => e['employee_code'] as String?,
-              onRestored: () => ref.invalidate(employeesProvider),
-            ),
           if (ref.watch(moduleAccessProvider('Employees')).create)
             GestureDetector(
               onTap: () => context.push(
@@ -230,48 +304,26 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: Container(
-              height: 48,
-              decoration: BoxDecoration(
-                color: isDark ? cs.surfaceContainerHighest : AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: isDark
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: AppColors.shadowDark.withValues(alpha: 0.06),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
-                        ),
-                        BoxShadow(
-                          color: AppColors.highlightShadow(0.85),
-                          blurRadius: 6,
-                          offset: const Offset(-3, -3),
-                        ),
-                      ],
-              ),
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (_) => setState(() {}),
-                style: TextStyle(color: cs.onSurface, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Search by name, code or department…',
-                  hintStyle: TextStyle(
-                    color: cs.onSurfaceVariant,
-                    fontSize: 14,
-                  ),
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    color: cs.onSurfaceVariant,
-                    size: 20,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 13),
+          SearchFilterBar(
+            controller: _searchCtrl,
+            hintText: 'Search',
+            onChanged: _onSearch,
+            filterActive: _filters.values.any((v) => v != null),
+            onFilter: () => _openFilter(employeesAsync.valueOrNull ?? const []),
+            actions: [
+              if (ref.watch(moduleAccessProvider('Employees')).delete)
+                DeletedItemsButton(
+                  title: 'Deleted employees',
+                  listPath: ApiEndpoints.employees,
+                  restorePath: (e) =>
+                      '${ApiEndpoints.employees}/${e['id']}/restore',
+                  labelOf: (e) =>
+                      '${e['first_name'] ?? ''} ${e['last_name'] ?? ''}'.trim(),
+                  subtitleOf: (e) => e['employee_code'] as String?,
+                  onRestored: () => ref.invalidate(employeesProvider),
+                  inline: true,
                 ),
-              ),
-            ),
+            ],
           ),
           const SuperAdminCompanyFilterBar(),
           Expanded(
@@ -281,19 +333,8 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
                 error: e,
                 onRetry: () => ref.invalidate(employeesProvider),
               ),
-              data: (list) {
-                final q = _searchCtrl.text.trim().toLowerCase();
-                final filtered = q.isEmpty
-                    ? list
-                    : list
-                          .where(
-                            (e) =>
-                                e.fullName.toLowerCase().contains(q) ||
-                                e.employeeCode.toLowerCase().contains(q) ||
-                                (e.department?.toLowerCase().contains(q) ??
-                                    false),
-                          )
-                          .toList();
+              data: (all) {
+                final filtered = all;
 
                 if (filtered.isEmpty) {
                   return Center(
@@ -307,14 +348,14 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          list.isEmpty ? 'No employees yet' : 'No results',
+                          query.isEmpty ? 'No employees yet' : 'No results',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                             color: cs.onSurfaceVariant,
                           ),
                         ),
-                        if (list.isEmpty) ...[
+                        if (query.isEmpty) ...[
                           const SizedBox(height: 6),
                           Text(
                             'Tap + to add your first employee',
@@ -355,76 +396,90 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
   }
 }
 
-class _StatSummaryCard extends StatelessWidget {
-  final String label;
+/// Label + colour for an employee status ("On Leave", "on_leave"…).
+(String, Color) _statusLook(String status) {
+  final k = status.toLowerCase().replaceAll(RegExp(r'[\s_-]'), '');
+  return switch (k) {
+    'active' => ('Active', AppColors.positive),
+    'onleave' => ('On leave', AppColors.brandLight),
+    _ => (
+      status.isEmpty
+          ? 'Unknown'
+          : status[0].toUpperCase() + status.substring(1),
+      AppColors.textSecondary,
+    ),
+  };
+}
+
+extension on String {
+  String ifEmpty(String fallback) => isEmpty ? fallback : this;
+}
+
+/// Small tinted chip with an icon (employee code, employment type).
+class _Chip extends StatelessWidget {
   final IconData icon;
+  final String text;
   final Color color;
-  const _StatSummaryCard({
-    required this.label,
-    required this.icon,
-    required this.color,
-  });
+  const _Chip({required this.icon, required this.text, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-        decoration: BoxDecoration(
-          color: isDark ? cs.surfaceContainerHighest : AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: isDark
-              ? null
-              : [
-                  BoxShadow(
-                    color: AppColors.shadowDark.withValues(alpha: 0.06),
-                    blurRadius: 14,
-                    offset: const Offset(0, 6),
-                  ),
-                  BoxShadow(
-                    color: AppColors.highlightShadow(0.85),
-                    blurRadius: 6,
-                    offset: const Offset(-3, -3),
-                  ),
-                ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [color, color.withValues(alpha: 0.75)],
-                ),
-                shape: BoxShape.circle,
-                boxShadow: AppColors.shadows([
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.35),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ]),
-              ),
-              child: Icon(icon, size: 16, color: AppColors.white),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-                color: cs.onSurfaceVariant,
-              ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: AppColors.ink.withValues(alpha: 0.6)),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.ink,
+              ),
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Status on the right of the card: green Active, grey Inactive, On leave.
+class _EmployeeStatusPill extends StatelessWidget {
+  final String status;
+  const _EmployeeStatusPill({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = _statusLook(status);
+    final active = color == AppColors.positive;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: active
+            ? LinearGradient(colors: AppColors.accentGradient(color))
+            : null,
+        color: active ? null : AppColors.surface.withValues(alpha: 0.75),
+        borderRadius: BorderRadius.circular(12),
+        border: active
+            ? null
+            : Border.all(color: color.withValues(alpha: 0.45)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: active ? Colors.white : color,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
@@ -454,7 +509,6 @@ class _EmployeeCard extends ConsumerWidget {
 
     final fg = AppColors.ink;
     final fgMuted = AppColors.ink.withValues(alpha: 0.55);
-    final fgFaint = AppColors.ink.withValues(alpha: 0.4);
 
     return SwipeActions(
       onTap: () => _showEmployeeDetail(context, ref, employee, accent),
@@ -488,69 +542,108 @@ class _EmployeeCard extends ConsumerWidget {
         backgroundGradient: AppColors.cardTintGradient(accent),
         edgeColor: accent,
         showAccentBar: false,
+        // Compact: avatar (status dot) · name / role · department / code &
+        // type chips · status pill.
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.all(12),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                width: 46,
-                height: 46,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: AppColors.accentGradient(accent),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: AppColors.accentGradient(accent),
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: AppColors.shadows([
+                        BoxShadow(
+                          color: accent.withValues(alpha: 0.35),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ]),
+                    ),
+                    child: Text(
+                      employee.fullName.trim().isNotEmpty
+                          ? employee.fullName.trim()[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.white,
+                      ),
+                    ),
                   ),
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  employee.fullName.trim().isNotEmpty
-                      ? employee.fullName.trim()[0].toUpperCase()
-                      : '?',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.white,
+                  Positioned(
+                    right: -1,
+                    bottom: -1,
+                    child: Container(
+                      width: 13,
+                      height: 13,
+                      decoration: BoxDecoration(
+                        color: _statusLook(employee.status).$2,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.surface, width: 2),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-              const SizedBox(width: 13),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       employee.fullName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 14.5,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                         color: fg,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
-                      employee.designation ?? employee.department ?? '—',
+                      [employee.designation, employee.department]
+                          .where((s) => s != null && s.isNotEmpty)
+                          .join(' · ')
+                          .ifEmpty('—'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 12, color: fgMuted),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      employee.employeeCode,
-                      style: TextStyle(fontSize: 11, color: fgFaint),
-                      overflow: TextOverflow.ellipsis,
+                    const SizedBox(height: 7),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        _Chip(
+                          icon: Icons.badge_outlined,
+                          text: employee.employeeCode,
+                          color: accent,
+                        ),
+                        if (employee.employmentType?.isNotEmpty == true)
+                          _Chip(
+                            icon: Icons.work_outline_rounded,
+                            text: employee.employmentType!,
+                            color: accent,
+                          ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: AppColors.textHint,
-              ),
+              const SizedBox(width: 10),
+              _EmployeeStatusPill(status: employee.status),
             ],
           ),
         ),

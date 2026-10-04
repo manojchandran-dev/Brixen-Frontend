@@ -14,7 +14,10 @@ Widget pickedImage(
   double? height,
   BoxFit fit = BoxFit.cover,
 }) {
-  if (kIsWeb || path.startsWith('http://') || path.startsWith('https://') || path.startsWith('blob:')) {
+  if (kIsWeb ||
+      path.startsWith('http://') ||
+      path.startsWith('https://') ||
+      path.startsWith('blob:')) {
     return Image.network(path, width: width, height: height, fit: fit);
   }
   return Image.file(File(path), width: width, height: height, fit: fit);

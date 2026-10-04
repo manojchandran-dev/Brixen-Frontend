@@ -25,7 +25,12 @@ class _LockScreenPageState extends State<LockScreenPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _tryBiometric());
+    // Cold start comes here straight from splash, before anything loaded
+    // the security settings — load them, then offer the fingerprint.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await context.read<SecurityCubit>().load();
+      if (mounted) _tryBiometric();
+    });
   }
 
   // Dashboard first, then a tapped push's target on top (if the app was

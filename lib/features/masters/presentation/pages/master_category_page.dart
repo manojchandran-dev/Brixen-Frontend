@@ -124,20 +124,6 @@ class _MasterCategoryPageState extends ConsumerState<MasterCategoryPage> {
                 ),
               ),
         actions: [
-          if (!isForm &&
-              access.delete &&
-              _deletedListPath(widget.typeKey) != null)
-            DeletedItemsButton(
-              title: 'Deleted ${typeCfg?.name.toLowerCase() ?? 'items'}',
-              listPath: _deletedListPath(widget.typeKey)!,
-              restorePath: (m) =>
-                  '${_deletedListPath(widget.typeKey)}/${m['id']}/restore',
-              // Units are named by `unit`; every other master type by `name`.
-              labelOf: (m) => (m['name'] ?? m['unit'] ?? '').toString(),
-              subtitleOf: (m) =>
-                  (m['full_form'] ?? m['description']) as String?,
-              onRestored: () => masterCubit.load(widget.typeKey),
-            ),
           if (!isForm && access.create)
             GestureDetector(
               onTap: _goCreate,
@@ -167,7 +153,25 @@ class _MasterCategoryPageState extends ConsumerState<MasterCategoryPage> {
               editId: _editId,
               onSaved: _goList,
             )
-          : MasterItemsBody(typeKey: widget.typeKey, onEdit: _goEdit),
+          : MasterItemsBody(
+              typeKey: widget.typeKey,
+              onEdit: _goEdit,
+              searchActions: [
+                if (access.delete && _deletedListPath(widget.typeKey) != null)
+                  DeletedItemsButton(
+                    title: 'Deleted ${typeCfg?.name.toLowerCase() ?? 'items'}',
+                    listPath: _deletedListPath(widget.typeKey)!,
+                    restorePath: (m) =>
+                        '${_deletedListPath(widget.typeKey)}/${m['id']}/restore',
+                    // Units are named by `unit`; every other master type by `name`.
+                    labelOf: (m) => (m['name'] ?? m['unit'] ?? '').toString(),
+                    subtitleOf: (m) =>
+                        (m['full_form'] ?? m['description']) as String?,
+                    onRestored: () => masterCubit.load(widget.typeKey),
+                    inline: true,
+                  ),
+              ],
+            ),
     );
   }
 }

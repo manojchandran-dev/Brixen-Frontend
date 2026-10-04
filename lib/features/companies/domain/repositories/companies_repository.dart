@@ -18,6 +18,7 @@ abstract class CompaniesRepository {
     String? industry,
     int page = 1,
     int limit = 50,
+
     /// true → the Permissions screen's list, each company with its access counts.
     bool withAccess = false,
   });

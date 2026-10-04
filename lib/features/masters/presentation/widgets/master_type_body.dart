@@ -16,6 +16,7 @@ import '../cubit/master_cubit.dart';
 import '../cubit/master_state.dart';
 import '../../../permissions/presentation/providers/module_access_provider.dart';
 import '../../../../shared/widgets/list_count_bar.dart';
+import '../../../../shared/widgets/chip_filter_sheet.dart';
 import '../../../../shared/widgets/search_field.dart';
 
 /// Public **duplicate** of `companies_page.dart`'s private master-type list/
@@ -40,11 +41,15 @@ class MasterItemsBody extends ConsumerStatefulWidget {
   final String typeKey;
   final void Function(String id) onEdit;
   final String? filterCategoryId; // null = show all
+
+  /// Extra buttons after the filter (e.g. restore deleted items).
+  final List<Widget> searchActions;
   const MasterItemsBody({
     super.key,
     required this.typeKey,
     required this.onEdit,
     this.filterCategoryId,
+    this.searchActions = const [],
   });
   @override
   ConsumerState<MasterItemsBody> createState() => _MasterItemsBodyState();
@@ -53,6 +58,7 @@ class MasterItemsBody extends ConsumerStatefulWidget {
 class _MasterItemsBodyState extends ConsumerState<MasterItemsBody> {
   final _searchCtrl = TextEditingController();
   String? _selectedCategory; // null = All
+  bool? _status; // filter sheet: true = Active, false = Inactive, null = All
 
   bool get _hasCategories =>
       masterTypeFor(widget.typeKey)?.hasParentAssignment ?? false;
@@ -81,6 +87,21 @@ class _MasterItemsBodyState extends ConsumerState<MasterItemsBody> {
     super.dispose();
   }
 
+  void _openStatusFilter() => showChipFilterSheet(
+    context,
+    title: 'Filter',
+    sections: const [
+      FilterSection(
+        key: 'status',
+        title: 'Status',
+        options: [(true, 'Active'), (false, 'Inactive')],
+      ),
+    ],
+    selected: {'status': _status},
+    onApply: (v) => setState(() => _status = v['status'] as bool?),
+    onClear: () => setState(() => _status = null),
+  );
+
   @override
   Widget build(BuildContext context) {
     final access = ref.watch(
@@ -93,14 +114,16 @@ class _MasterItemsBodyState extends ConsumerState<MasterItemsBody> {
       builder: (context, state) {
         // Search bar stays put while loading / on error — only the list
         // area below it changes.
-        final searchBar = Padding(
+        // Shared search box (with its ✕) + status filter button.
+        final searchBar = SearchFilterBar(
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
-          // Shared search box — includes the ✕ that clears the query.
-          child: SearchField(
-            controller: _searchCtrl,
-            hintText: 'Search ${typeCfg?.name ?? 'items'}...',
-            onChanged: masterCubit.search,
-          ),
+          controller: _searchCtrl,
+          hintText: 'Search',
+          onChanged: masterCubit.search,
+          filterActive: _status != null,
+          // Units have no status on the backend — no filter.
+          onFilter: widget.typeKey == 'unit' ? null : _openStatusFilter,
+          actions: widget.searchActions,
         );
         if (state is! MasterLoaded) {
           return Column(
@@ -135,6 +158,7 @@ class _MasterItemsBodyState extends ConsumerState<MasterItemsBody> {
         // Apply category filter: prop-level filter takes priority over chip selection
         final items = state.filtered.where((item) {
           final catFilter = widget.filterCategoryId ?? _selectedCategory;
+          if (_status != null && item.isActive != _status) return false;
           if (catFilter == null) return true;
           return item.assignedCategoryId == catFilter;
         }).toList();

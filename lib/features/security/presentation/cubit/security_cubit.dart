@@ -21,7 +21,11 @@ class SecurityCubit extends Cubit<SecurityState> {
     final bioEnabled = await _src.isBiometricEnabled();
     bool bioAvailable = false;
     try {
-      bioAvailable = await _localAuth.canCheckBiometrics;
+      // Supported hardware AND a fingerprint/face actually enrolled —
+      // canCheckBiometrics alone is true with nothing enrolled.
+      bioAvailable =
+          await _localAuth.isDeviceSupported() &&
+          (await _localAuth.getAvailableBiometrics()).isNotEmpty;
     } catch (_) {}
     emit(
       state.copyWith(

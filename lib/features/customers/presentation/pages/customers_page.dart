@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_endpoints.dart';
@@ -14,8 +15,11 @@ import '../../../../shared/widgets/detail_sheet.dart';
 import '../../../../shared/widgets/error_state.dart';
 import '../../../../shared/widgets/super_admin_company_filter_bar.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../permissions/presentation/providers/module_access_provider.dart';
 import '../../domain/entities/customer.dart';
+import '../../../../shared/widgets/chip_filter_sheet.dart';
+import '../../../../shared/widgets/search_field.dart';
 import '../providers/customers_provider.dart';
 import '../../../../shared/widgets/list_count_bar.dart';
 import '../../../../shared/widgets/module_title.dart';
@@ -34,14 +38,72 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _debounce?.cancel();
     super.dispose();
+  }
+
+  // Filter sheet choices (null = All) and the search text — both go to the
+  // API (see customerResultsProvider).
+  Map<String, Object?> _filters = {};
+  String _search = '';
+  Timer? _debounce;
+
+  /// Search + filters as API params, as a stable query string (the results
+  /// provider's key). '' = neither → the full list. "days" → from/to.
+  String _query() {
+    final days = _filters['days'] as int?;
+    final now = DateTime.now();
+    final day = DateFormat('yyyy-MM-dd');
+    final p = <String, String>{
+      if (_search.isNotEmpty) 'search': _search,
+      for (final e in _filters.entries)
+        if (e.key != 'days' && e.value != null) e.key: '${e.value}',
+      if (days != null) ...{
+        'from': day.format(now.subtract(Duration(days: days - 1))),
+        'to': day.format(now),
+      },
+    };
+    final keys = p.keys.toList()..sort();
+    return Uri(queryParameters: {for (final k in keys) k: p[k]!}).query;
+  }
+
+  void _onSearch(String v) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (mounted) setState(() => _search = v.trim());
+    });
+  }
+
+  void _openFilter(List<Customer> all) {
+    showChipFilterSheet(
+      context,
+      title: 'Filter customers',
+      sections: [
+        FilterSection(
+          key: 'has_gst',
+          title: 'GST',
+          options: const [(true, 'Registered'), (false, 'Not registered')],
+        ),
+        FilterSection(
+          key: 'days',
+          title: 'Added',
+          options: const [(7, 'Last 7 days'), (30, 'Last 30 days')],
+        ),
+      ],
+      selected: _filters,
+      onApply: (v) => setState(() => _filters = v),
+      onClear: () => setState(() => _filters = {}),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final customersAsync = ref.watch(customersProvider);
+    final query = _query();
+    final customersAsync = query.isEmpty
+        ? ref.watch(customersProvider)
+        : ref.watch(customerResultsProvider(query));
 
     return Scaffold(
       extendBody: true,
@@ -180,16 +242,6 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                 subtitle: 'Your customer records',
               ),
         actions: [
-          if (ref.watch(moduleAccessProvider('Customers')).delete)
-            DeletedItemsButton(
-              title: 'Deleted customers',
-              listPath: ApiEndpoints.customers,
-              restorePath: (c) =>
-                  '${ApiEndpoints.customers}/${c['id']}/restore',
-              labelOf: (c) => (c['name'] ?? '').toString(),
-              subtitleOf: (c) => (c['shop_name'] ?? c['phone']) as String?,
-              onRestored: () => ref.invalidate(customersProvider),
-            ),
           if (ref.watch(moduleAccessProvider('Customers')).create)
             GestureDetector(
               onTap: () => context.push(
@@ -231,48 +283,25 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: Container(
-              height: 48,
-              decoration: BoxDecoration(
-                color: isDark ? cs.surfaceContainerHighest : AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: isDark
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: AppColors.shadowDark.withValues(alpha: 0.06),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
-                        ),
-                        BoxShadow(
-                          color: AppColors.highlightShadow(0.85),
-                          blurRadius: 6,
-                          offset: const Offset(-3, -3),
-                        ),
-                      ],
-              ),
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (_) => setState(() {}),
-                style: TextStyle(color: cs.onSurface, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Search by name, phone or email…',
-                  hintStyle: TextStyle(
-                    color: cs.onSurfaceVariant,
-                    fontSize: 14,
-                  ),
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    color: cs.onSurfaceVariant,
-                    size: 20,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 13),
+          SearchFilterBar(
+            controller: _searchCtrl,
+            hintText: 'Search',
+            onChanged: _onSearch,
+            filterActive: _filters.values.any((v) => v != null),
+            onFilter: () => _openFilter(customersAsync.valueOrNull ?? const []),
+            actions: [
+              if (ref.watch(moduleAccessProvider('Customers')).delete)
+                DeletedItemsButton(
+                  title: 'Deleted customers',
+                  listPath: ApiEndpoints.customers,
+                  restorePath: (c) =>
+                      '${ApiEndpoints.customers}/${c['id']}/restore',
+                  labelOf: (c) => (c['name'] ?? '').toString(),
+                  subtitleOf: (c) => (c['shop_name'] ?? c['phone']) as String?,
+                  onRestored: () => ref.invalidate(customersProvider),
+                  inline: true,
                 ),
-              ),
-            ),
+            ],
           ),
           const SuperAdminCompanyFilterBar(),
           Expanded(
@@ -282,18 +311,8 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                 error: e,
                 onRetry: () => ref.invalidate(customersProvider),
               ),
-              data: (list) {
-                final q = _searchCtrl.text.trim().toLowerCase();
-                final filtered = q.isEmpty
-                    ? list
-                    : list
-                          .where(
-                            (c) =>
-                                c.name.toLowerCase().contains(q) ||
-                                (c.phone?.toLowerCase().contains(q) ?? false) ||
-                                (c.email?.toLowerCase().contains(q) ?? false),
-                          )
-                          .toList();
+              data: (all) {
+                final filtered = all;
 
                 if (filtered.isEmpty) {
                   return Center(
@@ -307,14 +326,14 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          list.isEmpty ? 'No customers yet' : 'No results',
+                          query.isEmpty ? 'No customers yet' : 'No results',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                             color: cs.onSurfaceVariant,
                           ),
                         ),
-                        if (list.isEmpty) ...[
+                        if (query.isEmpty) ...[
                           const SizedBox(height: 6),
                           Text(
                             'Tap + to add your first customer',
@@ -338,55 +357,65 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
                       count: filtered.length,
                     ),
                     Expanded(
-                      child: ListView(
+                      child: ListView.separated(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: AppColors.shadows([
-                                BoxShadow(
-                                  color: AppColors.shadowDark.withValues(
-                                    alpha: 0.06,
-                                  ),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 8),
-                                ),
-                                BoxShadow(
-                                  color: AppColors.highlightShadow(0.85),
-                                  blurRadius: 6,
-                                  offset: const Offset(-3, -3),
-                                ),
-                              ]),
-                            ),
-                            child: Column(
-                              children: filtered.asMap().entries.map((entry) {
-                                final i = entry.key;
-                                return Column(
-                                  children: [
-                                    _CustomerCard(
-                                      customer: entry.value,
-                                      index: i,
-                                    ),
-                                    if (i != filtered.length - 1)
-                                      Divider(
-                                        height: 1,
-                                        color: AppColors.border,
-                                        indent: 59,
-                                      ),
-                                  ],
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ],
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 12),
+                        itemBuilder: (_, i) =>
+                            _CustomerCard(customer: filtered[i], index: i),
                       ),
                     ),
                   ],
                 );
               },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Small tinted chip with an icon (phone, GST).
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color color;
+  final bool strong;
+  const _InfoChip({
+    required this.icon,
+    required this.text,
+    required this.color,
+    this.strong = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 11,
+            color: strong ? color : AppColors.ink.withValues(alpha: 0.6),
+          ),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.ink,
+              ),
             ),
           ),
         ],
@@ -413,10 +442,16 @@ class _CustomerCard extends ConsumerWidget {
 
     final fg = AppColors.ink;
     final fgMuted = AppColors.ink.withValues(alpha: 0.55);
-    final fgFaint = AppColors.ink.withValues(alpha: 0.4);
+    final bg = Color.lerp(
+      AppColors.surface,
+      accent,
+      AppColors.cardTintBlend(accent),
+    )!;
+    final phone = customer.phone?.trim() ?? '';
+    final gst = customer.gstNumber?.trim() ?? '';
 
-    // Flat list row — avatar, name, shop name and GST only — matching the
-    // Employees list style, instead of an individually shadowed card.
+    // Tinted card like the other module lists: avatar · name / shop /
+    // phone & GST chips · call button.
     return SwipeActions(
       onTap: () => _showCustomerDetail(context, ref, customer, accent),
       actions: [
@@ -436,71 +471,116 @@ class _CustomerCard extends ConsumerWidget {
             onTap: () => _confirmDelete(context, ref),
           ),
       ],
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        color: AppColors.surface,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: AppColors.accentGradient(accent),
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                customer.name.trim().isNotEmpty
-                    ? customer.name.trim()[0].toUpperCase()
-                    : '?',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.white,
-                ),
-              ),
-            ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    customer.name,
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
-                      color: fg,
+      child: RichCardShell(
+        accentColor: accent,
+        backgroundColor: bg,
+        backgroundGradient: AppColors.cardTintGradient(accent),
+        edgeColor: accent,
+        showAccentBar: false,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: AppColors.accentGradient(accent),
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: AppColors.shadows([
+                    BoxShadow(
+                      color: accent.withValues(alpha: 0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
                     ),
-                    overflow: TextOverflow.ellipsis,
+                  ]),
+                ),
+                child: Text(
+                  customer.name.trim().isNotEmpty
+                      ? customer.name.trim()[0].toUpperCase()
+                      : '?',
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.white,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    customer.shopName ?? '—',
-                    style: TextStyle(fontSize: 12, color: fgMuted),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    customer.gstNumber ?? 'No GST',
-                    style: TextStyle(fontSize: 11, color: fgFaint),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 18,
-              color: AppColors.textHint,
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      customer.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                        color: fg,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.storefront_outlined,
+                          size: 12,
+                          color: fgMuted,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            customer.shopName?.trim().isNotEmpty == true
+                                ? customer.shopName!.trim()
+                                : 'No shop name',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, color: fgMuted),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 7),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        if (phone.isNotEmpty)
+                          // Tap the number to call.
+                          GestureDetector(
+                            onTap: () => launchUrl(
+                              Uri(scheme: 'tel', path: phone),
+                            ).catchError((_) => false),
+                            child: _InfoChip(
+                              icon: Icons.call_rounded,
+                              text: phone,
+                              color: accent,
+                            ),
+                          ),
+                        _InfoChip(
+                          icon: gst.isEmpty
+                              ? Icons.remove_circle_outline_rounded
+                              : Icons.verified_rounded,
+                          text: gst.isEmpty ? 'No GST' : gst,
+                          color: gst.isEmpty
+                              ? AppColors.textHint
+                              : AppColors.positive,
+                          strong: gst.isNotEmpty,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

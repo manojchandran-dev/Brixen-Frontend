@@ -30,12 +30,28 @@ class BrandIllustration extends StatelessWidget {
             ),
           ),
           // Floating accents
-          Positioned(top: 6, left: 28, child: _Dot(color: AppColors.brandBlack, size: 8)),
-          Positioned(top: 20, right: 26, child: _Dot(color: AppColors.positive, size: 10)),
-          const Positioned(top: 52, left: 6, child: _Dot(color: AppColors.brand, size: 6)),
+          Positioned(
+            top: 6,
+            left: 28,
+            child: _Dot(color: AppColors.brandBlack, size: 8),
+          ),
+          Positioned(
+            top: 20,
+            right: 26,
+            child: _Dot(color: AppColors.positive, size: 10),
+          ),
+          const Positioned(
+            top: 52,
+            left: 6,
+            child: _Dot(color: AppColors.brand, size: 6),
+          ),
 
           // Back person (green)
-          const Positioned(left: 10, bottom: 16, child: _Person(color: AppColors.positive, height: 74)),
+          const Positioned(
+            left: 10,
+            bottom: 16,
+            child: _Person(color: AppColors.positive, height: 74),
+          ),
 
           // Device card
           Positioned(
@@ -49,7 +65,11 @@ class BrandIllustration extends StatelessWidget {
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: AppColors.brand, width: 2.5),
                 boxShadow: AppColors.shadows([
-                  BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.14), blurRadius: 18, offset: const Offset(0, 10)),
+                  BoxShadow(
+                    color: AppColors.shadowDark.withValues(alpha: 0.14),
+                    blurRadius: 18,
+                    offset: const Offset(0, 10),
+                  ),
                 ]),
               ),
               child: Column(
@@ -59,7 +79,10 @@ class BrandIllustration extends StatelessWidget {
                   Container(
                     width: 34,
                     height: 34,
-                    decoration: const BoxDecoration(color: AppColors.brand, shape: BoxShape.circle),
+                    decoration: const BoxDecoration(
+                      color: AppColors.brand,
+                      shape: BoxShape.circle,
+                    ),
                     child: Icon(deviceIcon, color: AppColors.white, size: 18),
                   ),
                   const SizedBox(height: 8),
@@ -70,7 +93,10 @@ class BrandIllustration extends StatelessWidget {
                       child: Container(
                         width: i == 1 ? 24 : 32,
                         height: 4,
-                        decoration: BoxDecoration(color: AppColors.surfaceElevated, borderRadius: BorderRadius.circular(2)),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceElevated,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
                     ),
                   ),
@@ -80,7 +106,11 @@ class BrandIllustration extends StatelessWidget {
           ),
 
           // Front person (blue)
-          const Positioned(right: 6, bottom: 0, child: _Person(color: AppColors.brand, height: 96)),
+          const Positioned(
+            right: 6,
+            bottom: 0,
+            child: _Person(color: AppColors.brand, height: 96),
+          ),
         ],
       ),
     );
@@ -99,7 +129,11 @@ class _Person extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: headSize, height: headSize, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        Container(
+          width: headSize,
+          height: headSize,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
         const SizedBox(height: 4),
         Container(
           width: headSize * 1.6,
@@ -126,6 +160,13 @@ class _Dot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(width: size, height: size, decoration: BoxDecoration(color: color.withValues(alpha: 0.5), shape: BoxShape.circle));
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.5),
+        shape: BoxShape.circle,
+      ),
+    );
   }
 }

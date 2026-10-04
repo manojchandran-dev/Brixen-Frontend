@@ -19,7 +19,10 @@ class _ShimmerState extends State<Shimmer> with SingleTickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..repeat();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
   }
 
   @override
@@ -62,7 +65,12 @@ class SkeletonBox extends StatelessWidget {
   final double? width;
   final double height;
   final double radius;
-  const SkeletonBox({super.key, this.width, required this.height, this.radius = 6});
+  const SkeletonBox({
+    super.key,
+    this.width,
+    required this.height,
+    this.radius = 6,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -91,39 +99,51 @@ class SkeletonListCard extends StatelessWidget {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
         boxShadow: AppColors.shadows([
-          BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 6)),
-          BoxShadow(color: AppColors.highlightShadow(0.85), blurRadius: 6, offset: const Offset(-3, -3)),
+          BoxShadow(
+            color: AppColors.shadowDark.withValues(alpha: 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: AppColors.highlightShadow(0.85),
+            blurRadius: 6,
+            offset: const Offset(-3, -3),
+          ),
         ]),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            const SkeletonBox(width: 38, height: 38, radius: 19),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  SkeletonBox(width: 130, height: 13, radius: 4),
-                  SizedBox(height: 7),
-                  SkeletonBox(width: 84, height: 10, radius: 4),
-                ],
+          Row(
+            children: [
+              const SkeletonBox(width: 38, height: 38, radius: 19),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    SkeletonBox(width: 130, height: 13, radius: 4),
+                    SizedBox(height: 7),
+                    SkeletonBox(width: 84, height: 10, radius: 4),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            const SkeletonBox(width: 54, height: 20, radius: 10),
-          ]),
+              const SizedBox(width: 10),
+              const SkeletonBox(width: 54, height: 20, radius: 10),
+            ],
+          ),
           const SizedBox(height: 16),
           const SkeletonBox(height: 1, radius: 0),
           const SizedBox(height: 14),
-          Row(children: const [
-            Expanded(child: SkeletonBox(height: 10, radius: 4)),
-            SizedBox(width: 18),
-            Expanded(child: SkeletonBox(height: 10, radius: 4)),
-            SizedBox(width: 18),
-            Expanded(child: SkeletonBox(height: 10, radius: 4)),
-          ]),
+          Row(
+            children: const [
+              Expanded(child: SkeletonBox(height: 10, radius: 4)),
+              SizedBox(width: 18),
+              Expanded(child: SkeletonBox(height: 10, radius: 4)),
+              SizedBox(width: 18),
+              Expanded(child: SkeletonBox(height: 10, radius: 4)),
+            ],
+          ),
           const SizedBox(height: 14),
           const SkeletonBox(height: 1, radius: 0),
           const SizedBox(height: 12),
@@ -151,7 +171,11 @@ class SkeletonDrawerTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          SkeletonBox(width: size, height: size, radius: compact ? size / 2 : 12),
+          SkeletonBox(
+            width: size,
+            height: size,
+            radius: compact ? size / 2 : 12,
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(

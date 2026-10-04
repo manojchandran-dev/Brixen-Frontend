@@ -35,7 +35,7 @@ class ReportPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _RangeChips(range: range, onRange: onRange),
+        ReportRangeChips(range: range, onRange: onRange),
         _ScopeLegend(range),
         Expanded(
           child: error != null && !loading
@@ -66,10 +66,15 @@ class ReportPage extends StatelessWidget {
   }
 }
 
-class _RangeChips extends StatelessWidget {
+/// Week · Month · Custom (bottom sheet) · All — the reports date filter.
+class ReportRangeChips extends StatelessWidget {
   final ReportPeriod range;
   final ValueChanged<ReportPeriod> onRange;
-  const _RangeChips({required this.range, required this.onRange});
+  const ReportRangeChips({
+    super.key,
+    required this.range,
+    required this.onRange,
+  });
 
   Future<void> _pickCustom(BuildContext context) async {
     // Bottom sheet (quick picks + calendar), not a full-screen page.
@@ -527,7 +532,7 @@ class ReportCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    '$total total',
+                    '${c is ReportTrendChart && c.valueLabel != null ? c.valueLabel!(total) : total} total',
                     style: const TextStyle(
                       color: AppColors.positive,
                       fontSize: 11.5,
@@ -552,10 +557,14 @@ class ReportTrendChart extends StatelessWidget {
 
   /// Kept for call sites; the chart uses the theme's green/blue pairing.
   final Color color;
+
+  /// Bar/total labels, e.g. rupees; default the plain number.
+  final String Function(int)? valueLabel;
   const ReportTrendChart({
     super.key,
     required this.buckets,
     this.color = AppColors.brand,
+    this.valueLabel,
   });
 
   @override
@@ -599,12 +608,19 @@ class ReportTrendChart extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             if (buckets[i].count > 0)
-                              Text(
-                                '${buckets[i].count}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
+                              // One line, shrunk to the bar width — amounts
+                              // like "₹1.2L" would wrap on narrow bars.
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  valueLabel?.call(buckets[i].count) ??
+                                      '${buckets[i].count}',
+                                  maxLines: 1,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
                               ),
                             const SizedBox(height: 3),
@@ -670,7 +686,10 @@ class BreakdownItem {
 /// percentage pill per slice.
 class ReportBreakdown extends StatelessWidget {
   final List<BreakdownItem> items;
-  const ReportBreakdown(this.items, {super.key});
+
+  /// Legend/centre labels, e.g. rupees; default the plain number.
+  final String Function(int)? valueLabel;
+  const ReportBreakdown(this.items, {super.key, this.valueLabel});
 
   @override
   Widget build(BuildContext context) {
@@ -688,10 +707,10 @@ class ReportBreakdown extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '$total',
+                    valueLabel?.call(total) ?? '$total',
                     style: TextStyle(
                       color: AppColors.ink,
-                      fontSize: 22,
+                      fontSize: valueLabel == null ? 22 : 15,
                       fontWeight: FontWeight.w800,
                       height: 1,
                     ),
@@ -736,7 +755,7 @@ class ReportBreakdown extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '${it.count}',
+                        valueLabel?.call(it.count) ?? '${it.count}',
                         style: TextStyle(
                           color: AppColors.ink,
                           fontSize: 13,

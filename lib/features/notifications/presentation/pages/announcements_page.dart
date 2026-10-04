@@ -13,12 +13,14 @@ import '../../../../shared/widgets/confirm_dialog.dart';
 import '../../../../shared/widgets/detail_sheet.dart';
 import '../../../../shared/widgets/error_state.dart';
 import '../../../../shared/widgets/picked_image.dart';
+import '../../../../shared/widgets/image_viewer.dart';
 import '../../../../shared/widgets/rich_card_shell.dart';
 import '../../../../shared/widgets/search_field.dart';
 import '../../../../shared/widgets/skeleton.dart';
 import '../../domain/entities/announcement.dart';
 import '../../domain/entities/push_notification.dart' show CommunicationStatus;
 import '../providers/announcements_provider.dart';
+import '../widgets/admin_only_notice.dart';
 import '../widgets/notification_labels.dart';
 import '../widgets/notification_status_badge.dart';
 import '../../../../shared/widgets/list_count_bar.dart';
@@ -42,7 +44,9 @@ class _AnnouncementsPageState extends ConsumerState<AnnouncementsPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (!Session.isSuperAdmin) return const SizedBox.shrink();
+    // Company admins get the page shell with a notice (see AdminOnlyNotice),
+    // not a blank screen.
+    final superAdmin = Session.isSuperAdmin;
 
     final cs = Theme.of(context).colorScheme;
     final announcementsAsync = ref.watch(announcementsProvider);
@@ -83,110 +87,126 @@ class _AnnouncementsPageState extends ConsumerState<AnnouncementsPage> {
           title: 'Announcements',
           subtitle: 'Updates shown to companies',
         ),
-        actions: [
-          DeletedItemsButton(
-            title: 'Deleted announcements',
-            listPath: ApiEndpoints.announcements,
-            restorePath: (a) =>
-                '${ApiEndpoints.announcements}/${a['id']}/restore',
-            labelOf: (a) => (a['title'] ?? '').toString(),
-            onRestored: () => ref.invalidate(announcementsProvider),
-          ),
-          GestureDetector(
-            onTap: () => context.push(AppRouter.createAnnouncement),
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
-              width: 38,
-              height: 38,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.brand, AppColors.brandDeep],
+        actions: !superAdmin
+            ? const []
+            : [
+                DeletedItemsButton(
+                  title: 'Deleted announcements',
+                  listPath: ApiEndpoints.announcements,
+                  restorePath: (a) =>
+                      '${ApiEndpoints.announcements}/${a['id']}/restore',
+                  labelOf: (a) => (a['title'] ?? '').toString(),
+                  onRestored: () => ref.invalidate(announcementsProvider),
                 ),
-                borderRadius: BorderRadius.circular(13),
-              ),
-              child: const Icon(
-                Icons.add_rounded,
-                size: 20,
-                color: AppColors.white,
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: SearchField(
-              controller: _searchCtrl,
-              hintText: 'Search announcements...',
-              onChanged: (_) => setState(() {}),
-            ),
-          ),
-          Expanded(
-            child: announcementsAsync.when(
-              loading: () => const SkeletonListView(),
-              error: (e, _) => ErrorCard(
-                error: e,
-                onRetry: () => ref.invalidate(announcementsProvider),
-              ),
-              data: (list) {
-                final query = _searchCtrl.text.trim().toLowerCase();
-                final filtered = query.isEmpty
-                    ? list
-                    : list
-                          .where((a) => a.title.toLowerCase().contains(query))
-                          .toList();
-
-                if (filtered.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.campaign_outlined,
-                          size: 56,
-                          color: cs.onSurfaceVariant.withValues(alpha: 0.3),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          list.isEmpty ? 'No announcements yet' : 'No results',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return Column(
-                  children: [
-                    ListCountBar(
-                      label: 'Total Announcements',
-                      count: filtered.length,
-                    ),
-                    Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) => _AnnouncementCard(
-                          index: i,
-                          announcement: filtered[i],
-                        ),
+                GestureDetector(
+                  onTap: () => context.push(AppRouter.createAnnouncement),
+                  child: Container(
+                    margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
+                    width: 38,
+                    height: 38,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppColors.brand, AppColors.brandDeep],
                       ),
+                      borderRadius: BorderRadius.circular(13),
                     ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ],
+                    child: const Icon(
+                      Icons.add_rounded,
+                      size: 20,
+                      color: AppColors.white,
+                    ),
+                  ),
+                ),
+              ],
       ),
+      body: !superAdmin
+          ? const AdminOnlyNotice(what: 'Announcements')
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                  child: SearchField(
+                    controller: _searchCtrl,
+                    hintText: 'Search',
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+                Expanded(
+                  child: announcementsAsync.when(
+                    loading: () => const SkeletonListView(),
+                    error: (e, _) => ErrorCard(
+                      error: e,
+                      onRetry: () => ref.invalidate(announcementsProvider),
+                    ),
+                    data: (list) {
+                      final query = _searchCtrl.text.trim().toLowerCase();
+                      final filtered = query.isEmpty
+                          ? list
+                          : list
+                                .where(
+                                  (a) => a.title.toLowerCase().contains(query),
+                                )
+                                .toList();
+
+                      if (filtered.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.campaign_outlined,
+                                size: 56,
+                                color: cs.onSurfaceVariant.withValues(
+                                  alpha: 0.3,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                list.isEmpty
+                                    ? 'No announcements yet'
+                                    : 'No results',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return Column(
+                        children: [
+                          ListCountBar(
+                            label: 'Total Announcements',
+                            count: filtered.length,
+                          ),
+                          Expanded(
+                            child: ListView.separated(
+                              padding: const EdgeInsets.fromLTRB(
+                                16,
+                                4,
+                                16,
+                                100,
+                              ),
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(height: 10),
+                              itemBuilder: (_, i) => _AnnouncementCard(
+                                index: i,
+                                announcement: filtered[i],
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
@@ -269,12 +289,16 @@ class _AnnouncementCard extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (announcement.bannerUrl != null) ...[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: pickedImage(
-                        announcement.bannerUrl!,
-                        width: 56,
-                        height: 56,
+                    GestureDetector(
+                      onTap: () =>
+                          showImageViewer(context, [announcement.bannerUrl!]),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: pickedImage(
+                          announcement.bannerUrl!,
+                          width: 56,
+                          height: 56,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),

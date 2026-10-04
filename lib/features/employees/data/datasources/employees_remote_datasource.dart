@@ -4,7 +4,9 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../models/employee_model.dart';
 
-final employeesRemoteDatasourceProvider = Provider<EmployeesRemoteDatasource>((ref) {
+final employeesRemoteDatasourceProvider = Provider<EmployeesRemoteDatasource>((
+  ref,
+) {
   return EmployeesRemoteDatasource(ref.read(dioProvider));
 });
 
@@ -13,21 +15,16 @@ class EmployeesRemoteDatasource {
   const EmployeesRemoteDatasource(this._dio);
 
   Future<List<EmployeeModel>> getEmployees({
-    int page = 1,
-    int limit = 200,
+    Map<String, String> filters = const {},
     String? search,
   }) async {
     try {
-      final resp = await _dio.get(ApiEndpoints.employees, queryParameters: {
-        'page': page,
-        'limit': limit,
+      final rows = await fetchAllPages(_dio, ApiEndpoints.employees, {
         if (search != null && search.isNotEmpty) 'search': search,
+
+        ...filters,
       });
-      final data = resp.data['data'] ?? resp.data;
-      final list = (data is List) ? data : (data['employees'] ?? data['items'] ?? []);
-      return (list as List)
-          .map((e) => EmployeeModel.fromJson(e as Map<String, dynamic>))
-          .toList();
+      return rows.map(EmployeeModel.fromJson).toList();
     } on DioException catch (e) {
       throw mapDioError(e);
     }
@@ -53,7 +50,11 @@ class EmployeesRemoteDatasource {
     }
   }
 
-  Future<EmployeeModel> updateStep2(String id, Map<String, dynamic> body, {String? companyId}) async {
+  Future<EmployeeModel> updateStep2(
+    String id,
+    Map<String, dynamic> body, {
+    String? companyId,
+  }) async {
     try {
       final resp = await _dio.put(
         ApiEndpoints.employeeStep2(id),
@@ -67,7 +68,11 @@ class EmployeesRemoteDatasource {
     }
   }
 
-  Future<EmployeeModel> updateStep3(String id, Map<String, dynamic> body, {String? companyId}) async {
+  Future<EmployeeModel> updateStep3(
+    String id,
+    Map<String, dynamic> body, {
+    String? companyId,
+  }) async {
     try {
       final resp = await _dio.put(
         ApiEndpoints.employeeStep3(id),
@@ -81,7 +86,11 @@ class EmployeesRemoteDatasource {
     }
   }
 
-  Future<EmployeeModel> updateEmployee(String id, Map<String, dynamic> body, {String? companyId}) async {
+  Future<EmployeeModel> updateEmployee(
+    String id,
+    Map<String, dynamic> body, {
+    String? companyId,
+  }) async {
     try {
       final resp = await _dio.put(
         ApiEndpoints.employeeById(id),

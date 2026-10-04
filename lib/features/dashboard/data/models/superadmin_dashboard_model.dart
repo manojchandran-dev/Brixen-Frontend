@@ -4,10 +4,12 @@ import '../../domain/entities/superadmin_dashboard.dart';
 /// Parses `GET /dashboard/superadmin`. Tolerant: a missing or odd field
 /// falls back to 0 / empty rather than failing the whole dashboard.
 SuperadminDashboard superadminDashboardFromJson(Map<String, dynamic> json) {
-  Map<String, dynamic> obj(Object? v) => v is Map ? Map<String, dynamic>.from(v) : const {};
+  Map<String, dynamic> obj(Object? v) =>
+      v is Map ? Map<String, dynamic>.from(v) : const {};
   List list(Object? v) => v is List ? v : const [];
   int i(Object? v) => v is num ? v.toInt() : int.tryParse('$v') ?? 0;
-  DateTime date(Object? v) => DateTime.tryParse('$v')?.toLocal() ?? DateTime.now();
+  DateTime date(Object? v) =>
+      DateTime.tryParse('$v')?.toLocal() ?? DateTime.now();
   T byName<T extends Enum>(List<T> values, Object? v, T fallback) =>
       values.where((e) => e.name == '$v').firstOrNull ?? fallback;
 
@@ -21,7 +23,9 @@ SuperadminDashboard superadminDashboardFromJson(Map<String, dynamic> json) {
     companiesActive: i(companies['active']),
     companiesInactive: i(companies['inactive']),
     companiesNewThisMonth: i(companies['new_this_month']),
-    weeklySignups: [for (final w in list(companies['weekly_signups'])) i(obj(w)['count'])],
+    weeklySignups: [
+      for (final w in list(companies['weekly_signups'])) i(obj(w)['count']),
+    ],
     employeesTotal: i(obj(json['employees'])['total']),
     ticketsOpen: i(tickets['open']),
     ticketsPending: i(tickets['pending']),
@@ -39,7 +43,11 @@ SuperadminDashboard superadminDashboardFromJson(Map<String, dynamic> json) {
             companyName: '${t['company_name'] ?? ''}',
             raisedBy: '',
             status: byName(TicketStatus.values, t['status'], TicketStatus.open),
-            priority: byName(TicketPriority.values, t['priority'], TicketPriority.medium),
+            priority: byName(
+              TicketPriority.values,
+              t['priority'],
+              TicketPriority.medium,
+            ),
             createdAt: created,
             updatedAt: created,
           );
@@ -71,7 +79,8 @@ SuperadminDashboard superadminDashboardFromJson(Map<String, dynamic> json) {
             'ok' => HealthStatus.ok,
             'slow' => HealthStatus.slow,
             // A service without keys on the server isn't "broken".
-            _ when (error ?? '').toLowerCase().contains('not configured') => HealthStatus.notConfigured,
+            _ when (error ?? '').toLowerCase().contains('not configured') =>
+              HealthStatus.notConfigured,
             _ => HealthStatus.down,
           };
           return HealthCheck(

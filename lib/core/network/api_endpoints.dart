@@ -31,6 +31,13 @@ class ApiEndpoints {
   static const String customers = '/api/v1/customers';
   static const String sales = '/api/v1/sales';
   static const String products = '/api/v1/products';
+  static const String purchases = '/api/v1/purchases';
+  static String purchaseById(String id) => '/api/v1/purchases/$id';
+
+  /// Stock: per-product levels + summary, the movement ledger, adjustments.
+  static const String inventory = '/api/v1/inventory';
+  static const String inventoryMovements = '/api/v1/inventory/movements';
+  static const String inventoryAdjustments = '/api/v1/inventory/adjustments';
   static const String dashboardSummary = '/api/v1/dashboard/summary';
 
   /// Superadmin dashboard: every count, recent activity and health in one call.
@@ -43,6 +50,13 @@ class ApiEndpoints {
   static const String uploads = '/api/v1/uploads';
   static const String pushNotifications = '/api/v1/notifications/push';
   static const String pushDevices = '/api/v1/notifications/push/devices';
+
+  /// Company users' inbox: every push their company received.
+  static const String pushInbox = '/api/v1/notifications/push/inbox';
+  static const String pushInboxReadAll =
+      '/api/v1/notifications/push/inbox/read-all';
+  static String pushOpened(String id) =>
+      '/api/v1/notifications/push/$id/opened';
   static String pushNotificationById(String id) =>
       '/api/v1/notifications/push/$id';
   static String pushNotificationDuplicate(String id) =>

@@ -48,14 +48,15 @@ class ExpenseModel extends Expense {
   /// `receipt_url` must already be a hosted URL — the page uploads a picked
   /// receipt via `POST /uploads` before submitting.
   static Map<String, dynamic> toBody(Expense e, {String? companyId}) => {
-        if (companyId != null) 'company_id': int.parse(companyId),
-        'category_id': e.categoryId,
-        'title': e.title,
-        'amount': e.amount,
-        'unit_id': e.unitId,
-        'expense_date': e.expenseDate.toIso8601String(),
-        if (e.paymentMethod != null && e.paymentMethod!.isNotEmpty) 'payment_method': e.paymentMethod,
-        if (e.notes != null && e.notes!.isNotEmpty) 'notes': e.notes,
-        'receipt_url': e.receiptImagePath,
-      };
+    if (companyId != null) 'company_id': int.parse(companyId),
+    'category_id': e.categoryId,
+    'title': e.title,
+    'amount': e.amount,
+    'unit_id': e.unitId,
+    'expense_date': e.expenseDate.toIso8601String(),
+    if (e.paymentMethod != null && e.paymentMethod!.isNotEmpty)
+      'payment_method': e.paymentMethod,
+    if (e.notes != null && e.notes!.isNotEmpty) 'notes': e.notes,
+    'receipt_url': e.receiptImagePath,
+  };
 }

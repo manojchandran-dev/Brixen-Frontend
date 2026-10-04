@@ -17,6 +17,12 @@ class Product {
   final List<String> galleryPaths;
   final String status;
   final String? onboardingStatus;
+
+  /// Units in stock (can go below 0 when more is sold than recorded).
+  final int stockQuantity;
+
+  /// At or below this counts as low stock.
+  final int lowStockThreshold;
   final DateTime createdAt;
 
   const Product({
@@ -38,8 +44,13 @@ class Product {
     this.galleryPaths = const [],
     this.status = 'Active',
     this.onboardingStatus,
+    this.stockQuantity = 0,
+    this.lowStockThreshold = 5,
     required this.createdAt,
   });
+
+  bool get isOutOfStock => stockQuantity <= 0;
+  bool get isLowStock => !isOutOfStock && stockQuantity <= lowStockThreshold;
 
   Product copyWith({
     String? id,
@@ -61,6 +72,8 @@ class Product {
     String? status,
     String? onboardingStatus,
     DateTime? createdAt,
+    int? stockQuantity,
+    int? lowStockThreshold,
   }) {
     return Product(
       id: id ?? this.id,
@@ -81,6 +94,8 @@ class Product {
       galleryPaths: galleryPaths ?? this.galleryPaths,
       status: status ?? this.status,
       onboardingStatus: onboardingStatus ?? this.onboardingStatus,
+      stockQuantity: stockQuantity ?? this.stockQuantity,
+      lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
       createdAt: createdAt ?? this.createdAt,
     );
   }

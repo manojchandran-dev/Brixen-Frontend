@@ -5,7 +5,9 @@ import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../models/expense_model.dart';
 
-final expensesRemoteDatasourceProvider = Provider<ExpensesRemoteDatasource>((ref) {
+final expensesRemoteDatasourceProvider = Provider<ExpensesRemoteDatasource>((
+  ref,
+) {
   return ExpensesRemoteDatasource(ref.read(dioProvider));
 });
 
@@ -14,8 +16,7 @@ class ExpensesRemoteDatasource {
   const ExpensesRemoteDatasource(this._dio);
 
   Future<List<ExpenseModel>> getExpenses({
-    int page = 1,
-    int limit = 200,
+    Map<String, String> filters = const {},
     String? search,
     String? categoryId,
     String? unitId,
@@ -23,20 +24,16 @@ class ExpensesRemoteDatasource {
     DateTime? to,
   }) async {
     try {
-      final resp = await _dio.get(ApiEndpoints.expenses, queryParameters: {
-        'page': page,
-        'limit': limit,
+      final rows = await fetchAllPages(_dio, ApiEndpoints.expenses, {
         if (search != null && search.isNotEmpty) 'search': search,
         'category_id': ?categoryId,
         'unit_id': ?unitId,
         if (from != null) 'from': toIsoDateOnly(from),
         if (to != null) 'to': toIsoDateOnly(to),
+
+        ...filters,
       });
-      final data = resp.data['data'] ?? resp.data;
-      final list = (data is List) ? data : (data['items'] ?? []);
-      return (list as List)
-          .map((e) => ExpenseModel.fromJson(e as Map<String, dynamic>))
-          .toList();
+      return rows.map(ExpenseModel.fromJson).toList();
     } on DioException catch (e) {
       throw mapDioError(e);
     }
@@ -62,7 +59,10 @@ class ExpensesRemoteDatasource {
     }
   }
 
-  Future<ExpenseModel> updateExpense(String id, Map<String, dynamic> body) async {
+  Future<ExpenseModel> updateExpense(
+    String id,
+    Map<String, dynamic> body,
+  ) async {
     try {
       final resp = await _dio.put(ApiEndpoints.expenseById(id), data: body);
       final data = resp.data['data'] ?? resp.data;

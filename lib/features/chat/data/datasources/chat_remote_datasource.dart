@@ -27,7 +27,9 @@ class ChatRemoteDatasource {
         return ChatConversation(
           companyId: c['company_id'].toString(),
           companyName: (c['company_name'] ?? '').toString(),
-          messages: last is Map<String, dynamic> ? [chatMessageFromJson(last)] : const [],
+          messages: last is Map<String, dynamic>
+              ? [chatMessageFromJson(last)]
+              : const [],
         );
       }).toList();
     } on DioException catch (e) {
@@ -39,8 +41,13 @@ class ChatRemoteDatasource {
   /// into the UI yet.
   Future<List<ChatMessage>> messages(String companyId) async {
     try {
-      final resp = await _dio.get(ApiEndpoints.chatMessages(companyId), queryParameters: {'limit': 100});
-      return _items(resp).map((e) => chatMessageFromJson(e as Map<String, dynamic>)).toList();
+      final resp = await _dio.get(
+        ApiEndpoints.chatMessages(companyId),
+        queryParameters: {'limit': 100},
+      );
+      return _items(
+        resp,
+      ).map((e) => chatMessageFromJson(e as Map<String, dynamic>)).toList();
     } on DioException catch (e) {
       throw mapDioError(e);
     }
@@ -54,12 +61,15 @@ class ChatRemoteDatasource {
     int durationMs = 0,
   }) async {
     try {
-      await _dio.post(ApiEndpoints.chatMessages(companyId), data: {
-        'type': type.name,
-        if (text.isNotEmpty) 'text': text,
-        'attachment_url': ?attachmentUrl,
-        if (durationMs > 0) 'duration_ms': durationMs,
-      });
+      await _dio.post(
+        ApiEndpoints.chatMessages(companyId),
+        data: {
+          'type': type.name,
+          if (text.isNotEmpty) 'text': text,
+          'attachment_url': ?attachmentUrl,
+          if (durationMs > 0) 'duration_ms': durationMs,
+        },
+      );
     } on DioException catch (e) {
       throw mapDioError(e);
     }

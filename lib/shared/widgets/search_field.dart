@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
+import 'chip_filter_sheet.dart';
 
 /// The inline search bar styling every list page (Sales, Products, ...) has
 /// been hand-rolling separately — pulled out once so new lists don't
@@ -77,4 +78,75 @@ class SearchField extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Search box (with its ✕) plus a filter button — the header every module
+/// list uses. [filterActive] fills the button while a filter is applied.
+class SearchFilterBar extends StatelessWidget {
+  final TextEditingController controller;
+  final String hintText;
+  final ValueChanged<String>? onChanged;
+  final bool filterActive;
+
+  /// Null = no filter button.
+  final VoidCallback? onFilter;
+
+  /// More square buttons after the filter, e.g. restore deleted items.
+  final List<Widget> actions;
+  final EdgeInsetsGeometry padding;
+
+  const SearchFilterBar({
+    super.key,
+    required this.controller,
+    required this.hintText,
+    this.onChanged,
+    required this.filterActive,
+    this.onFilter,
+    this.actions = const [],
+    this.padding = const EdgeInsets.fromLTRB(16, 14, 16, 8),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: padding,
+      child: Row(
+        children: [
+          Expanded(
+            child: SearchField(
+              controller: controller,
+              hintText: hintText,
+              onChanged: onChanged,
+            ),
+          ),
+          if (onFilter != null) ...[
+            const SizedBox(width: 10),
+            HeaderIconButton(
+              tooltip: 'Filter',
+              icon: Icons.filter_list_rounded,
+              active: filterActive,
+              onTap: onFilter!,
+            ),
+          ],
+          for (final a in actions) ...[const SizedBox(width: 10), a],
+        ],
+      ),
+    );
+  }
+}
+
+/// Filter options from a loaded list's distinct values — so a filter only
+/// ever offers values that exist. "on_leave" → "On leave".
+List<(Object, String)> distinctOptions<T>(
+  Iterable<T> items,
+  String? Function(T) valueOf,
+) {
+  final values = <String>{
+    for (final i in items)
+      if (valueOf(i) case final v? when v.trim().isNotEmpty) v,
+  }.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+  return [
+    for (final v in values)
+      (v, (v[0].toUpperCase() + v.substring(1)).replaceAll('_', ' ')),
+  ];
 }

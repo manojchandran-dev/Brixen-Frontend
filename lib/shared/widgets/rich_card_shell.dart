@@ -124,7 +124,11 @@ class RichCardShell extends StatelessWidget {
     return RichCardShell(
       key: key,
       accentColor: accent,
-      backgroundColor: Color.lerp(AppColors.surface, accent, AppColors.cardTintBlend(accent))!,
+      backgroundColor: Color.lerp(
+        AppColors.surface,
+        accent,
+        AppColors.cardTintBlend(accent),
+      )!,
       backgroundGradient: AppColors.cardTintGradient(accent),
       edgeColor: accent,
       showAccentBar: false,

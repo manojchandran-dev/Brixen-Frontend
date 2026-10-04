@@ -1,3 +1,6 @@
+import 'dart:async';
+import '../../../../core/network/api_endpoints.dart';
+import '../../../../shared/providers/list_filter_options_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,9 +16,12 @@ import '../../../../shared/widgets/skeleton.dart';
 import '../../../../shared/widgets/detail_sheet.dart';
 import '../../../../shared/widgets/error_state.dart';
 import '../../../../shared/widgets/picked_image.dart';
+import '../../../../shared/widgets/image_viewer.dart';
 import '../../../../shared/widgets/super_admin_company_filter_bar.dart';
 import '../../data/repositories/expenses_repository_impl.dart';
 import '../../domain/entities/expense.dart';
+import '../../../../shared/widgets/chip_filter_sheet.dart';
+import '../../../../shared/widgets/search_field.dart';
 import '../providers/expenses_provider.dart';
 import '../../../../shared/widgets/list_count_bar.dart';
 import '../../../../shared/widgets/module_title.dart';
@@ -34,6 +40,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
@@ -47,11 +54,94 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
     AppColors.brandBlack,
   ];
 
+  // Filter sheet choices (null = All) and the search text — both go to the
+  // API (see expenseResultsProvider).
+  Map<String, Object?> _filters = {};
+  String _search = '';
+  Timer? _debounce;
+
+  /// Search + filters as API params, as a stable query string (the results
+  /// provider's key). '' = neither → the full list. "days" → from/to.
+  String _query() {
+    final days = _filters['days'] as int?;
+    final now = DateTime.now();
+    final day = DateFormat('yyyy-MM-dd');
+    final p = <String, String>{
+      if (_search.isNotEmpty) 'search': _search,
+      for (final e in _filters.entries)
+        if (e.key != 'days' && e.value != null) e.key: '${e.value}',
+      if (days != null) ...{
+        'from': day.format(now.subtract(Duration(days: days - 1))),
+        'to': day.format(now),
+      },
+    };
+    final keys = p.keys.toList()..sort();
+    return Uri(queryParameters: {for (final k in keys) k: p[k]!}).query;
+  }
+
+  void _onSearch(String v) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (mounted) setState(() => _search = v.trim());
+    });
+  }
+
+  void _openFilter(List<Expense> all) {
+    final server =
+        ref
+            .read(listFilterOptionsProvider(ApiEndpoints.expenses))
+            .valueOrNull ??
+        const {};
+    List<(Object, String)> opts(String key, List<(Object, String)> fallback) {
+      final o = serverOptions(server, key);
+      return o.isEmpty ? fallback : o;
+    }
+
+    showChipFilterSheet(
+      context,
+      title: 'Filter expenses',
+      sections: [
+        FilterSection(
+          key: 'category_id',
+          title: 'Category',
+          options: opts('categories', [
+            for (final c in {
+              for (final e in all)
+                if (e.categoryId.isNotEmpty) e.categoryId: e.category,
+            }.entries)
+              (c.key, c.value),
+          ]),
+        ),
+        FilterSection(
+          key: 'payment_method',
+          title: 'Payment method',
+          options: opts(
+            'payment_method',
+            distinctOptions(all, (e) => e.paymentMethod),
+          ),
+        ),
+        FilterSection(
+          key: 'days',
+          title: 'Date',
+          options: const [(7, 'Last 7 days'), (30, 'Last 30 days')],
+        ),
+      ],
+      selected: _filters,
+      onApply: (v) => setState(() => _filters = v),
+      onClear: () => setState(() => _filters = {}),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final expensesAsync = ref.watch(expensesProvider);
+    final query = _query();
+    final expensesAsync = query.isEmpty
+        ? ref.watch(expensesProvider)
+        : ref.watch(expenseResultsProvider(query));
+    // Loads the filter choices ahead of the sheet opening.
+    ref.watch(listFilterOptionsProvider(ApiEndpoints.expenses));
 
     return Scaffold(
       extendBody: true,
@@ -228,48 +318,12 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: Container(
-              height: 48,
-              decoration: BoxDecoration(
-                color: isDark ? cs.surfaceContainerHighest : AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: isDark
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: AppColors.shadowDark.withValues(alpha: 0.06),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
-                        ),
-                        BoxShadow(
-                          color: AppColors.highlightShadow(0.85),
-                          blurRadius: 6,
-                          offset: const Offset(-3, -3),
-                        ),
-                      ],
-              ),
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (_) => setState(() {}),
-                style: TextStyle(color: cs.onSurface, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Search by title or category…',
-                  hintStyle: TextStyle(
-                    color: cs.onSurfaceVariant,
-                    fontSize: 14,
-                  ),
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    color: cs.onSurfaceVariant,
-                    size: 20,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 13),
-                ),
-              ),
-            ),
+          SearchFilterBar(
+            controller: _searchCtrl,
+            hintText: 'Search',
+            onChanged: _onSearch,
+            filterActive: _filters.values.any((v) => v != null),
+            onFilter: () => _openFilter(expensesAsync.valueOrNull ?? const []),
           ),
           const SuperAdminCompanyFilterBar(),
           Expanded(
@@ -279,17 +333,8 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
                 error: e,
                 onRetry: () => ref.invalidate(expensesProvider),
               ),
-              data: (list) {
-                final q = _searchCtrl.text.trim().toLowerCase();
-                final filtered = q.isEmpty
-                    ? list
-                    : list
-                          .where(
-                            (e) =>
-                                e.title.toLowerCase().contains(q) ||
-                                e.category.toLowerCase().contains(q),
-                          )
-                          .toList();
+              data: (all) {
+                final filtered = all;
                 if (filtered.isEmpty) {
                   return Center(
                     child: Column(
@@ -302,14 +347,14 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          list.isEmpty ? 'No expenses yet' : 'No results',
+                          query.isEmpty ? 'No expenses yet' : 'No results',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                             color: cs.onSurfaceVariant,
                           ),
                         ),
-                        if (list.isEmpty) ...[
+                        if (query.isEmpty) ...[
                           const SizedBox(height: 6),
                           Text(
                             'Tap + to log your first expense',
@@ -371,7 +416,14 @@ class _ExpenseCard extends ConsumerWidget {
     )!;
     final fg = AppColors.ink;
     final fgMuted = AppColors.ink.withValues(alpha: 0.6);
-    final dividerColor = AppColors.ink.withValues(alpha: 0.12);
+    // "₹1,750" — paise only when there are some.
+    final amount = expense.amount % 1 == 0
+        ? '₹${NumberFormat('#,##,##0', 'en_IN').format(expense.amount)}'
+        : '₹${fmt.format(expense.amount)}';
+    final meta = [
+      DateFormat('d MMM yyyy').format(expense.expenseDate),
+      if (expense.paymentMethod?.isNotEmpty == true) expense.paymentMethod!,
+    ].join(' · ');
 
     return SwipeActions(
       onTap: () => _showExpenseDetail(context, ref, expense, categoryColor),
@@ -396,68 +448,147 @@ class _ExpenseCard extends ConsumerWidget {
         backgroundColor: bg,
         showAccentBar: false,
         edgeColor: categoryColor,
+        // Compact: icon · title / date · method / category chip · amount pill.
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.all(12),
+          child: Row(
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  Expanded(
-                    child: Text(
-                      expense.title,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: fg,
-                        height: 1.25,
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: AppColors.accentGradient(categoryColor),
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.receipt_long_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                  // A receipt photo is attached.
+                  if (expense.receiptImagePath?.isNotEmpty == true)
+                    Positioned(
+                      right: -4,
+                      bottom: -4,
+                      child: Container(
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          color: AppColors.positive,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.surface,
+                            width: 2,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.photo_rounded,
+                          size: 9,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(
-                    '₹${fmt.format(expense.amount)}',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: fg,
-                    ),
-                  ),
                 ],
               ),
-              const SizedBox(height: 14),
-              RichCardDivider(color: dividerColor),
-              const SizedBox(height: 10),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Icon(Icons.calendar_today_rounded, size: 12, color: fgMuted),
-                  const SizedBox(width: 4),
-                  Text(
-                    DateFormat('dd MMM yyyy').format(expense.expenseDate),
-                    style: TextStyle(fontSize: 12, color: fgMuted),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: categoryColor,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      expense.category,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.white,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      expense.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                        color: fg,
                       ),
                     ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today_rounded,
+                          size: 11,
+                          color: fgMuted,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            meta,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 11.5, color: fgMuted),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (expense.category.isNotEmpty) ...[
+                      const SizedBox(height: 7),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: categoryColor.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          expense.category,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            color: fg,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              // The amount is what you look for — a solid pill.
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.brand, AppColors.brandDeep],
                   ),
-                ],
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: AppColors.shadows([
+                    BoxShadow(
+                      color: AppColors.brand.withValues(alpha: 0.35),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]),
+                ),
+                child: Text(
+                  amount,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
+                ),
               ),
             ],
           ),
@@ -746,9 +877,12 @@ class _ExpenseReceiptImageState extends ConsumerState<_ExpenseReceiptImage> {
     }
     final url = _url;
     if (url == null || url.isEmpty) return const SizedBox.shrink();
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: pickedImage(url, width: double.infinity, height: 180),
+    return GestureDetector(
+      onTap: () => showImageViewer(context, [url]),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: pickedImage(url, width: double.infinity, height: 180),
+      ),
     );
   }
 }

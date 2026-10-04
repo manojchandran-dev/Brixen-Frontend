@@ -19,7 +19,11 @@ Future<bool> showConfirmDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Text(
         title,
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.ink),
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          color: AppColors.ink,
+        ),
       ),
       content: Text(
         message,
@@ -28,16 +32,16 @@ Future<bool> showConfirmDialog(
       actions: [
         TextButton(
           onPressed: () => Navigator.of(dCtx).pop(false),
-          child: Text(cancelLabel, style: TextStyle(color: AppColors.textSecondary)),
+          child: Text(
+            cancelLabel,
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
         ),
         TextButton(
           onPressed: () => Navigator.of(dCtx).pop(true),
           child: Text(
             confirmLabel,
-            style: TextStyle(
-              color: AppColors.ink,
-              fontWeight: FontWeight.w700,
-            ),
+            style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700),
           ),
         ),
       ],

@@ -481,7 +481,7 @@ class _CompanyPickerSheetState extends State<_CompanyPickerSheet> {
                 padding: const EdgeInsets.symmetric(horizontal: 18),
                 child: SearchField(
                   controller: _searchCtrl,
-                  hintText: 'Search companies...',
+                  hintText: 'Search',
                   onChanged: (v) =>
                       setState(() => _query = v.trim().toLowerCase()),
                 ),

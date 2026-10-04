@@ -32,14 +32,14 @@ class _GalleryPhoto {
   String? error;
 
   _GalleryPhoto.local(XFile this.file)
-      : url = null,
-        uploading = true,
-        error = null;
+    : url = null,
+      uploading = true,
+      error = null;
 
   _GalleryPhoto.remote(String this.url)
-      : file = null,
-        uploading = false,
-        error = null;
+    : file = null,
+      uploading = false,
+      error = null;
 
   /// What to show for this tile — the local file while uploading/on error
   /// (fastest, no network round-trip), otherwise the hosted URL.
@@ -68,7 +68,8 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
   int _currentStep = 0;
   bool _submitting = false;
   String? _productId;
-  Company? _selectedCompany; // superAdmin only — companyAdmin/employee use Session.companyId
+  Company?
+  _selectedCompany; // superAdmin only — companyAdmin/employee use Session.companyId
 
   // Step 1 — Basic Info
   final _nameCtrl = TextEditingController();
@@ -89,6 +90,8 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
   final _costPriceCtrl = TextEditingController();
   final _retailPriceCtrl = TextEditingController();
   final _wholesalePriceCtrl = TextEditingController();
+  final _stockCtrl = TextEditingController();
+  final _lowStockCtrl = TextEditingController(text: '5');
 
   // Step 4 — Gallery & Status
   final _picker = ImagePicker();
@@ -132,13 +135,17 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
       _colorCtrl.text = p.color ?? '';
       _sizeCtrl.text = p.size ?? '';
       _costPriceCtrl.text = p.costPrice == 0 ? '' : p.costPrice.toString();
+      _stockCtrl.text = '${p.stockQuantity}';
+      _lowStockCtrl.text = '${p.lowStockThreshold}';
       _retailPriceCtrl.text = p.retailPrice == 0
           ? ''
           : p.retailPrice.toString();
       _wholesalePriceCtrl.text = p.wholesalePrice == 0
           ? ''
           : p.wholesalePrice.toString();
-      _gallery = p.galleryPaths.map((url) => _GalleryPhoto.remote(url)).toList();
+      _gallery = p.galleryPaths
+          .map((url) => _GalleryPhoto.remote(url))
+          .toList();
       _status = p.status;
     }
     _loadCategories();
@@ -171,7 +178,9 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
       setState(() {
         _categories = list.where((c) => c.isActive).toList();
         _loadingCategories = false;
-        final id = _isEditing ? widget.editProduct!.categoryId : _selectedCategory?.id;
+        final id = _isEditing
+            ? widget.editProduct!.categoryId
+            : _selectedCategory?.id;
         _selectedCategory = id == null
             ? null
             : _categories.where((c) => c.id == id).firstOrNull;
@@ -199,13 +208,17 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
     }
     setState(() => _loadingUnits = true);
     try {
-      final list = await unitsRemoteDatasource.getAll(companyId: _effectiveCompanyId);
+      final list = await unitsRemoteDatasource.getAll(
+        companyId: _effectiveCompanyId,
+      );
       if (!mounted) return;
       setState(() {
         _units = list;
         _loadingUnits = false;
         final id = _isEditing ? widget.editProduct!.unitId : _selectedUnit?.id;
-        _selectedUnit = id == null ? null : _units.where((u) => u.id == id).firstOrNull;
+        _selectedUnit = id == null
+            ? null
+            : _units.where((u) => u.id == id).firstOrNull;
       });
     } catch (e) {
       if (!mounted) return;
@@ -224,6 +237,8 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
     _costPriceCtrl.dispose();
     _retailPriceCtrl.dispose();
     _wholesalePriceCtrl.dispose();
+    _stockCtrl.dispose();
+    _lowStockCtrl.dispose();
     super.dispose();
   }
 
@@ -248,7 +263,9 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
     if (files.length > accepted.length && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Only $_maxGalleryImages photos allowed — added the first $remaining.'),
+          content: Text(
+            'Only $_maxGalleryImages photos allowed — added the first $remaining.',
+          ),
           backgroundColor: AppColors.dangerFill,
         ),
       );
@@ -273,10 +290,9 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
   /// still visibly in progress (submission is blocked while any is).
   Future<void> _uploadPhoto(_GalleryPhoto photo) async {
     try {
-      final url = await ref.read(uploadServiceProvider).uploadImage(
-            photo.file!,
-            folder: 'products',
-          );
+      final url = await ref
+          .read(uploadServiceProvider)
+          .uploadImage(photo.file!, folder: 'products');
       if (!mounted || !_gallery.contains(photo)) return;
       setState(() {
         photo.url = url;
@@ -372,7 +388,10 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
       );
       return;
     }
-    if (_currentStep == 0 && !_isEditing && Session.isSuperAdmin && _selectedCompany == null) {
+    if (_currentStep == 0 &&
+        !_isEditing &&
+        Session.isSuperAdmin &&
+        _selectedCompany == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select a company'),
@@ -412,7 +431,10 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
               gender: _gender,
               designPattern: _designPattern,
             );
-            await notifier.updateProduct(merged, companyId: _effectiveCompanyId);
+            await notifier.updateProduct(
+              merged,
+              companyId: _effectiveCompanyId,
+            );
             _productId = widget.editProduct!.id;
           } else {
             final basic = Product(
@@ -430,7 +452,9 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
             );
             final created = await notifier.createStep1(
               basic,
-              companyId: (Session.isSuperAdmin ? _selectedCompany!.id : Session.companyId)!,
+              companyId: (Session.isSuperAdmin
+                  ? _selectedCompany!.id
+                  : Session.companyId)!,
             );
             _productId = created.id;
           }
@@ -446,15 +470,17 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
             color: _colorCtrl.text.trim().isEmpty
                 ? null
                 : _colorCtrl.text.trim(),
-            size: _sizeCtrl.text.trim().isEmpty
-                ? null
-                : _sizeCtrl.text.trim(),
+            size: _sizeCtrl.text.trim().isEmpty ? null : _sizeCtrl.text.trim(),
             costPrice: 0,
             retailPrice: 0,
             wholesalePrice: 0,
             createdAt: DateTime.now(),
           );
-          await notifier.updateStep2(_productId!, attrs, companyId: _effectiveCompanyId);
+          await notifier.updateStep2(
+            _productId!,
+            attrs,
+            companyId: _effectiveCompanyId,
+          );
           setState(() => _currentStep = 2);
         case 2:
           final pricing = Product(
@@ -468,7 +494,17 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
             wholesalePrice: double.tryParse(_wholesalePriceCtrl.text) ?? 0,
             createdAt: DateTime.now(),
           );
-          await notifier.updateStep3(_productId!, pricing, companyId: _effectiveCompanyId);
+          await notifier.updateStep3(
+            _productId!,
+            pricing,
+            companyId: _effectiveCompanyId,
+          );
+          await notifier.updateStock(
+            _productId!,
+            stockQuantity: int.tryParse(_stockCtrl.text.trim()) ?? 0,
+            lowStockThreshold: int.tryParse(_lowStockCtrl.text.trim()) ?? 5,
+            companyId: _effectiveCompanyId,
+          );
           setState(() => _currentStep = 3);
         case 3:
           final galleryAndStatus = Product(
@@ -480,11 +516,18 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
             costPrice: 0,
             retailPrice: 0,
             wholesalePrice: 0,
-            galleryPaths: _gallery.map((p) => p.url).whereType<String>().toList(),
+            galleryPaths: _gallery
+                .map((p) => p.url)
+                .whereType<String>()
+                .toList(),
             status: _status,
             createdAt: DateTime.now(),
           );
-          await notifier.updateStep4(_productId!, galleryAndStatus, companyId: _effectiveCompanyId);
+          await notifier.updateStep4(
+            _productId!,
+            galleryAndStatus,
+            companyId: _effectiveCompanyId,
+          );
           if (!mounted) return;
           if (widget.fromMasters) {
             context.pop();
@@ -701,6 +744,8 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
           costPriceCtrl: _costPriceCtrl,
           retailPriceCtrl: _retailPriceCtrl,
           wholesalePriceCtrl: _wholesalePriceCtrl,
+          stockCtrl: _stockCtrl,
+          lowStockCtrl: _lowStockCtrl,
         );
       default:
         return _Step4(
@@ -930,7 +975,10 @@ class _Step1 extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
         children: [
           if (showCompanyField) ...[
-            CompanySelectorField(value: selectedCompany, onChanged: onCompanyChanged),
+            CompanySelectorField(
+              value: selectedCompany,
+              onChanged: onCompanyChanged,
+            ),
             const SizedBox(height: 22),
           ],
           BrixenTextField(
@@ -1050,13 +1098,17 @@ class _Step3 extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController costPriceCtrl,
       retailPriceCtrl,
-      wholesalePriceCtrl;
+      wholesalePriceCtrl,
+      stockCtrl,
+      lowStockCtrl;
 
   const _Step3({
     required this.formKey,
     required this.costPriceCtrl,
     required this.retailPriceCtrl,
     required this.wholesalePriceCtrl,
+    required this.stockCtrl,
+    required this.lowStockCtrl,
   });
 
   @override
@@ -1093,10 +1145,39 @@ class _Step3 extends StatelessWidget {
             hint: '0.00',
             controller: wholesalePriceCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textInputAction: TextInputAction.done,
+            textInputAction: TextInputAction.next,
             prefixIcon: const Icon(Icons.local_shipping_outlined),
             validator: (v) =>
                 (v == null || v.trim().isEmpty) ? 'Required' : null,
+          ),
+          const SizedBox(height: 22),
+          // Stock: sales take from it automatically; correct it here.
+          BrixenTextField(
+            label: 'Stock quantity',
+            hint: '0',
+            controller: stockCtrl,
+            keyboardType: const TextInputType.numberWithOptions(signed: true),
+            textInputAction: TextInputAction.next,
+            prefixIcon: const Icon(Icons.inventory_2_outlined),
+            validator: (v) =>
+                v == null || v.trim().isEmpty || int.tryParse(v.trim()) != null
+                ? null
+                : 'Whole number',
+          ),
+          const SizedBox(height: 22),
+          BrixenTextField(
+            label: 'Low-stock alert at',
+            hint: '5',
+            controller: lowStockCtrl,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            prefixIcon: const Icon(Icons.notifications_active_outlined),
+            validator: (v) {
+              final n = int.tryParse(v?.trim() ?? '');
+              return v == null || v.trim().isEmpty || (n != null && n >= 0)
+                  ? null
+                  : '0 or more';
+            },
           ),
           const SizedBox(height: 22),
         ],
@@ -1150,7 +1231,10 @@ class _Step4 extends StatelessWidget {
           const SizedBox(height: 3),
           Text(
             'Optional — up to $_maxGalleryImages photos',
-            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
+            style: TextStyle(
+              fontSize: 11,
+              color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+            ),
           ),
           const SizedBox(height: 10),
           _GalleryGrid(
@@ -1304,7 +1388,10 @@ class _GalleryGrid extends StatelessWidget {
                   child: SizedBox(
                     width: 22,
                     height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -1313,7 +1400,11 @@ class _GalleryGrid extends StatelessWidget {
                 child: GestureDetector(
                   onTap: () => onRetry(i),
                   child: const Center(
-                    child: Icon(Icons.refresh_rounded, color: Colors.white, size: 26),
+                    child: Icon(
+                      Icons.refresh_rounded,
+                      color: Colors.white,
+                      size: 26,
+                    ),
                   ),
                 ),
               ),

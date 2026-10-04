@@ -81,6 +81,8 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
   final _totalAmountCtrl = TextEditingController();
   String? _paymentType;
   String? _paymentStatus;
+  // Only for Partial: how much was received (Paid is filled in by the server).
+  final _amountPaidCtrl = TextEditingController();
   final List<_SaleLineItem> _lineItems = [];
 
   // Step 3 — Notes
@@ -125,6 +127,11 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
       }
       _paymentType = s.paymentType;
       _paymentStatus = s.paymentStatus;
+      if (s.amountPaid != null && s.paymentStatus.toLowerCase() == 'partial') {
+        _amountPaidCtrl.text = s.amountPaid!.toStringAsFixed(
+          s.amountPaid! % 1 == 0 ? 0 : 2,
+        );
+      }
       _notesCtrl.text = s.notes ?? '';
       // Pre-select customer, and rebuild the line-item rows from the saved
       // sale_items, once the Customers/Products providers have data.
@@ -201,6 +208,7 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
     _taxPercentCtrl.dispose();
     _totalAmountCtrl.dispose();
     _notesCtrl.dispose();
+    _amountPaidCtrl.dispose();
     super.dispose();
   }
 
@@ -356,6 +364,9 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
       totalAmount: 0,
       paymentType: _paymentType,
       paymentStatus: _paymentStatus ?? 'Pending',
+      amountPaid: _paymentStatus == 'Partial'
+          ? double.tryParse(_amountPaidCtrl.text.trim())
+          : null,
       notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
       billImagePath: _billImage?.path,
       createdAt: _isEditing ? widget.editSale!.createdAt : DateTime.now(),
@@ -687,6 +698,7 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
           paymentStatuses: _paymentStatuses,
           onPaymentTypeChanged: (v) => setState(() => _paymentType = v),
           onPaymentStatusChanged: (v) => setState(() => _paymentStatus = v),
+          amountPaidCtrl: _amountPaidCtrl,
           onRecalc: _recalcTaxAndTotal,
         );
       default:
@@ -972,6 +984,7 @@ class _Step2 extends StatelessWidget {
   final List<String> paymentTypes, paymentStatuses;
   final void Function(String?) onPaymentTypeChanged;
   final void Function(String?) onPaymentStatusChanged;
+  final TextEditingController amountPaidCtrl;
   final VoidCallback onRecalc;
 
   const _Step2({
@@ -992,6 +1005,7 @@ class _Step2 extends StatelessWidget {
     required this.paymentStatuses,
     required this.onPaymentTypeChanged,
     required this.onPaymentStatusChanged,
+    required this.amountPaidCtrl,
     required this.onRecalc,
   });
 
@@ -1127,6 +1141,28 @@ class _Step2 extends StatelessWidget {
             onChanged: onPaymentStatusChanged,
           ),
           const SizedBox(height: 22),
+          if (paymentStatus == 'Partial') ...[
+            BrixenTextField(
+              label: 'Amount paid *',
+              hint: '0.00',
+              controller: amountPaidCtrl,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              prefixIcon: const Icon(Icons.payments_outlined),
+              validator: (v) {
+                final paid = double.tryParse(v?.trim() ?? '');
+                if (paid == null) return 'Enter the amount received';
+                if (paid < 0) return 'Can\'t be negative';
+                final total = double.tryParse(totalAmountCtrl.text) ?? 0;
+                if (total > 0 && paid > total) {
+                  return 'More than the total (₹${totalAmountCtrl.text})';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 22),
+          ],
         ],
       ),
     );

@@ -2,8 +2,7 @@ import '../entities/expense.dart';
 
 abstract class ExpensesRepository {
   Future<List<Expense>> getExpenses({
-    int page = 1,
-    int limit = 200,
+    Map<String, String> filters = const {},
     String? search,
     String? categoryId,
     String? unitId,

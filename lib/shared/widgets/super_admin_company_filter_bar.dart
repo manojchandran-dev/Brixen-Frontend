@@ -34,14 +34,26 @@ class SuperAdminCompanyFilterBar extends ConsumerWidget {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: isActive ? AppColors.brand.withValues(alpha: 0.5) : AppColors.border),
+            border: Border.all(
+              color: isActive
+                  ? AppColors.brand.withValues(alpha: 0.5)
+                  : AppColors.border,
+            ),
             boxShadow: AppColors.shadows([
-              BoxShadow(color: AppColors.shadowDark.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+              BoxShadow(
+                color: AppColors.shadowDark.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
             ]),
           ),
           child: Row(
             children: [
-              Icon(Icons.apartment_rounded, size: 18, color: isActive ? AppColors.brand : AppColors.textHint),
+              Icon(
+                Icons.apartment_rounded,
+                size: 18,
+                color: isActive ? AppColors.brand : AppColors.textHint,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -56,15 +68,25 @@ class SuperAdminCompanyFilterBar extends ConsumerWidget {
               ),
               if (isActive)
                 GestureDetector(
-                  onTap: () => ref.read(superAdminCompanyFilterProvider.notifier).state = null,
+                  onTap: () =>
+                      ref.read(superAdminCompanyFilterProvider.notifier).state =
+                          null,
                   behavior: HitTestBehavior.opaque,
                   child: Padding(
                     padding: const EdgeInsets.all(4),
-                    child: Icon(Icons.close_rounded, size: 16, color: AppColors.textHint),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 16,
+                      color: AppColors.textHint,
+                    ),
                   ),
                 ),
               const SizedBox(width: 2),
-              Icon(Icons.expand_more_rounded, size: 20, color: AppColors.textHint),
+              Icon(
+                Icons.expand_more_rounded,
+                size: 20,
+                color: AppColors.textHint,
+              ),
             ],
           ),
         ),
@@ -79,7 +101,9 @@ class SuperAdminCompanyFilterBar extends ConsumerWidget {
       backgroundColor: Colors.transparent,
       builder: (ctx) => Consumer(
         builder: (ctx, sheetRef, _) {
-          final companies = sheetRef.watch(companiesProvider).valueOrNull ?? const <Company>[];
+          final companies =
+              sheetRef.watch(companiesProvider).valueOrNull ??
+              const <Company>[];
           final selected = sheetRef.watch(superAdminCompanyFilterProvider);
           return DraggableScrollableSheet(
             initialChildSize: 0.6,
@@ -89,7 +113,9 @@ class SuperAdminCompanyFilterBar extends ConsumerWidget {
             builder: (_, controller) => Container(
               decoration: BoxDecoration(
                 color: AppColors.background,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
               ),
               child: Column(
                 children: [
@@ -97,13 +123,23 @@ class SuperAdminCompanyFilterBar extends ConsumerWidget {
                     margin: const EdgeInsets.only(top: 12, bottom: 8),
                     width: 36,
                     height: 4,
-                    decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
                     child: Row(
                       children: [
-                        Text('Filter by Company', style: TextStyle(color: AppColors.ink, fontSize: 16, fontWeight: FontWeight.w800)),
+                        Text(
+                          'Filter by Company',
+                          style: TextStyle(
+                            color: AppColors.ink,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -116,7 +152,12 @@ class SuperAdminCompanyFilterBar extends ConsumerWidget {
                           name: 'All Companies',
                           selected: selected == null,
                           onTap: () {
-                            ref.read(superAdminCompanyFilterProvider.notifier).state = null;
+                            ref
+                                    .read(
+                                      superAdminCompanyFilterProvider.notifier,
+                                    )
+                                    .state =
+                                null;
                             Navigator.of(ctx).pop();
                           },
                         ),
@@ -125,7 +166,13 @@ class SuperAdminCompanyFilterBar extends ConsumerWidget {
                             name: c.name,
                             selected: selected?.id == c.id,
                             onTap: () {
-                              ref.read(superAdminCompanyFilterProvider.notifier).state = c;
+                              ref
+                                      .read(
+                                        superAdminCompanyFilterProvider
+                                            .notifier,
+                                      )
+                                      .state =
+                                  c;
                               Navigator.of(ctx).pop();
                             },
                           ),
@@ -146,7 +193,11 @@ class _CompanyTile extends StatelessWidget {
   final String name;
   final bool selected;
   final VoidCallback onTap;
-  const _CompanyTile({required this.name, required this.selected, required this.onTap});
+  const _CompanyTile({
+    required this.name,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -157,7 +208,9 @@ class _CompanyTile extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 6),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: BoxDecoration(
-          color: selected ? AppColors.brand.withValues(alpha: 0.1) : Colors.transparent,
+          color: selected
+              ? AppColors.brand.withValues(alpha: 0.1)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
@@ -172,7 +225,8 @@ class _CompanyTile extends StatelessWidget {
                 ),
               ),
             ),
-            if (selected) Icon(Icons.check_rounded, size: 18, color: AppColors.brand),
+            if (selected)
+              Icon(Icons.check_rounded, size: 18, color: AppColors.brand),
           ],
         ),
       ),

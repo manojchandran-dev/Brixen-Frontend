@@ -32,6 +32,7 @@ class Company extends Equatable {
   /// Hosted image URLs (from `POST /uploads`): one logo, up to 3 pictures.
   final String? logoUrl;
   final List<String> galleryUrls;
+
   /// Only set on the Permissions screen's list.
   final AccessCounts? access;
   final String? entityType;

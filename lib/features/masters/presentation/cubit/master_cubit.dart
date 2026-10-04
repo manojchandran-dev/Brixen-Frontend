@@ -43,6 +43,26 @@ class MasterCubit extends Cubit<MasterState> {
   Future<MasterItem> fetchByIdRemote(String typeKey, String id) =>
       _repository.getById(typeKey, id);
 
+  final Map<String, Future<void>> _inFlight = {};
+
+  /// Makes sure [typeKey]'s items are cached — for other modules that only
+  /// need names (Expenses/Products resolving category and unit). Fetches
+  /// only when not cached yet, shares one request between callers, and
+  /// leaves the Masters page's visible list alone.
+  Future<void> ensureLoaded(String typeKey) {
+    if (_store.containsKey(typeKey) || !_repository.isRemote(typeKey)) {
+      return Future.value();
+    }
+    return _inFlight[typeKey] ??= _repository
+        .getAll(typeKey)
+        .then((items) => _store[typeKey] = items)
+        // Block body: `remove` returns this very future, and whenComplete
+        // would wait on it — i.e. on itself — forever.
+        .whenComplete(() {
+          _inFlight.remove(typeKey);
+        });
+  }
+
   Future<void> load(String typeKey) async {
     _activeType = typeKey;
     _query = '';

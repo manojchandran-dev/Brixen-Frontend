@@ -40,6 +40,9 @@ ModuleVisual moduleVisualFor(String name) {
       return const ModuleVisual(Icons.receipt_outlined, AppColors.brandBlack);
     case 'products':
       return const ModuleVisual(Icons.checkroom_rounded, AppColors.brand);
+    case 'inventory':
+    case 'stock':
+      return const ModuleVisual(Icons.inventory_2_rounded, AppColors.positive);
     case 'companycategory':
       return const ModuleVisual(Icons.apartment_rounded, AppColors.brand);
     case 'expensecategory':

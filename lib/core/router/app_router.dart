@@ -29,6 +29,7 @@ import '../../features/employees/presentation/pages/employees_page.dart';
 import '../../features/employees/presentation/pages/create_employee_page.dart';
 import '../../features/employees/domain/entities/employee.dart';
 import '../../features/products/presentation/pages/products_page.dart';
+import '../../features/inventory/presentation/pages/inventory_page.dart';
 import '../../features/products/presentation/pages/create_product_page.dart';
 import '../../features/products/domain/entities/product.dart';
 import '../../features/permissions/presentation/pages/permission_management_page.dart';
@@ -96,6 +97,7 @@ class AppRouter {
   static const String employees = RouteNames.employees;
   static const String createEmployee = RouteNames.createEmployee;
   static const String products = RouteNames.products;
+  static const String inventory = RouteNames.inventory;
   static const String createProduct = RouteNames.createProduct;
   static const String permissions = RouteNames.permissions;
   static const String createPermission = RouteNames.createPermission;
@@ -271,6 +273,10 @@ class AppRouter {
                 },
               ),
             ],
+          ),
+          GoRoute(
+            path: _sub(inventory, dashboard),
+            builder: (context, state) => const InventoryPage(),
           ),
           GoRoute(
             path: _sub(products, dashboard),

@@ -28,7 +28,9 @@ class SalesNotifier extends AsyncNotifier<List<Sale>> {
   List<Sale> _resolveNames(List<Sale> list, List<Customer> customers) {
     final names = {for (final c in customers) c.id: c.name};
     return list
-        .map((s) => s.copyWith(customerName: names[s.customerId] ?? s.customerId))
+        .map(
+          (s) => s.copyWith(customerName: names[s.customerId] ?? s.customerId),
+        )
         .toList();
   }
 
@@ -45,9 +47,15 @@ class SalesNotifier extends AsyncNotifier<List<Sale>> {
   Future<Sale> updateSale(Sale updated, {String? companyId}) async {
     final saved = await ref
         .read(salesRepositoryProvider)
-        .updateSale(updated.id, SaleModel.toBody(updated, companyId: companyId));
+        .updateSale(
+          updated.id,
+          SaleModel.toBody(updated, companyId: companyId),
+        );
     final customers = ref.read(customersProvider).value ?? [];
-    _all = _resolveNames(_all.map((s) => s.id == saved.id ? saved : s).toList(), customers);
+    _all = _resolveNames(
+      _all.map((s) => s.id == saved.id ? saved : s).toList(),
+      customers,
+    );
     state = AsyncData(List.from(_all));
     return saved;
   }
@@ -63,13 +71,19 @@ class SalesNotifier extends AsyncNotifier<List<Sale>> {
   }) async {
     final updated = await ref
         .read(salesRepositoryProvider)
-        .updateSaleItems(saleId, SaleModel.toStep2Body(items, taxPercentage), companyId: companyId);
+        .updateSaleItems(
+          saleId,
+          SaleModel.toStep2Body(items, taxPercentage),
+          companyId: companyId,
+        );
     _replace(updated);
     return updated;
   }
 
   Future<void> deleteSale(String id, {String? companyId}) async {
-    await ref.read(salesRepositoryProvider).deleteSale(id, companyId: companyId);
+    await ref
+        .read(salesRepositoryProvider)
+        .deleteSale(id, companyId: companyId);
     _all = _all.where((s) => s.id != id).toList();
     state = AsyncData(List.from(_all));
   }
@@ -84,3 +98,20 @@ class SalesNotifier extends AsyncNotifier<List<Sale>> {
     state = AsyncData(List.from(_all));
   }
 }
+
+/// The sales page's search/filter results: the server decides what
+/// matches (`search` + filter params in [query], a query string), and the
+/// items come from [salesProvider] so display names stay resolved. Rebuilds
+/// whenever that list changes (add/edit/delete).
+final saleResultsProvider = FutureProvider.autoDispose
+    .family<List<Sale>, String>((ref, query) async {
+      final all = await ref.watch(salesProvider.future);
+      final rows = await ref
+          .read(salesRepositoryProvider)
+          .getSales(filters: Uri.splitQueryString(query));
+      final ids = {for (final r in rows) r.id};
+      return [
+        for (final x in all)
+          if (ids.contains(x.id)) x,
+      ];
+    });

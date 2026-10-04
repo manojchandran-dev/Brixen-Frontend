@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'package:intl/intl.dart';
+import '../../../../shared/providers/list_filter_options_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_endpoints.dart';
@@ -16,8 +19,11 @@ import '../../../../shared/widgets/detail_sheet.dart';
 import '../../../../shared/widgets/error_state.dart';
 import '../../../../shared/widgets/super_admin_company_filter_bar.dart';
 import '../../../../shared/widgets/picked_image.dart';
+import '../../../../shared/widgets/image_viewer.dart';
 import '../../data/repositories/products_repository_impl.dart';
 import '../../domain/entities/product.dart';
+import '../../../../shared/widgets/chip_filter_sheet.dart';
+import '../../../../shared/widgets/search_field.dart';
 import '../providers/products_provider.dart';
 import '../../../../shared/widgets/list_count_bar.dart';
 import '../../../../shared/widgets/module_title.dart';
@@ -36,14 +42,96 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _debounce?.cancel();
     super.dispose();
+  }
+
+  // Filter sheet choices (null = All) and the search text — both go to the
+  // API (see productResultsProvider).
+  Map<String, Object?> _filters = {};
+  String _search = '';
+  Timer? _debounce;
+
+  /// Search + filters as API params, as a stable query string (the results
+  /// provider's key). '' = neither → the full list. "days" → from/to.
+  String _query() {
+    final days = _filters['days'] as int?;
+    final now = DateTime.now();
+    final day = DateFormat('yyyy-MM-dd');
+    final p = <String, String>{
+      if (_search.isNotEmpty) 'search': _search,
+      for (final e in _filters.entries)
+        if (e.key != 'days' && e.value != null) e.key: '${e.value}',
+      if (days != null) ...{
+        'from': day.format(now.subtract(Duration(days: days - 1))),
+        'to': day.format(now),
+      },
+    };
+    final keys = p.keys.toList()..sort();
+    return Uri(queryParameters: {for (final k in keys) k: p[k]!}).query;
+  }
+
+  void _onSearch(String v) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (mounted) setState(() => _search = v.trim());
+    });
+  }
+
+  void _openFilter(List<Product> all) {
+    final server =
+        ref
+            .read(listFilterOptionsProvider(ApiEndpoints.products))
+            .valueOrNull ??
+        const {};
+    List<(Object, String)> opts(String key, List<(Object, String)> fallback) {
+      final o = serverOptions(server, key);
+      return o.isEmpty ? fallback : o;
+    }
+
+    showChipFilterSheet(
+      context,
+      title: 'Filter products',
+      sections: [
+        FilterSection(
+          key: 'category_id',
+          title: 'Category',
+          options: opts('categories', [
+            for (final c in {
+              for (final e in all)
+                if (e.categoryId?.isNotEmpty ?? false)
+                  e.categoryId!: e.category,
+            }.entries)
+              (c.key, c.value),
+          ]),
+        ),
+        FilterSection(
+          key: 'status',
+          title: 'Status',
+          options: opts('status', distinctOptions(all, (e) => e.status)),
+        ),
+        FilterSection(
+          key: 'gender',
+          title: 'Gender',
+          options: opts('gender', distinctOptions(all, (e) => e.gender)),
+        ),
+      ],
+      selected: _filters,
+      onApply: (v) => setState(() => _filters = v),
+      onClear: () => setState(() => _filters = {}),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final productsAsync = ref.watch(productsProvider);
+    final query = _query();
+    final productsAsync = query.isEmpty
+        ? ref.watch(productsProvider)
+        : ref.watch(productResultsProvider(query));
+    // Loads the filter choices ahead of the sheet opening.
+    ref.watch(listFilterOptionsProvider(ApiEndpoints.products));
 
     return Scaffold(
       extendBody: true,
@@ -179,15 +267,15 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
               )
             : ModuleTitle(title: 'Products', subtitle: 'Your product catalog'),
         actions: [
-          if (ref.watch(moduleAccessProvider('Products')).delete)
-            DeletedItemsButton(
-              title: 'Deleted products',
-              listPath: ApiEndpoints.products,
-              restorePath: (p) => '${ApiEndpoints.products}/${p['id']}/restore',
-              labelOf: (p) => (p['product_name'] ?? '').toString(),
-              subtitleOf: (p) => p['color'] as String?,
-              onRestored: () => ref.invalidate(productsProvider),
+          // Stock levels, adjustments and history.
+          IconButton(
+            tooltip: 'Inventory',
+            onPressed: () => context.push(AppRouter.inventory),
+            icon: const Icon(
+              Icons.inventory_2_outlined,
+              color: AppColors.brand,
             ),
+          ),
           if (ref.watch(moduleAccessProvider('Products')).create)
             GestureDetector(
               onTap: () => context.push(
@@ -229,48 +317,25 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: Container(
-              height: 48,
-              decoration: BoxDecoration(
-                color: isDark ? cs.surfaceContainerHighest : AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: isDark
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: AppColors.shadowDark.withValues(alpha: 0.06),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
-                        ),
-                        BoxShadow(
-                          color: AppColors.highlightShadow(0.85),
-                          blurRadius: 6,
-                          offset: const Offset(-3, -3),
-                        ),
-                      ],
-              ),
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (_) => setState(() {}),
-                style: TextStyle(color: cs.onSurface, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Search by name, code or category…',
-                  hintStyle: TextStyle(
-                    color: cs.onSurfaceVariant,
-                    fontSize: 14,
-                  ),
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    color: cs.onSurfaceVariant,
-                    size: 20,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 13),
+          SearchFilterBar(
+            controller: _searchCtrl,
+            hintText: 'Search',
+            onChanged: _onSearch,
+            filterActive: _filters.values.any((v) => v != null),
+            onFilter: () => _openFilter(productsAsync.valueOrNull ?? const []),
+            actions: [
+              if (ref.watch(moduleAccessProvider('Products')).delete)
+                DeletedItemsButton(
+                  title: 'Deleted products',
+                  listPath: ApiEndpoints.products,
+                  restorePath: (p) =>
+                      '${ApiEndpoints.products}/${p['id']}/restore',
+                  labelOf: (p) => (p['product_name'] ?? '').toString(),
+                  subtitleOf: (p) => p['color'] as String?,
+                  onRestored: () => ref.invalidate(productsProvider),
+                  inline: true,
                 ),
-              ),
-            ),
+            ],
           ),
           const SuperAdminCompanyFilterBar(),
           Expanded(
@@ -280,18 +345,8 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                 error: e,
                 onRetry: () => ref.invalidate(productsProvider),
               ),
-              data: (list) {
-                final q = _searchCtrl.text.trim().toLowerCase();
-                final filtered = q.isEmpty
-                    ? list
-                    : list
-                          .where(
-                            (p) =>
-                                p.productName.toLowerCase().contains(q) ||
-                                p.productCode.toLowerCase().contains(q) ||
-                                p.category.toLowerCase().contains(q),
-                          )
-                          .toList();
+              data: (all) {
+                final filtered = all;
 
                 if (filtered.isEmpty) {
                   return Center(
@@ -305,14 +360,14 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          list.isEmpty ? 'No products yet' : 'No results',
+                          query.isEmpty ? 'No products yet' : 'No results',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                             color: cs.onSurfaceVariant,
                           ),
                         ),
-                        if (list.isEmpty) ...[
+                        if (query.isEmpty) ...[
                           const SizedBox(height: 6),
                           Text(
                             'Tap + to add your first product',
@@ -409,116 +464,116 @@ class _ProductCard extends ConsumerWidget {
         edgeColor: accent,
         showAccentBar: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          // List card: just what you scan for — picture, name, attributes,
+          // category, retail price (wholesale under it). Cost, unit and the
+          // rest are in the detail sheet (tap).
+          padding: const EdgeInsets.all(12),
+          child: Row(
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _Thumb(product: product, accent: accent),
-                  const SizedBox(width: 13),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              _Thumb(product: product, accent: accent),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.productName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: fg,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      [
+                        product.gender,
+                        product.designPattern,
+                        product.color,
+                      ].where((s) => s != null && s.isNotEmpty).join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: fgMuted),
+                    ),
+                    const SizedBox(height: 8),
+                    // Wraps to a second line when the name column is narrow.
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
                       children: [
-                        Text(
-                          product.productName,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: fg,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Attributes',
-                          style: TextStyle(fontSize: 9, color: fgMuted),
-                        ),
-                        Text(
-                          [
-                            product.gender,
-                            product.designPattern,
-                            product.color,
-                          ].where((s) => s != null && s.isNotEmpty).join(' · '),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: fg,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            _MiniLabelValue(
-                              label: 'Unit',
-                              value: product.unit ?? '—',
-                              fgMuted: fgMuted,
-                              fg: fg,
+                        if (product.category.isNotEmpty) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
                             ),
-                            const SizedBox(width: 18),
-                            _MiniLabelValue(
-                              label: 'Category',
-                              value: product.category.isEmpty
-                                  ? '—'
-                                  : product.category,
-                              fgMuted: fgMuted,
-                              fg: fg,
+                            decoration: BoxDecoration(
+                              color: accent.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                          ],
-                        ),
+                            child: Text(
+                              product.category,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: fg,
+                              ),
+                            ),
+                          ),
+                        ],
+                        _StatusPill(status: product.status),
+                        _StockPill(product: product),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        '₹${product.retailPrice.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: fg,
-                        ),
-                      ),
-                      Text(
-                        'Retail Price',
-                        style: TextStyle(fontSize: 10, color: fgMuted),
-                      ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
               ),
-              const SizedBox(height: 11),
-              Row(
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Expanded(
-                    child: _StatBlock(
-                      icon: Icons.currency_rupee_rounded,
-                      amount: '₹${product.costPrice.toStringAsFixed(0)}',
-                      label: 'Cost',
-                      color: AppColors.positive,
+                  // The price is what you look for — a solid pill.
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [AppColors.brand, AppColors.brandDeep],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: AppColors.shadows([
+                        BoxShadow(
+                          color: AppColors.brand.withValues(alpha: 0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]),
+                    ),
+                    child: Text(
+                      '₹${product.retailPrice.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _StatBlock(
-                      icon: Icons.local_offer_outlined,
-                      amount: '₹${product.wholesalePrice.toStringAsFixed(0)}',
-                      label: 'Wholesale',
-                      color: AppColors.brand,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _StatBlock(
-                      icon: Icons.shopping_cart_outlined,
-                      amount: '₹${product.retailPrice.toStringAsFixed(0)}',
-                      label: 'Retail',
-                      color: AppColors.brandBlack,
+                  const SizedBox(height: 6),
+                  Text(
+                    'Wholesale ₹${product.wholesalePrice.toStringAsFixed(0)}',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                      color: fgMuted,
                     ),
                   ),
                 ],
@@ -605,8 +660,8 @@ class _Thumb extends StatelessWidget {
     final images = product.galleryPaths;
     final extra = images.length > 1 ? images.length - 1 : 0;
     return SizedBox(
-      width: 92,
-      height: 108,
+      width: 78,
+      height: 84,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -614,8 +669,8 @@ class _Thumb extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             child: images.isEmpty
                 ? Container(
-                    width: 92,
-                    height: 108,
+                    width: 78,
+                    height: 84,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -626,16 +681,11 @@ class _Thumb extends StatelessWidget {
                     ),
                     child: const Icon(
                       Icons.checkroom_rounded,
-                      size: 30,
+                      size: 26,
                       color: AppColors.white,
                     ),
                   )
-                : pickedImage(images.first, width: 92, height: 108),
-          ),
-          Positioned(
-            top: 6,
-            left: 6,
-            child: _StatusPill(status: product.status),
+                : pickedImage(images.first, width: 78, height: 84),
           ),
           if (extra > 0)
             Positioned(
@@ -669,13 +719,14 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final active = status == 'Active';
-    final color = active ? AppColors.positive : AppColors.brandBlack;
+    final active = status.toLowerCase() == 'active';
+    final color = active ? AppColors.positive : AppColors.textSecondary;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: AppColors.accentGradient(color)),
-        borderRadius: BorderRadius.circular(20),
+        color: AppColors.surface.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -683,18 +734,19 @@ class _StatusPill extends StatelessWidget {
           Container(
             width: 6,
             height: 6,
-            decoration: const BoxDecoration(
-              color: AppColors.white,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 5),
-          Text(
-            status,
-            style: const TextStyle(
-              color: AppColors.white,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              status,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: active ? AppColors.positive : AppColors.textSecondary,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
@@ -703,93 +755,47 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
-class _MiniLabelValue extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color fgMuted;
-  final Color fg;
-  const _MiniLabelValue({
-    required this.label,
-    required this.value,
-    required this.fgMuted,
-    required this.fg,
-  });
+/// "12 in stock" · "Low · 3" · "Out of stock".
+class _StockPill extends StatelessWidget {
+  final Product product;
+  const _StockPill({required this.product});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(label, style: TextStyle(fontSize: 9, color: fgMuted)),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w700,
-            color: fg,
-          ),
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    );
-  }
-}
-
-class _StatBlock extends StatelessWidget {
-  final IconData icon;
-  final String amount;
-  final String label;
-  final Color color;
-  const _StatBlock({
-    required this.icon,
-    required this.amount,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+    final (text, color) = product.isOutOfStock
+        ? ('Out of stock', AppColors.brandBlack)
+        : product.isLowStock
+        ? ('Low · ${product.stockQuantity}', AppColors.brandDeep)
+        : ('${product.stockQuantity} in stock', AppColors.brand);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
+        color: color.withValues(
+          alpha: product.isOutOfStock || product.isLowStock ? 0.16 : 0.10,
+        ),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 28,
-            height: 28,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            child: Icon(icon, size: 14, color: AppColors.white),
+          Icon(
+            product.isOutOfStock || product.isLowStock
+                ? Icons.warning_amber_rounded
+                : Icons.inventory_2_outlined,
+            size: 11,
+            color: color,
           ),
-          const SizedBox(width: 7),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  amount,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: AppColors.ink.withValues(alpha: 0.6),
-                  ),
-                  maxLines: 2,
-                  softWrap: true,
-                ),
-              ],
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
@@ -1128,9 +1134,12 @@ class _ProductGallerySectionState
             scrollDirection: Axis.horizontal,
             itemCount: _images.length,
             separatorBuilder: (_, _) => const SizedBox(width: 10),
-            itemBuilder: (_, i) => ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: pickedImage(_images[i], width: 92, height: 92),
+            itemBuilder: (_, i) => GestureDetector(
+              onTap: () => showImageViewer(context, _images, initialIndex: i),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: pickedImage(_images[i], width: 92, height: 92),
+              ),
             ),
           ),
         ),

@@ -18,6 +18,7 @@ import '../../../../shared/widgets/skeleton.dart';
 import '../../data/repositories/push_notifications_repository_impl.dart';
 import '../../domain/entities/push_notification.dart';
 import '../providers/push_notifications_provider.dart';
+import '../widgets/admin_only_notice.dart';
 import '../widgets/notification_labels.dart';
 import '../widgets/notification_status_badge.dart';
 import '../../../../shared/widgets/list_count_bar.dart';
@@ -104,7 +105,9 @@ class _PushNotificationsPageState extends ConsumerState<PushNotificationsPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (!Session.isSuperAdmin) return const SizedBox.shrink();
+    // Company admins get the page shell with a notice (see AdminOnlyNotice),
+    // not a blank screen.
+    final superAdmin = Session.isSuperAdmin;
 
     final cs = Theme.of(context).colorScheme;
     final notificationsAsync = ref.watch(pushNotificationsProvider);
@@ -145,118 +148,133 @@ class _PushNotificationsPageState extends ConsumerState<PushNotificationsPage> {
           title: 'Push Notifications',
           subtitle: 'Alerts sent to company apps',
         ),
-        actions: [
-          GestureDetector(
-            onTap: () => context.push(AppRouter.createPushNotification),
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
-              width: 38,
-              height: 38,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.brand, AppColors.brandDeep],
-                ),
-                borderRadius: BorderRadius.circular(13),
-              ),
-              child: const Icon(
-                Icons.add_rounded,
-                size: 20,
-                color: AppColors.white,
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: SearchField(
-                    controller: _searchCtrl,
-                    hintText: 'Search notifications...',
-                    onChanged: _onSearchChanged,
+        actions: !superAdmin
+            ? const []
+            : [
+                GestureDetector(
+                  onTap: () => context.push(AppRouter.createPushNotification),
+                  child: Container(
+                    margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
+                    width: 38,
+                    height: 38,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppColors.brand, AppColors.brandDeep],
+                      ),
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: const Icon(
+                      Icons.add_rounded,
+                      size: 20,
+                      color: AppColors.white,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                HeaderIconButton(
-                  tooltip: 'Filter notifications',
-                  icon: Icons.filter_list_rounded,
-                  active: _statusFilter != null || _priorityFilter != null,
-                  onTap: _openFilter,
+              ],
+      ),
+      body: !superAdmin
+          ? const AdminOnlyNotice(what: 'Push notifications')
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SearchField(
+                          controller: _searchCtrl,
+                          hintText: 'Search',
+                          onChanged: _onSearchChanged,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      HeaderIconButton(
+                        tooltip: 'Filter notifications',
+                        icon: Icons.filter_list_rounded,
+                        active:
+                            _statusFilter != null || _priorityFilter != null,
+                        onTap: _openFilter,
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  // reload() keeps the previous list in the loading state — show
+                  // the skeleton anyway, so a search/filter visibly reloads.
+                  child: notificationsAsync.when(
+                    skipLoadingOnRefresh: false,
+                    skipLoadingOnReload: false,
+                    loading: () => const SkeletonListView(),
+                    error: (e, _) => ErrorCard(error: e, onRetry: _reload),
+                    data: (all) {
+                      final list = _priorityFilter == null
+                          ? all
+                          : all
+                                .where((n) => n.priority == _priorityFilter)
+                                .toList();
+                      if (list.isEmpty) {
+                        final filtered =
+                            _statusFilter != null ||
+                            _priorityFilter != null ||
+                            _searchCtrl.text.trim().isNotEmpty;
+                        return Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.notifications_none_rounded,
+                                size: 56,
+                                color: cs.onSurfaceVariant.withValues(
+                                  alpha: 0.3,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                filtered
+                                    ? 'No notifications match'
+                                    : 'No push notifications yet',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return Column(
+                        children: [
+                          ListCountBar(
+                            label: 'Total Notifications',
+                            count: list.length,
+                          ),
+                          Expanded(
+                            child: ListView.separated(
+                              padding: const EdgeInsets.fromLTRB(
+                                16,
+                                4,
+                                16,
+                                100,
+                              ),
+                              itemCount: list.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(height: 10),
+                              itemBuilder: (_, i) => _PushNotificationCard(
+                                index: i,
+                                notification: list[i],
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
-          ),
-          Expanded(
-            // reload() keeps the previous list in the loading state — show
-            // the skeleton anyway, so a search/filter visibly reloads.
-            child: notificationsAsync.when(
-              skipLoadingOnRefresh: false,
-              skipLoadingOnReload: false,
-              loading: () => const SkeletonListView(),
-              error: (e, _) => ErrorCard(error: e, onRetry: _reload),
-              data: (all) {
-                final list = _priorityFilter == null
-                    ? all
-                    : all.where((n) => n.priority == _priorityFilter).toList();
-                if (list.isEmpty) {
-                  final filtered =
-                      _statusFilter != null ||
-                      _priorityFilter != null ||
-                      _searchCtrl.text.trim().isNotEmpty;
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.notifications_none_rounded,
-                          size: 56,
-                          color: cs.onSurfaceVariant.withValues(alpha: 0.3),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          filtered
-                              ? 'No notifications match'
-                              : 'No push notifications yet',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return Column(
-                  children: [
-                    ListCountBar(
-                      label: 'Total Notifications',
-                      count: list.length,
-                    ),
-                    Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                        itemCount: list.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) => _PushNotificationCard(
-                          index: i,
-                          notification: list[i],
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

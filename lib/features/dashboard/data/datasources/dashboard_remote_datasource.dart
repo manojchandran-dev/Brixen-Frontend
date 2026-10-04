@@ -6,7 +6,9 @@ import '../../domain/entities/superadmin_dashboard.dart';
 import '../models/dashboard_summary_model.dart';
 import '../models/superadmin_dashboard_model.dart';
 
-final dashboardRemoteDatasourceProvider = Provider<DashboardRemoteDatasource>((ref) {
+final dashboardRemoteDatasourceProvider = Provider<DashboardRemoteDatasource>((
+  ref,
+) {
   return DashboardRemoteDatasource(ref.read(dioProvider));
 });
 
