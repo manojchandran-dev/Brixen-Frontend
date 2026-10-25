@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/router/app_router.dart';
+import 'core/services/app_lock.dart';
 import 'core/router/route_names.dart';
 import 'core/services/session_service.dart';
 import 'core/theme/app_colors.dart';
@@ -109,6 +110,7 @@ class _BrixenAppState extends ConsumerState<BrixenApp> {
   void initState() {
     super.initState();
     AppRouter.router.routerDelegate.addListener(_onRoute);
+    AppLock.instance.start();
     _themeSub = themeCubit.stream.listen((_) {
       if (!mounted) return;
       // Widgets that read AppColors getters directly (not Theme.of) don't

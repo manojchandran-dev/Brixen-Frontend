@@ -154,6 +154,20 @@ class AccountStore {
     await _persist();
   }
 
+  /// Refreshes the active account's saved copy after its tokens changed
+  /// (token refresh, PIN unlock, PIN reset). Refresh tokens are single-use,
+  /// so a stale copy would make the next switch back to it fail. Only
+  /// updates an account already in the list — adding is [upsertCurrent]'s
+  /// job, after a full sign-in.
+  static Future<void> syncActive() async {
+    final email = TokenService.email;
+    if (!TokenService.isLoggedIn || email == null) return;
+    final i = _accounts.indexWhere((a) => a.email == email);
+    if (i < 0) return;
+    _accounts[i] = AccountSnapshot.fromTokenService();
+    await _persist();
+  }
+
   static AccountSnapshot? find(String email) {
     for (final a in _accounts) {
       if (a.email == email) return a;

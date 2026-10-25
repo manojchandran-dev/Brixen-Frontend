@@ -6,6 +6,7 @@ import '../../core/services/token_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../features/auth/domain/entities/user_role.dart';
 import '../../features/auth/presentation/cubit/auth_cubit.dart';
+import '../../features/security/presentation/pages/confirm_identity_sheet.dart';
 
 /// Opens the Gmail-style account switcher — every account signed into on
 /// this device (see [AccountStore]), plus "Add another account". Call from a
@@ -106,6 +107,9 @@ class _AccountSwitcherSheetState extends State<_AccountSwitcherSheet> {
 
   Future<void> _switchTo(String email) async {
     if (_switching != null || email == TokenService.email) return;
+    // Fingerprint (or this device's PIN) before handing over another
+    // account's data.
+    if (!await confirmIdentity(context) || !mounted) return;
     setState(() => _switching = email);
     final navigator = Navigator.of(context);
     final router = GoRouter.of(context);

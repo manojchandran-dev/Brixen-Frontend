@@ -135,6 +135,12 @@ class SecurityCubit extends Cubit<SecurityState> {
 
   Future<bool> isLockActive() => _src.isPinEnabled();
 
+  /// Checks [pin] against this device's PIN only — no server call, so it
+  /// doesn't touch the session (used to confirm it's you before switching
+  /// accounts).
+  Future<bool> checkLocalPin(String pin) async =>
+      pin.isNotEmpty && pin == await _src.getPin();
+
   Future<bool> authenticateWithBiometric() async {
     try {
       return await _localAuth.authenticate(

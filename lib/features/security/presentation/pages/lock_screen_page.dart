@@ -11,7 +11,10 @@ import '../cubit/security_state.dart';
 import 'forgot_pin_sheet.dart';
 
 class LockScreenPage extends StatefulWidget {
-  const LockScreenPage({super.key});
+  /// Opened by AppLock when the app came back from the background: unlocking
+  /// returns to the page underneath instead of the dashboard.
+  final bool resume;
+  const LockScreenPage({super.key, this.resume = false});
 
   @override
   State<LockScreenPage> createState() => _LockScreenPageState();
@@ -36,6 +39,10 @@ class _LockScreenPageState extends State<LockScreenPage> {
   // Dashboard first, then a tapped push's target on top (if the app was
   // launched by one), so back from it returns to the dashboard.
   void _goToDashboard() {
+    if (widget.resume) {
+      context.pop();
+      return;
+    }
     context.go(AppRouter.dashboard);
     final pushRoute = PushTokenService.takePendingRoute();
     if (pushRoute != null) context.push(pushRoute);

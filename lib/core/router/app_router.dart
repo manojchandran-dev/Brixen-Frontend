@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart' show PopScope;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'route_names.dart';
@@ -438,9 +439,16 @@ class AppRouter {
       ),
       GoRoute(
         path: lockScreen,
+        // extra == true: pushed by AppLock over the page the user left, so
+        // unlocking returns there and back can't skip it.
         builder: (context, state) => BlocProvider.value(
           value: securityCubit,
-          child: const ExitGuard(child: LockScreenPage()),
+          child: state.extra == true
+              ? const PopScope(
+                  canPop: false,
+                  child: LockScreenPage(resume: true),
+                )
+              : const ExitGuard(child: LockScreenPage()),
         ),
       ),
     ],

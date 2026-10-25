@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/storage_keys.dart';
+import 'account_store.dart';
 
 class TokenService {
   TokenService._();
@@ -137,6 +138,10 @@ class TokenService {
       setIfPresent(_kOnboardingStatus, onboardingStatus),
       setIfPresent(_kCompanyStatus, companyStatus),
     ]);
+    // Every token change (refresh, PIN unlock, PIN reset) also updates the
+    // account switcher's saved copy, so switching back never uses a spent
+    // refresh token.
+    await AccountStore.syncActive();
   }
 
   /// Remove all tokens on logout.

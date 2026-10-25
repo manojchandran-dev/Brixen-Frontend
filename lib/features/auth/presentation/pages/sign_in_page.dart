@@ -10,6 +10,7 @@ import '../../../../shared/widgets/brixen_button.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
 import '../../../../shared/widgets/account_switcher_sheet.dart'
     show accountDisplayName;
+import '../../../security/presentation/pages/confirm_identity_sheet.dart';
 import '../cubit/auth_cubit.dart';
 import '../cubit/auth_state.dart';
 
@@ -55,6 +56,7 @@ class _SignInViewState extends State<_SignInView> {
 
   Future<void> _continueAs(AccountSnapshot a) async {
     if (_switching != null) return;
+    if (!await confirmIdentity(context) || !mounted) return;
     setState(() => _switching = a.email);
     final router = GoRouter.of(context);
     final messenger = ScaffoldMessenger.of(context);
