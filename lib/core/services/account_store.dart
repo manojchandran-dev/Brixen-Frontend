@@ -168,6 +168,25 @@ class AccountStore {
     await _persist();
   }
 
+  /// Stores a fresh token pair for a saved account that is NOT the active
+  /// one — e.g. a token refresh that finished after the user had already
+  /// switched away from it.
+  static Future<void> updateTokens(
+    String email, {
+    required String token,
+    String? refreshToken,
+  }) async {
+    final i = _accounts.indexWhere((a) => a.email == email);
+    if (i < 0) return;
+    final a = _accounts[i];
+    _accounts[i] = AccountSnapshot.fromJson({
+      ...a.toJson(),
+      'token': token,
+      'refreshToken': refreshToken ?? a.refreshToken,
+    });
+    await _persist();
+  }
+
   static AccountSnapshot? find(String email) {
     for (final a in _accounts) {
       if (a.email == email) return a;

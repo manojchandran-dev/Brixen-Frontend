@@ -21,8 +21,9 @@ final authCubit = AuthCubit();
 enum SwitchResult {
   switched,
 
-  /// The account's session has ended; it must be signed into again. The
-  /// previous account stays active.
+  /// The account's session has ended; it was removed from the saved
+  /// accounts and must be signed into again. The previous account stays
+  /// active.
   expired,
 
   /// No saved account with that email.
@@ -105,6 +106,9 @@ class AuthCubit extends Cubit<AuthState> {
   Future<SwitchResult> switchAccount(String email) async {
     final target = AccountStore.find(email);
     if (target == null) return SwitchResult.notFound;
+    // A refresh for the current account must finish before its tokens are
+    // swapped out, or it would land on the account being switched to.
+    await TokenRefreshInterceptor.settle();
     await AccountStore.upsertCurrent();
     final active = TokenService.email;
     final previous = active == null ? null : AccountStore.find(active);
@@ -112,6 +116,9 @@ class AuthCubit extends Cubit<AuthState> {
     emit(const AuthLoading());
     await target.restoreToTokenService();
     if (!await _sessionAlive()) {
+      // Dead for good (signed out, password changed, account deleted): drop
+      // it so it doesn't linger in the switcher. Signing in adds it back.
+      await AccountStore.remove(email);
       if (previous != null) {
         await previous.restoreToTokenService();
         emit(AuthAuthenticated(role: _activeRole));

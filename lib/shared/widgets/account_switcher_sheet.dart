@@ -81,7 +81,9 @@ Future<bool> switchToAccount(BuildContext context, String email) async {
     case SwitchResult.expired:
       messenger.showSnackBar(
         SnackBar(
-          content: Text('$email was signed out. Sign in to use it again.'),
+          content: Text(
+            '$email was signed out and removed. Sign in to add it again.',
+          ),
           action: SnackBarAction(
             label: 'Sign in',
             onPressed: () => router.push(AppRouter.signIn, extra: email),
