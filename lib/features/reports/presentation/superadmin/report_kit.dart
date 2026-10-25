@@ -445,7 +445,7 @@ class ReportCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = child;
     final icon = switch (c) {
-      ReportTrendChart() => Icons.bar_chart_rounded,
+      ReportTrendChart() || ReportGroupedBarChart() => Icons.bar_chart_rounded,
       ReportBreakdown() => Icons.donut_large_rounded,
       _ => Icons.list_alt_rounded,
     };
@@ -670,6 +670,179 @@ class ReportTrendChart extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// One series of a [ReportGroupedBarChart]: its name, colour and a value
+/// per bucket (same order as the chart's labels).
+class BarSeries {
+  final String label;
+  final Color color;
+  final List<int> values;
+  const BarSeries(this.label, this.color, this.values);
+
+  int get total => values.fold(0, (a, v) => a + v);
+}
+
+/// Side-by-side bars per bucket, one per [series], on the card surface:
+/// a legend with each series' total, faint grid lines, rounded bars.
+class ReportGroupedBarChart extends StatelessWidget {
+  final List<String> labels;
+  final List<BarSeries> series;
+  final String Function(int)? valueLabel;
+  const ReportGroupedBarChart({
+    super.key,
+    required this.labels,
+    required this.series,
+    this.valueLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (series.every((s) => s.total == 0)) {
+      return const ReportEmpty('Nothing in this period');
+    }
+    String fmt(int v) => valueLabel?.call(v) ?? '$v';
+    final max = [
+      for (final s in series) ...s.values,
+    ].fold<int>(1, (a, v) => v > a ? v : a);
+    final labelEvery = labels.length <= 8 ? 1 : (labels.length / 6).ceil();
+    const chartHeight = 150.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Legend: colour dot, name, period total.
+        Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          children: [
+            for (final s in series)
+              Container(
+                padding: const EdgeInsets.fromLTRB(8, 6, 10, 6),
+                decoration: BoxDecoration(
+                  color: s.color.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: s.color,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                    Text(
+                      s.label,
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      fmt(s.total),
+                      style: TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: chartHeight,
+          child: Stack(
+            children: [
+              for (final f in const [0.0, 0.5, 1.0])
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: (chartHeight - 4) * f,
+                  child: Container(
+                    height: 1,
+                    color: AppColors.border.withValues(alpha: f == 0 ? 1 : 0.6),
+                  ),
+                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  for (var i = 0; i < labels.length; i++)
+                    Expanded(
+                      child: Tooltip(
+                        message: [
+                          labels[i],
+                          for (final s in series)
+                            '${s.label}: ${fmt(s.values[i])}',
+                        ].join('\n'),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: labels.length > 10 ? 1.5 : 4,
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              for (final s in series)
+                                Expanded(
+                                  child: Container(
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 1,
+                                    ),
+                                    height: s.values[i] == 0
+                                        ? 0
+                                        : 3 +
+                                              (s.values[i] / max) *
+                                                  (chartHeight - 8),
+                                    decoration: BoxDecoration(
+                                      color: s.color,
+                                      borderRadius: const BorderRadius.vertical(
+                                        top: Radius.circular(5),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            for (var i = 0; i < labels.length; i++)
+              Expanded(
+                child: Text(
+                  i % labelEvery == 0 || i == labels.length - 1
+                      ? labels[i]
+                      : '',
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.clip,
+                  style: TextStyle(
+                    color: AppColors.textHint,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }

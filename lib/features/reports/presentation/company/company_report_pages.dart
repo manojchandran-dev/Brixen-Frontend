@@ -128,6 +128,10 @@ class _RankRow extends StatelessWidget {
 
 String _cap(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 
+/// "5", "2.5" — a GST % without trailing zeros.
+String _rate(double v) =>
+    v % 1 == 0 ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
+
 // ── 1. Sales report ───────────────────────────────────────────────────────
 
 class CompanySalesReport extends ConsumerWidget {
@@ -151,25 +155,20 @@ class CompanySalesReport extends ConsumerWidget {
         final total = list.fold<double>(0, (a, s) => a + s.totalAmount);
         final unpaid = list.where((s) => s.balance > 0);
         final byProduct = salesByProduct(list, prods);
+        final gstBills = list.where((s) => s.isGst).toList();
+        final secBills = list.where((s) => !s.isGst).toList();
+        double sum(Iterable<Sale> l, double Function(Sale) f) =>
+            l.fold(0, (a, s) => a + f(s));
+        final gstCollected = sum(gstBills, (s) => s.taxAmount);
+        final byType = salesByBillType(list, period, now);
+        final rates = gstByRate(gstBills);
         return [
           ReportSummary([
             ReportStat(
               Icons.point_of_sale_rounded,
-              'Total sales',
+              'Total sales · ${list.length}',
               rupees(total),
               AppColors.positive,
-            ),
-            ReportStat(
-              Icons.receipt_rounded,
-              'Invoices',
-              '${list.length}',
-              AppColors.brand,
-            ),
-            ReportStat(
-              Icons.functions_rounded,
-              'Avg invoice',
-              rupees(list.isEmpty ? 0 : total / list.length),
-              AppColors.brandDeep,
             ),
             ReportStat(
               Icons.pending_actions_rounded,
@@ -177,19 +176,80 @@ class CompanySalesReport extends ConsumerWidget {
               rupees(unpaid.fold<double>(0, (a, s) => a + s.balance)),
               AppColors.brandBlack,
             ),
+            ReportStat(
+              Icons.verified_outlined,
+              'GST bills · ${gstBills.length}',
+              rupees(sum(gstBills, (s) => s.totalAmount)),
+              AppColors.brand,
+            ),
+            ReportStat(
+              Icons.receipt_long_outlined,
+              'Secondary bills · ${secBills.length}',
+              rupees(sum(secBills, (s) => s.totalAmount)),
+              AppColors.brandDeep,
+            ),
+            ReportStat(
+              Icons.account_balance_rounded,
+              'GST collected',
+              rupees(gstCollected),
+              AppColors.brandLight,
+            ),
+            ReportStat(
+              Icons.functions_rounded,
+              'Avg invoice',
+              rupees(list.isEmpty ? 0 : total / list.length),
+              AppColors.brandDeep,
+            ),
           ]),
           ReportCard(
             title: 'Sales by date',
-            caption: 'Invoice value',
+            caption: 'GST vs secondary bills',
+            child: ReportGroupedBarChart(
+              labels: [for (final r in byType) r.label],
+              series: [
+                BarSeries('GST bills', AppColors.brand, [
+                  for (final r in byType) r.gst,
+                ]),
+                BarSeries('Secondary', AppColors.positive, [
+                  for (final r in byType) r.secondary,
+                ]),
+              ],
+              valueLabel: _money,
+            ),
+          ),
+          ReportCard(
+            title: 'GST collected',
+            caption: 'Tax on GST bills by date',
             child: ReportTrendChart(
               buckets: amountBuckets(
-                [for (final s in list) (s.billDate, s.totalAmount)],
+                [for (final s in gstBills) (s.billDate, s.taxAmount)],
                 period,
                 now,
               ),
               valueLabel: _money,
             ),
           ),
+          if (rates.isNotEmpty)
+            ReportCard(
+              title: 'GST by rate',
+              caption:
+                  'Taxable ${rupees(sum(gstBills, (s) => s.subtotal))} · '
+                  'GST ${rupees(gstCollected)}',
+              child: Column(
+                children: [
+                  for (final (i, r) in rates.indexed)
+                    _RankRow(
+                      rank: i + 1,
+                      title: 'GST @ ${_rate(r.rate)}%',
+                      subtitle:
+                          '${r.bills} bill${r.bills == 1 ? '' : 's'} · '
+                          'Taxable ${rupees(r.taxable)} · '
+                          'CGST ${rupees(r.tax / 2)} + SGST ${rupees(r.tax / 2)}',
+                      value: rupees(r.tax),
+                    ),
+                ],
+              ),
+            ),
           ReportCard(
             title: 'Sales by category',
             caption: 'Line-item revenue',
@@ -225,7 +285,9 @@ class CompanySalesReport extends ConsumerWidget {
             caption: '${list.length} in this period',
             items: list,
             searchText: (s) =>
-                '${s.customerName ?? ''} ${s.invoiceType ?? ''} ${s.paymentStatus} ${s.paymentType ?? ''}',
+                '${s.customerName ?? ''} ${s.billNo ?? ''} '
+                '${s.isGst ? 'GST' : 'Secondary'} ${s.invoiceType ?? ''} '
+                '${s.paymentStatus} ${s.paymentType ?? ''}',
             sorts: [
               ReportSort('Newest', (a, b) => b.billDate.compareTo(a.billDate)),
               ReportSort('Oldest', (a, b) => a.billDate.compareTo(b.billDate)),
@@ -247,8 +309,9 @@ class CompanySalesReport extends ConsumerWidget {
                   ? s.customerName!
                   : 'Walk-in',
               subtitle:
-                  '${_day.format(s.billDate)} · ${_cap(s.paymentStatus)}'
-                  '${s.paymentType == null ? '' : ' · ${s.paymentType}'}',
+                  '${s.isGst ? 'GST' : 'Secondary'}'
+                  '${s.billNo == null ? '' : ' ${s.billNo}'} · '
+                  '${_day.format(s.billDate)} · ${_cap(s.paymentStatus)}',
               trailing: rupees(s.totalAmount),
             ),
           ),
@@ -852,8 +915,30 @@ class CompanyProfitLossReport extends ConsumerWidget {
           ]),
           ReportCard(
             title: 'Profit & loss statement',
-            caption: '${s.length} invoices · ${e.length} expenses',
+            caption:
+                '${s.where((x) => x.isGst).length} GST · '
+                '${s.where((x) => !x.isGst).length} secondary bills · '
+                '${e.length} expenses',
             child: _Statement(pl),
+          ),
+          ReportCard(
+            title: 'Sales by bill type',
+            caption: 'GST and secondary bills, both counted in profit',
+            child: () {
+              final byType = salesByBillType(s, period, now);
+              return ReportGroupedBarChart(
+                labels: [for (final r in byType) r.label],
+                series: [
+                  BarSeries('GST bills', AppColors.brand, [
+                    for (final r in byType) r.gst,
+                  ]),
+                  BarSeries('Secondary', AppColors.positive, [
+                    for (final r in byType) r.secondary,
+                  ]),
+                ],
+                valueLabel: _money,
+              );
+            }(),
           ),
           if (pl.uncostedLines > 0)
             ReportNote(
@@ -906,7 +991,7 @@ class CompanyProfitLossReport extends ConsumerWidget {
             ),
           ),
           const ReportNote(
-            'Cost of goods uses the cost saved on each sale line (older lines: the product\'s current cost). Sales are counted without the tax collected.',
+            'Both GST and secondary bills count as sales. GST collected on GST bills is taken out, since it is paid to the government. Cost of goods uses the cost saved on each sale line (older lines: the product\'s current cost).',
           ),
         ];
       },
@@ -966,8 +1051,11 @@ class _Statement extends StatelessWidget {
     final net = pl.netProfit;
     return Column(
       children: [
-        line('Sales (incl. tax)', pl.grossSales),
-        line('Tax collected', pl.tax, sign: '−'),
+        line('GST bill sales (incl. GST)', pl.gstBillSales),
+        line('Secondary bill sales', pl.secondaryBillSales, sign: '+'),
+        rule(),
+        line('Total sales', pl.grossSales, sign: '=', total: true),
+        line('GST collected (not income)', pl.tax, sign: '−'),
         rule(),
         line('Net sales', pl.netSales, sign: '=', total: true),
         line('Cost of goods sold', pl.cogs, sign: '−'),

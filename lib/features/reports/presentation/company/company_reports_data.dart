@@ -199,6 +199,9 @@ List<Tally> expensesByCategory(Iterable<Expense> expenses) {
 /// are counted in [uncostedLines].
 class ProfitLoss {
   final double grossSales, tax, cogs, expenses;
+
+  /// [grossSales] split by bill type (each incl. any GST on it).
+  final double gstBillSales, secondaryBillSales;
   final int uncostedLines;
   const ProfitLoss({
     required this.grossSales,
@@ -206,6 +209,8 @@ class ProfitLoss {
     required this.cogs,
     required this.expenses,
     required this.uncostedLines,
+    this.gstBillSales = 0,
+    this.secondaryBillSales = 0,
   });
 
   /// Sales without the tax collected (tax isn't income).
@@ -236,6 +241,12 @@ class ProfitLoss {
       cogs: cogs,
       expenses: expenses.fold(0, (a, e) => a + e.amount),
       uncostedLines: uncosted,
+      gstBillSales: sales
+          .where((s) => s.isGst)
+          .fold(0, (a, s) => a + s.totalAmount),
+      secondaryBillSales: sales
+          .where((s) => !s.isGst)
+          .fold(0, (a, s) => a + s.totalAmount),
     );
   }
 }
@@ -282,4 +293,64 @@ List<ProfitRow> profitByPeriod(
         expenses: eb[i].count,
       ),
   ];
+}
+
+/// One chart bucket split by bill type: GST bills vs secondary bills.
+typedef BillTypeRow = ({String label, int gst, int secondary});
+
+/// Invoice value per chart bucket of [p] for GST and secondary bills (same
+/// buckets as the other charts, so the two series line up).
+List<BillTypeRow> salesByBillType(
+  Iterable<Sale> sales,
+  ReportPeriod p,
+  DateTime now,
+) {
+  final g = [
+    for (final s in sales)
+      if (s.isGst) (s.billDate, s.totalAmount),
+  ];
+  final sec = [
+    for (final s in sales)
+      if (!s.isGst) (s.billDate, s.totalAmount),
+  ];
+  // Zero points on every date keep both series on the same buckets.
+  final zeros = [for (final s in sales) (s.billDate, 0.0)];
+  final gb = amountBuckets([...g, ...zeros], p, now);
+  final sb = amountBuckets([...sec, ...zeros], p, now);
+  return [
+    for (var i = 0; i < gb.length; i++)
+      (label: gb[i].label, gst: gb[i].count, secondary: sb[i].count),
+  ];
+}
+
+/// GST collected at one rate: the taxable value it was charged on, the tax
+/// and how many bills.
+typedef GstRateRow = ({double rate, double taxable, double tax, int bills});
+
+/// GST bills grouped by their GST %, highest tax first. Bills with 0% are
+/// left out (no GST was collected on them).
+List<GstRateRow> gstByRate(Iterable<Sale> sales) {
+  final m = <double, ({double taxable, double tax, int bills})>{};
+  for (final s in sales) {
+    if (!s.isGst || s.taxAmount <= 0) continue;
+    final rate =
+        s.taxPercentage ??
+        (s.subtotal > 0 ? s.taxAmount / s.subtotal * 100 : 0);
+    final key = (rate * 100).round() / 100;
+    final cur = m[key] ?? (taxable: 0.0, tax: 0.0, bills: 0);
+    m[key] = (
+      taxable: cur.taxable + s.subtotal,
+      tax: cur.tax + s.taxAmount,
+      bills: cur.bills + 1,
+    );
+  }
+  return [
+    for (final e in m.entries)
+      (
+        rate: e.key,
+        taxable: e.value.taxable,
+        tax: e.value.tax,
+        bills: e.value.bills,
+      ),
+  ]..sort((a, b) => b.tax.compareTo(a.tax));
 }

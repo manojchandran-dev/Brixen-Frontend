@@ -998,22 +998,89 @@ class _GenerateBillButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: FilledButton.icon(
-        style: FilledButton.styleFrom(
-          backgroundColor: AppColors.brand,
-          foregroundColor: AppColors.white,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+    final isDark = AppColors.isDark;
+    // Same gradient and foreground as the app bar's + button.
+    final fg = isDark ? AppColors.black : AppColors.white;
+    const radius = BorderRadius.all(Radius.circular(18));
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        gradient: isDark
+            ? AppColors.silverGradient
+            : const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.brand, AppColors.brandDeep],
+              ),
+        boxShadow: AppColors.shadows([
+          BoxShadow(
+            color: AppColors.brand.withValues(alpha: isDark ? 0 : 0.35),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
-        ),
-        onPressed: () => SaleBillPage.open(context, sale),
-        icon: const Icon(Icons.picture_as_pdf_outlined),
-        label: Text(
-          sale.isGst ? 'Generate GST Bill' : 'Generate Bill',
-          style: const TextStyle(fontWeight: FontWeight.w700),
+        ]),
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: () => SaleBillPage.open(context, sale),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: fg.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Icon(Icons.receipt_long_rounded, color: fg, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        sale.isGst ? 'Generate GST Bill' : 'Generate Bill',
+                        style: TextStyle(
+                          color: fg,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        sale.isGst
+                            ? 'Tax invoice PDF · print or share'
+                            : 'Bill without GST · print or share',
+                        style: TextStyle(
+                          color: fg.withValues(alpha: 0.8),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: fg.withValues(alpha: 0.16),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.arrow_forward_rounded, color: fg, size: 18),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
