@@ -12,8 +12,8 @@ import '../../../../shared/widgets/picked_image.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
 import '../../../../core/network/upload_service.dart';
 import '../../../../core/services/session_service.dart';
-import '../../../products/domain/entities/product.dart';
-import '../../../products/presentation/providers/products_provider.dart';
+import '../../../masters/domain/entities/master_item.dart';
+import '../../../masters/presentation/cubit/master_cubit.dart';
 import '../../domain/entities/purchase.dart';
 import '../providers/purchases_provider.dart';
 
@@ -46,7 +46,7 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
   XFile? _billImage;
   final _picker = ImagePicker();
 
-  // Step 2 — items (they're what add stock) and payment
+  // Step 2 — items (purchase categories) and payment
   final List<_Line> _lines = [];
   bool _loadingLines = false;
   final _taxPercentCtrl = TextEditingController(text: '0');
@@ -141,7 +141,13 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
       ..clear()
       ..addAll([
         for (final it in items)
-          _Line(it.productId, it.productName, it.quantity, it.unitCost),
+          _Line(
+            it.productName,
+            it.quantity,
+            it.unitCost,
+            purchaseCategoryId: it.purchaseCategoryId,
+            productId: it.productId,
+          ),
       ]);
   }
 
@@ -149,20 +155,22 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
     if (_lines.isNotEmpty) return true;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Add at least one product'),
+        content: Text('Add at least one item'),
         backgroundColor: AppColors.dangerFill,
       ),
     );
     return false;
   }
 
-  void _addProduct(Product p) {
-    final existing = _lines.where((l) => l.productId == p.id).firstOrNull;
+  void _addCategory(MasterItem c) {
+    final existing = _lines
+        .where((l) => l.purchaseCategoryId == c.id)
+        .firstOrNull;
     setState(() {
       if (existing != null) {
         existing.qty.text = '${(int.tryParse(existing.qty.text) ?? 0) + 1}';
       } else {
-        _lines.add(_Line(p.id, p.productName, 1, p.costPrice));
+        _lines.add(_Line(c.name, 1, 0, purchaseCategoryId: c.id));
       }
     });
   }
@@ -280,6 +288,7 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
         items: [
           for (final l in _lines)
             PurchaseItem(
+              purchaseCategoryId: l.purchaseCategoryId,
               productId: l.productId,
               productName: l.name,
               quantity: int.tryParse(l.qty.text) ?? 0,
@@ -485,15 +494,15 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
     );
   }
 
-  Future<void> _pickProduct(BuildContext context) async {
-    final picked = await showModalBottomSheet<Product>(
+  Future<void> _pickCategory(BuildContext context) async {
+    final picked = await showModalBottomSheet<MasterItem>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const _ProductPickerSheet(),
+      builder: (_) => const _CategoryPickerSheet(),
     );
-    if (picked != null) _addProduct(picked);
+    if (picked != null) _addCategory(picked);
   }
 
   Widget _buildStep() {
@@ -517,7 +526,7 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
           formKey: _step2Key,
           lines: _lines,
           loading: _loadingLines,
-          onAdd: () => _pickProduct(context),
+          onAdd: () => _pickCategory(context),
           onRemove: (l) => setState(() {
             _lines.remove(l);
             l.dispose();
@@ -549,7 +558,7 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
                 ? '—'
                 : _billNoCtrl.text.trim(),
             'Items':
-                '${_lines.length} product${_lines.length == 1 ? '' : 's'} · '
+                '${_lines.length} item${_lines.length == 1 ? '' : 's'} · '
                 '${_lines.fold<int>(0, (a, l) => a + (int.tryParse(l.qty.text) ?? 0))} units',
             'Subtotal': '₹${_subtotal.toStringAsFixed(2)}',
             'Tax': '₹${_taxAmount.toStringAsFixed(2)}',
@@ -799,20 +808,27 @@ class _Step1 extends StatelessWidget {
 
 // ── Step 2: Items & payment ────────────────────────────────────────────────
 
-/// One product line being edited: quantity and unit cost fields.
+/// One bill line being edited: quantity and unit cost fields. New lines are
+/// purchase categories; a product line only comes from an older bill.
 class _Line {
+  final String? purchaseCategoryId;
   final String productId;
   final String name;
   final TextEditingController qty;
   final TextEditingController cost;
 
-  _Line(this.productId, this.name, int quantity, double unitCost)
-    : qty = TextEditingController(text: '$quantity'),
-      cost = TextEditingController(
-        text: unitCost % 1 == 0
-            ? unitCost.toStringAsFixed(0)
-            : unitCost.toStringAsFixed(2),
-      );
+  _Line(
+    this.name,
+    int quantity,
+    double unitCost, {
+    this.purchaseCategoryId,
+    this.productId = '',
+  }) : qty = TextEditingController(text: '$quantity'),
+       cost = TextEditingController(
+         text: unitCost % 1 == 0
+             ? unitCost.toStringAsFixed(0)
+             : unitCost.toStringAsFixed(2),
+       );
 
   double get total =>
       (int.tryParse(qty.text) ?? 0) * (double.tryParse(cost.text) ?? 0);
@@ -868,7 +884,7 @@ class _ItemsStep extends StatelessWidget {
           Row(
             children: [
               Text(
-                'Products bought',
+                'Items bought',
                 style: TextStyle(
                   color: AppColors.ink,
                   fontSize: 14,
@@ -879,7 +895,7 @@ class _ItemsStep extends StatelessWidget {
               TextButton.icon(
                 onPressed: onAdd,
                 icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Add product'),
+                label: const Text('Add item'),
               ),
             ],
           ),
@@ -907,11 +923,11 @@ class _ItemsStep extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Add the products on this bill',
+                      'Add the items on this bill',
                       style: TextStyle(color: AppColors.textSecondary),
                     ),
                     Text(
-                      'Their quantities are added to stock',
+                      'Pick from your purchase categories',
                       style: TextStyle(
                         color: AppColors.textHint,
                         fontSize: 11.5,
@@ -1148,30 +1164,41 @@ class _LineCard extends StatelessWidget {
   }
 }
 
-/// Pick a product for a purchase line (searchable).
-class _ProductPickerSheet extends ConsumerStatefulWidget {
-  const _ProductPickerSheet();
+/// Pick a purchase category (Masters → Purchase Category) for a bill line
+/// (searchable). Only active categories are listed.
+class _CategoryPickerSheet extends StatefulWidget {
+  const _CategoryPickerSheet();
 
   @override
-  ConsumerState<_ProductPickerSheet> createState() =>
-      _ProductPickerSheetState();
+  State<_CategoryPickerSheet> createState() => _CategoryPickerSheetState();
 }
 
-class _ProductPickerSheetState extends ConsumerState<_ProductPickerSheet> {
+class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
   String _q = '';
+  late final Future<void> _load = masterCubit.ensureLoaded('purchaseCategory');
 
   @override
   Widget build(BuildContext context) {
-    final async = ref.watch(productsProvider);
-    final all = async.valueOrNull ?? const <Product>[];
+    return FutureBuilder<void>(
+      future: _load,
+      builder: (context, snap) => _sheet(
+        context,
+        loading: snap.connectionState != ConnectionState.done,
+        failed: snap.hasError,
+      ),
+    );
+  }
+
+  Widget _sheet(
+    BuildContext context, {
+    required bool loading,
+    required bool failed,
+  }) {
+    final all = masterCubit.itemsOfType('purchaseCategory');
     final q = _q.toLowerCase();
     final shown = [
-      for (final p in all)
-        if (q.isEmpty ||
-            '${p.productName} ${p.productCode} ${p.category}'
-                .toLowerCase()
-                .contains(q))
-          p,
+      for (final c in all)
+        if (q.isEmpty || c.name.toLowerCase().contains(q)) c,
     ];
     return Container(
       height: MediaQuery.sizeOf(context).height * 0.8,
@@ -1208,42 +1235,51 @@ class _ProductPickerSheetState extends ConsumerState<_ProductPickerSheet> {
             ),
           ),
           Expanded(
-            child: async.isLoading && all.isEmpty
+            child: loading
                 ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
                 : shown.isEmpty
                 ? Center(
-                    child: Text(
-                      'No products found',
-                      style: TextStyle(color: AppColors.textSecondary),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        failed
+                            ? "Couldn't load purchase categories"
+                            : all.isEmpty
+                            ? 'No purchase categories yet.\nAdd them in Masters → Purchase Category.'
+                            : 'No purchase categories found',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
                     ),
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(8, 0, 8, 24),
                     itemCount: shown.length,
                     itemBuilder: (_, i) {
-                      final p = shown[i];
+                      final c = shown[i];
+                      final about = c.description?.trim() ?? '';
                       return ListTile(
                         leading: const CircleAvatar(
                           backgroundColor: AppColors.brand,
                           child: Icon(
-                            Icons.checkroom_rounded,
+                            Icons.shopping_basket_outlined,
                             color: Colors.white,
                             size: 18,
                           ),
                         ),
                         title: Text(
-                          p.productName,
+                          c.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        subtitle: Text(
-                          '${p.category.isEmpty ? 'Uncategorised' : p.category} · ${p.stockQuantity} in stock',
-                        ),
-                        trailing: Text(
-                          '₹${p.costPrice.toStringAsFixed(0)}',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        onTap: () => Navigator.of(context).pop(p),
+                        subtitle: about.isEmpty
+                            ? null
+                            : Text(
+                                about,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                        onTap: () => Navigator.of(context).pop(c),
                       );
                     },
                   ),

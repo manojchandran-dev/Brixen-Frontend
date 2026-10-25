@@ -1,5 +1,12 @@
 import 'sale_item.dart';
 
+/// Which series a sale belongs to: a GST tax invoice or a secondary bill
+/// (no GST). Set when the sale is created and fixed after that.
+abstract final class BillType {
+  static const gst = 'GST';
+  static const secondary = 'SECONDARY';
+}
+
 class Sale {
   final String id;
   final String? companyId;
@@ -17,6 +24,13 @@ class Sale {
   final String? notes;
   final String? billImagePath;
   final List<SaleItem> items;
+
+  /// [BillType.gst] or [BillType.secondary].
+  final String billType;
+
+  /// Server-set running number, e.g. "C7G2627/0001" (company 7, GST,
+  /// 2026-27); unique across companies. Null on old sales.
+  final String? billNo;
 
   /// Received so far (null on old data). See [balance].
   final double? amountPaid;
@@ -38,9 +52,13 @@ class Sale {
     this.notes,
     this.billImagePath,
     this.items = const [],
+    this.billType = BillType.gst,
+    this.billNo,
     this.amountPaid,
     required this.createdAt,
   });
+
+  bool get isGst => billType != BillType.secondary;
 
   /// Still owed: total − amount paid. Without [amountPaid] (old data), a
   /// Paid sale owes nothing and any other owes the full total.
@@ -66,6 +84,8 @@ class Sale {
     String? notes,
     String? billImagePath,
     List<SaleItem>? items,
+    String? billType,
+    String? billNo,
     DateTime? createdAt,
     double? amountPaid,
   }) {
@@ -85,6 +105,8 @@ class Sale {
       notes: notes ?? this.notes,
       billImagePath: billImagePath ?? this.billImagePath,
       items: items ?? this.items,
+      billType: billType ?? this.billType,
+      billNo: billNo ?? this.billNo,
       amountPaid: amountPaid ?? this.amountPaid,
       createdAt: createdAt ?? this.createdAt,
     );

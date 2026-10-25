@@ -25,6 +25,7 @@ class ApiEndpoints {
   static const String expenseCategories = '/api/v1/expense-categories';
   static const String companyCategories = '/api/v1/company-categories';
   static const String productCategories = '/api/v1/product-categories';
+  static const String purchaseCategories = '/api/v1/purchase-categories';
   static const String employees = '/api/v1/employees';
   static const String units = '/api/v1/units';
   static const String expenses = '/api/v1/expenses';
@@ -98,6 +99,8 @@ class ApiEndpoints {
       '/api/v1/company-categories/$id';
   static String productCategoryById(String id) =>
       '/api/v1/product-categories/$id';
+  static String purchaseCategoryById(String id) =>
+      '/api/v1/purchase-categories/$id';
   static String employeeById(String id) => '/api/v1/employees/$id';
   static String employeeStep2(String id) => '/api/v1/employees/$id/step2';
   static String employeeStep3(String id) => '/api/v1/employees/$id/step3';

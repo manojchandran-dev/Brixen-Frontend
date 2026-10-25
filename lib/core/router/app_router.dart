@@ -118,6 +118,8 @@ class AppRouter {
       RouteNames.masterExpenseCategories;
   static const String masterProductCategories =
       RouteNames.masterProductCategories;
+  static const String masterPurchaseCategories =
+      RouteNames.masterPurchaseCategories;
   static const String masterUnits = RouteNames.masterUnits;
   static const String lockScreen = RouteNames.lockScreen;
   static const String security = RouteNames.security;
@@ -193,6 +195,7 @@ class AppRouter {
                       fromMasters: extra['fromMasters'] == true,
                       fromMenu: extra['fromMenu'] == true,
                       editSale: extra['sale'] as Sale?,
+                      billType: extra['billType'] as String? ?? BillType.gst,
                     );
                   }
                   return CreateSalePage(
@@ -389,6 +392,11 @@ class AppRouter {
             path: _sub(masterProductCategories, dashboard),
             builder: (context, state) =>
                 const MasterCategoryPage(typeKey: 'productCategory'),
+          ),
+          GoRoute(
+            path: _sub(masterPurchaseCategories, dashboard),
+            builder: (context, state) =>
+                const MasterCategoryPage(typeKey: 'purchaseCategory'),
           ),
           GoRoute(
             path: _sub(masterUnits, dashboard),

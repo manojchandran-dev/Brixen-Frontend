@@ -28,6 +28,7 @@ Purchase purchaseFromJson(Map<String, dynamic> j) {
             for (final raw in items)
               if (raw is Map)
                 PurchaseItem(
+                  purchaseCategoryId: raw['purchase_category_id']?.toString(),
                   productId: '${raw['product_id'] ?? ''}',
                   productName: '${raw['product_name'] ?? ''}',
                   quantity: int.tryParse('${raw['quantity'] ?? 0}') ?? 0,
@@ -57,7 +58,10 @@ Map<String, dynamic> purchaseToBody(Purchase p, {String? companyId}) => {
   'items': [
     for (final it in p.items)
       {
-        'product_id': int.tryParse(it.productId) ?? it.productId,
+        if (it.purchaseCategoryId != null)
+          'purchase_category_id': it.purchaseCategoryId
+        else
+          'product_id': int.tryParse(it.productId) ?? it.productId,
         'quantity': it.quantity,
         'unit_cost': it.unitCost,
       },

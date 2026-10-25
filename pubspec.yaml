@@ -28,6 +28,8 @@ dependencies:
   flutter_local_notifications: ^22.3.1
   form_builder_validators: ^11.3.0
   url_launcher: ^6.3.2
+  pdf: ^3.13.1
+  printing: ^5.15.1
 
 dev_dependencies:
   flutter_test:

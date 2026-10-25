@@ -247,6 +247,11 @@ void Function(BuildContext context) _destinationFor(NavModule module) {
         AppRouter.companies,
         extra: AppRouter.companiesSection('masters/productCategory'),
       );
+    case 'purchasecategory':
+      return (context) => context.go(
+        AppRouter.companies,
+        extra: AppRouter.companiesSection('masters/purchaseCategory'),
+      );
     // No backend module row exists for these yet — the module only reaches
     // superAdmin today via the Dashboard's Quick Actions tiles
     // (welcome_dashboard_view.dart). These cases are additive/forward-

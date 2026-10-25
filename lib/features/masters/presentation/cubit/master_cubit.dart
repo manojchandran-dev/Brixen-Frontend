@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/datasources/company_categories_remote_datasource.dart';
 import '../../data/datasources/expense_categories_remote_datasource.dart';
 import '../../data/datasources/product_categories_remote_datasource.dart';
+import '../../data/datasources/purchase_categories_remote_datasource.dart';
 import '../../data/datasources/remote_master_datasource.dart';
 import '../../data/datasources/units_remote_datasource.dart';
 import '../../data/repositories/masters_repository_impl.dart';
@@ -17,6 +18,7 @@ final Map<String, RemoteMasterDatasource> _remoteDatasources = {
   'expenseCategory': expenseCategoriesRemoteDatasource,
   'companyCategory': companyCategoriesRemoteDatasource,
   'productCategory': productCategoriesRemoteDatasource,
+  'purchaseCategory': purchaseCategoriesRemoteDatasource,
   'unit': unitsRemoteDatasource,
 };
 

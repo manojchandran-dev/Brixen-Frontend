@@ -170,7 +170,7 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
                   ],
                 ),
               )
-            : ModuleTitle(title: 'Purchases', subtitle: 'Stock purchases'),
+            : ModuleTitle(title: 'Purchases', subtitle: 'Raw material purchases'),
         actions: [
           GestureDetector(
             onTap: () => context.push(

@@ -53,6 +53,8 @@ class RouteNames {
       '/dashboard/masters/expense-categories';
   static const String masterProductCategories =
       '/dashboard/masters/product-categories';
+  static const String masterPurchaseCategories =
+      '/dashboard/masters/purchase-categories';
   static const String masterUnits = '/dashboard/masters/units';
   static const String lockScreen = '/lock';
   static const String security = '/dashboard/security';

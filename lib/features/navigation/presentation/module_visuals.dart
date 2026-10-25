@@ -52,6 +52,11 @@ ModuleVisual moduleVisualFor(String name) {
       return const ModuleVisual(Icons.straighten_rounded, AppColors.brandDeep);
     case 'productcategory':
       return const ModuleVisual(Icons.checkroom_outlined, AppColors.brandLight);
+    case 'purchasecategory':
+      return const ModuleVisual(
+        Icons.shopping_basket_outlined,
+        AppColors.positive,
+      );
     case 'notifications':
     case 'pushnotifications':
       return const ModuleVisual(

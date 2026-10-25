@@ -1,12 +1,20 @@
-/// One line of a purchase bill (`purchase_items`): stock that came in.
+/// One line of a purchase bill (`purchase_items`). New lines name a purchase
+/// category (a raw material such as Elastic; no stock); older bills may have
+/// product lines, which add to that product's stock.
 class PurchaseItem {
+  final String? purchaseCategoryId;
+
+  /// Empty for a purchase-category line.
   final String productId;
+
+  /// The category's or product's name.
   final String productName;
   final int quantity;
   final double unitCost;
 
   const PurchaseItem({
-    required this.productId,
+    this.purchaseCategoryId,
+    this.productId = '',
     required this.productName,
     required this.quantity,
     required this.unitCost,

@@ -1,0 +1,167 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import '../../../../core/network/api_client.dart'
+    show mapDioError, CompanyScopeInterceptor;
+import '../../../../core/network/api_endpoints.dart';
+import '../../../../core/network/token_refresh_interceptor.dart';
+import '../../../../core/services/token_service.dart';
+import '../../domain/entities/master_item.dart';
+import 'remote_master_datasource.dart';
+
+final _dio =
+    Dio(
+        BaseOptions(
+          baseUrl: ApiEndpoints.baseUrl,
+          connectTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 30),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      )
+      ..interceptors.add(_AuthInterceptor())
+      ..interceptors.add(TokenRefreshInterceptor())
+      ..interceptors.add(CompanyScopeInterceptor())
+      ..interceptors.add(
+        LogInterceptor(
+          requestBody: true,
+          responseBody: true,
+          logPrint: (o) => debugPrint(o.toString()),
+        ),
+      );
+
+class _AuthInterceptor extends Interceptor {
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    final token = TokenService.token;
+    if (token != null && token.isNotEmpty) {
+      options.headers['Authorization'] = 'Bearer $token';
+    }
+    handler.next(options);
+  }
+}
+
+/// Purchase categories — the raw materials a company buys (Elastic, Thread),
+/// listed in the Purchases bill-line picker. Not to be confused with product
+/// categories, which group what it sells. Same "simple list" API shape:
+/// name, description, status.
+class PurchaseCategoriesRemoteDatasource implements RemoteMasterDatasource {
+  const PurchaseCategoriesRemoteDatasource();
+
+  @override
+  Future<MasterItem> getById(String id) async {
+    try {
+      final resp = await _dio.get(ApiEndpoints.purchaseCategoryById(id));
+      final data = resp.data['data'] ?? resp.data;
+      return _fromJson(data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  @override
+  Future<List<MasterItem>> getAll({
+    int page = 1,
+    int limit = 100,
+    String? search,
+    String? companyId,
+  }) async {
+    try {
+      final resp = await _dio.get(
+        ApiEndpoints.purchaseCategories,
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+          if (search != null && search.isNotEmpty) 'search': search,
+          'company_id': ?companyId,
+        },
+      );
+      final data = resp.data['data'] ?? resp.data;
+      final list = (data is List)
+          ? data
+          : (data['items'] ?? data['categories'] ?? []);
+      return (list as List)
+          .map((e) => _fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  @override
+  Future<MasterItem> create({
+    required String name,
+    String? description,
+    String? fullForm,
+    bool isActive = true,
+    String? companyId,
+  }) async {
+    try {
+      final resp = await _dio.post(
+        ApiEndpoints.purchaseCategories,
+        data: {
+          'company_id': int.parse(companyId!),
+          'name': name,
+          if (description != null && description.isNotEmpty)
+            'description': description,
+          'status': isActive ? 'ACTIVE' : 'INACTIVE',
+        },
+      );
+      final data = resp.data['data'] ?? resp.data;
+      return _fromJson(data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  @override
+  Future<MasterItem> update(
+    String id, {
+    String? name,
+    String? description,
+    String? fullForm,
+    bool? isActive,
+  }) async {
+    try {
+      final resp = await _dio.put(
+        ApiEndpoints.purchaseCategoryById(id),
+        data: {
+          'name': ?name,
+          'description': ?description,
+          if (isActive != null) 'status': isActive ? 'ACTIVE' : 'INACTIVE',
+        },
+      );
+      final data = resp.data['data'] ?? resp.data;
+      return _fromJson(data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    try {
+      await _dio.delete(ApiEndpoints.purchaseCategoryById(id));
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  MasterItem _fromJson(Map<String, dynamic> json) => MasterItem(
+    id: json['id'].toString(),
+    typeKey: 'purchaseCategory',
+    name: (json['name'] ?? '').toString(),
+    description: json['description'] as String?,
+    isActive:
+        (json['status']?.toString().toUpperCase() ?? 'ACTIVE') == 'ACTIVE',
+    createdAt: (json['created_at'] ?? json['createdAt']) != null
+        ? DateTime.tryParse(
+                (json['created_at'] ?? json['createdAt']).toString(),
+              ) ??
+              DateTime.now()
+        : DateTime.now(),
+  );
+}
+
+final purchaseCategoriesRemoteDatasource = PurchaseCategoriesRemoteDatasource();

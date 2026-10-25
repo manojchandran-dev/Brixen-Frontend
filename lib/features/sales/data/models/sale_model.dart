@@ -18,6 +18,8 @@ class SaleModel extends Sale {
     super.notes,
     super.billImagePath,
     super.items,
+    super.billType,
+    super.billNo,
     super.amountPaid,
     required super.createdAt,
   });
@@ -45,6 +47,10 @@ class SaleModel extends Sale {
           ? null
           : _num(json['amount_paid']),
       notes: json['notes'],
+      billType: json['bill_type'] == BillType.secondary
+          ? BillType.secondary
+          : BillType.gst,
+      billNo: json['bill_no']?.toString(),
       billImagePath: json['bill_image_url'],
       items: json['sale_items'] is List
           ? (json['sale_items'] as List)
@@ -68,6 +74,8 @@ class SaleModel extends Sale {
     if (s.customerId != null && s.customerId!.isNotEmpty)
       'customer_id': s.customerId,
     'bill_date': s.billDate.toIso8601String(),
+    // Only used on create; the server keeps a sale's bill type fixed.
+    'bill_type': s.billType,
     if (s.invoiceType != null && s.invoiceType!.isNotEmpty)
       'invoice_type': s.invoiceType,
     if (s.paymentType != null && s.paymentType!.isNotEmpty)

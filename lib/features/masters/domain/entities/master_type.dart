@@ -33,6 +33,11 @@ const kMasterTypes = <MasterTypeConfig>[
     'Product Category',
     Icons.checkroom_outlined,
   ),
+  MasterTypeConfig(
+    'purchaseCategory',
+    'Purchase Category',
+    Icons.shopping_basket_outlined,
+  ),
   MasterTypeConfig('unit', 'Unit', Icons.straighten_outlined),
 ];
 

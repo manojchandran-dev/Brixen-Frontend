@@ -69,6 +69,9 @@ class MasterItem extends Equatable {
       case 'productCategory':
         // Backend id is already the formatted code, e.g. "PRCAT65618502479".
         return id;
+      case 'purchaseCategory':
+        // Backend id is already the formatted code, e.g. "PUCAT65618502479".
+        return id;
       case 'unit':
         // Backend id is already the formatted code, e.g. "UNIT533111998460".
         return id;

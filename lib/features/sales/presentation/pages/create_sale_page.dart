@@ -11,6 +11,8 @@ import '../../../../core/services/session_service.dart';
 import '../../../../shared/widgets/brixen_button.dart';
 import '../../../../shared/widgets/brixen_date_field.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
+import '../../../../shared/widgets/pill_segmented_control.dart';
+import '../../../../shared/widgets/skeleton.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
 import '../../../../shared/widgets/company_selector_field.dart';
 import '../../../companies/domain/entities/company.dart';
@@ -46,11 +48,15 @@ class CreateSalePage extends ConsumerStatefulWidget {
   final bool fromMenu;
   final bool fromMasters;
   final Sale? editSale;
+
+  /// Starting bill type for a new sale (the Sales tab it was opened from).
+  final String billType;
   const CreateSalePage({
     super.key,
     this.fromMenu = false,
     this.fromMasters = false,
     this.editSale,
+    this.billType = BillType.gst,
   });
 
   @override
@@ -66,6 +72,9 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
   bool _submitting = false;
 
   // Step 1 — Bill Info
+  /// GST bill or secondary bill; fixed once the sale is saved.
+  late String _billType = widget.editSale?.billType ?? widget.billType;
+  bool get _isGst => _billType != BillType.secondary;
   DateTime _billDate = DateTime.now();
   String? _invoiceType;
   XFile? _billImage;
@@ -260,7 +269,7 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
   /// actual amount the backend stores, then the total.
   void _recalcTaxAndTotal() {
     final sub = double.tryParse(_subtotalCtrl.text) ?? 0;
-    final pct = double.tryParse(_taxPercentCtrl.text) ?? 0;
+    final pct = _isGst ? double.tryParse(_taxPercentCtrl.text) ?? 0 : 0;
     final taxAmt = sub * pct / 100;
     setState(() {
       _taxAmountCtrl.text = taxAmt.toStringAsFixed(2);
@@ -358,6 +367,7 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
       id: _isEditing ? widget.editSale!.id : '',
       customerId: _selectedCustomer?.id,
       billDate: _billDate,
+      billType: _billType,
       invoiceType: _invoiceType,
       subtotal: 0,
       taxAmount: 0,
@@ -403,7 +413,9 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
               ),
             )
             .toList();
-        final taxPct = double.tryParse(_taxPercentCtrl.text) ?? 0;
+        final taxPct = _isGst
+            ? double.tryParse(_taxPercentCtrl.text) ?? 0
+            : 0.0;
         await notifier.updateSaleItems(
           saved.id,
           items,
@@ -663,6 +675,14 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
         final customers = ref.watch(customersProvider).valueOrNull ?? [];
         return _Step1(
           formKey: _step1Key,
+          billType: _billType,
+          // Each bill type has its own numbering, so it can't change later.
+          onBillTypeChanged: _isEditing
+              ? null
+              : (v) {
+                  setState(() => _billType = v);
+                  _recalcTaxAndTotal();
+                },
           billDate: _billDate,
           invoiceType: _invoiceType,
           invoiceTypes: _invoiceTypes,
@@ -679,16 +699,17 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
           onCompanyChanged: (c) => setState(() => _selectedCompany = c),
         );
       case 1:
-        final products = ref.watch(productsProvider).valueOrNull ?? [];
+        // Starts loading products now, so the picker is usually ready.
+        ref.watch(productsProvider);
         return _Step2(
           formKey: _step2Key,
-          products: products,
           lineItems: _lineItems,
           onToggleProduct: _toggleProduct,
           onRemoveLineItem: _removeLineItem,
           onLineItemQtyChanged: _updateLineItemQty,
           onLineItemPriceTypeChanged: _updateLineItemPriceType,
           subtotalCtrl: _subtotalCtrl,
+          showTax: _isGst,
           taxPercentCtrl: _taxPercentCtrl,
           taxAmountCtrl: _taxAmountCtrl,
           totalAmountCtrl: _totalAmountCtrl,
@@ -711,6 +732,7 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
   }
 
   Map<String, String> _buildPreview() => {
+    'Bill': _isGst ? 'GST Bill' : 'Secondary Bill (no GST)',
     if (_selectedCustomer != null) 'Customer': _selectedCustomer!.name,
     'Date': DateFormat('dd MMM yyyy').format(_billDate),
     'Invoice Type': _invoiceType ?? '—',
@@ -719,8 +741,10 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
           .map((l) => '${l.product.productName} ×${l.quantity}')
           .join(', '),
     'Subtotal': '₹${_subtotalCtrl.text.isEmpty ? '0.00' : _subtotalCtrl.text}',
-    if (_taxPercentCtrl.text.isNotEmpty) 'Tax %': _taxPercentCtrl.text,
-    'Tax': '₹${_taxAmountCtrl.text.isEmpty ? '0.00' : _taxAmountCtrl.text}',
+    if (_isGst && _taxPercentCtrl.text.isNotEmpty)
+      'GST %': _taxPercentCtrl.text,
+    if (_isGst)
+      'GST': '₹${_taxAmountCtrl.text.isEmpty ? '0.00' : _taxAmountCtrl.text}',
     'Total':
         '₹${_totalAmountCtrl.text.isEmpty ? '0.00' : _totalAmountCtrl.text}',
     'Payment Type': _paymentType ?? '—',
@@ -880,6 +904,10 @@ class _SaleStepIndicator extends StatelessWidget {
 
 class _Step1 extends StatelessWidget {
   final GlobalKey<FormState> formKey;
+  final String billType;
+
+  /// Null when the bill type is locked (editing a saved sale).
+  final ValueChanged<String>? onBillTypeChanged;
   final DateTime billDate;
   final String? invoiceType;
   final List<String> invoiceTypes;
@@ -897,6 +925,8 @@ class _Step1 extends StatelessWidget {
 
   const _Step1({
     required this.formKey,
+    required this.billType,
+    required this.onBillTypeChanged,
     required this.billDate,
     required this.invoiceType,
     required this.invoiceTypes,
@@ -927,6 +957,46 @@ class _Step1 extends StatelessWidget {
             ),
             const SizedBox(height: 22),
           ],
+          Text(
+            'Bill type',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          PillSegmentedControl<String>(
+            value: billType,
+            onChanged: onBillTypeChanged,
+            segments: const [
+              PillSegment(
+                value: BillType.gst,
+                label: 'GST Bill',
+                icon: Icons.verified_outlined,
+              ),
+              PillSegment(
+                value: BillType.secondary,
+                label: 'Secondary Bill',
+                icon: Icons.receipt_long_outlined,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            onBillTypeChanged == null
+                ? "A saved sale's bill type can't be changed"
+                : billType == BillType.gst
+                ? 'Tax invoice with GST'
+                : 'Bill without GST',
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(height: 22),
           BrixenDateField(
             label: 'Bill Date *',
             value: billDate,
@@ -970,7 +1040,6 @@ class _Step1 extends StatelessWidget {
 
 class _Step2 extends StatelessWidget {
   final GlobalKey<FormState> formKey;
-  final List<Product> products;
   final List<_SaleLineItem> lineItems;
   final void Function(Product) onToggleProduct;
   final void Function(int index) onRemoveLineItem;
@@ -980,6 +1049,9 @@ class _Step2 extends StatelessWidget {
       taxPercentCtrl,
       taxAmountCtrl,
       totalAmountCtrl;
+
+  /// False for a secondary bill (no GST).
+  final bool showTax;
   final String? paymentType, paymentStatus;
   final List<String> paymentTypes, paymentStatuses;
   final void Function(String?) onPaymentTypeChanged;
@@ -989,13 +1061,13 @@ class _Step2 extends StatelessWidget {
 
   const _Step2({
     required this.formKey,
-    required this.products,
     required this.lineItems,
     required this.onToggleProduct,
     required this.onRemoveLineItem,
     required this.onLineItemQtyChanged,
     required this.onLineItemPriceTypeChanged,
     required this.subtotalCtrl,
+    required this.showTax,
     required this.taxPercentCtrl,
     required this.taxAmountCtrl,
     required this.totalAmountCtrl,
@@ -1038,7 +1110,6 @@ class _Step2 extends StatelessWidget {
           const SizedBox(height: 12),
 
           _ProductMultiSelectField(
-            products: products,
             lineItems: lineItems,
             onToggle: onToggleProduct,
           ),
@@ -1091,26 +1162,32 @@ class _Step2 extends StatelessWidget {
           ),
           const SizedBox(height: 22),
 
-          BrixenTextField(
-            label: 'Tax %',
-            hint: 'e.g. 5',
-            controller: taxPercentCtrl,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textInputAction: TextInputAction.next,
-            prefixIcon: const Icon(Icons.percent_rounded),
-            onChanged: (_) => onRecalc(),
-          ),
-          const SizedBox(height: 22),
+          if (showTax) ...[
+            BrixenTextField(
+              label: 'GST %',
+              hint: 'e.g. 5',
+              controller: taxPercentCtrl,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              textInputAction: TextInputAction.next,
+              prefixIcon: const Icon(Icons.percent_rounded),
+              onChanged: (_) => onRecalc(),
+            ),
+            const SizedBox(height: 22),
 
-          BrixenTextField(
-            label: 'Tax Amount',
-            hint: '0.00',
-            controller: taxAmountCtrl,
-            readOnly: true,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            prefixIcon: const Icon(Icons.currency_rupee_rounded),
-          ),
-          const SizedBox(height: 22),
+            BrixenTextField(
+              label: 'GST Amount',
+              hint: '0.00',
+              controller: taxAmountCtrl,
+              readOnly: true,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              prefixIcon: const Icon(Icons.currency_rupee_rounded),
+            ),
+            const SizedBox(height: 22),
+          ],
 
           BrixenTextField(
             label: 'Total Amount',
@@ -1337,11 +1414,9 @@ class _QtyButton extends StatelessWidget {
 /// (`_ProductMultiSelectSheet`) instead of a single-select panel — checking
 /// a product adds it as a line item immediately, unchecking removes it.
 class _ProductMultiSelectField extends StatelessWidget {
-  final List<Product> products;
   final List<_SaleLineItem> lineItems;
   final void Function(Product) onToggle;
   const _ProductMultiSelectField({
-    required this.products,
     required this.lineItems,
     required this.onToggle,
   });
@@ -1360,7 +1435,6 @@ class _ProductMultiSelectField extends StatelessWidget {
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (_) => _ProductMultiSelectSheet(
-          products: products,
           selectedIds: lineItems.map((l) => l.product.id).toSet(),
           onToggle: onToggle,
         ),
@@ -1406,27 +1480,88 @@ class _ProductMultiSelectField extends StatelessWidget {
   }
 }
 
-class _ProductMultiSelectSheet extends StatefulWidget {
-  final List<Product> products;
+/// Watches the products list itself, so a sheet opened before products
+/// finish loading fills in when they arrive instead of showing "none".
+class _ProductMultiSelectSheet extends ConsumerStatefulWidget {
   final Set<String> selectedIds;
   final void Function(Product) onToggle;
   const _ProductMultiSelectSheet({
-    required this.products,
     required this.selectedIds,
     required this.onToggle,
   });
 
   @override
-  State<_ProductMultiSelectSheet> createState() =>
+  ConsumerState<_ProductMultiSelectSheet> createState() =>
       _ProductMultiSelectSheetState();
 }
 
-class _ProductMultiSelectSheetState extends State<_ProductMultiSelectSheet> {
+class _ProductMultiSelectSheetState
+    extends ConsumerState<_ProductMultiSelectSheet> {
   late final Set<String> _selectedIds = {...widget.selectedIds};
+
+  /// Skeleton rows shaped like the product tiles.
+  Widget _loading() => Shimmer(
+    child: ListView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+      itemCount: 6,
+      itemBuilder: (_, _) => const Padding(
+        padding: EdgeInsets.only(bottom: 18),
+        child: Row(
+          children: [
+            SkeletonBox(width: 22, height: 22, radius: 6),
+            SizedBox(width: 18),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBox(width: 160, height: 13),
+                  SizedBox(height: 7),
+                  SkeletonBox(width: 210, height: 10),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  Widget _message(IconData icon, String text, {VoidCallback? onRetry}) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 40,
+            color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            text,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+          ),
+          if (onRetry != null) ...[
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Retry'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final async = ref.watch(productsProvider);
+    final products = async.valueOrNull ?? const <Product>[];
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
       minChildSize: 0.35,
@@ -1470,26 +1605,29 @@ class _ProductMultiSelectSheetState extends State<_ProductMultiSelectSheet> {
             ),
             Divider(height: 1, color: Theme.of(context).dividerColor),
             Expanded(
-              child: widget.products.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No products available',
-                        style: TextStyle(
-                          color: cs.onSurfaceVariant,
-                          fontSize: 13,
-                        ),
-                      ),
+              child: products.isEmpty && async.isLoading
+                  ? _loading()
+                  : products.isEmpty && async.hasError
+                  ? _message(
+                      Icons.cloud_off_rounded,
+                      "Couldn't load products",
+                      onRetry: () => ref.invalidate(productsProvider),
+                    )
+                  : products.isEmpty
+                  ? _message(
+                      Icons.checkroom_rounded,
+                      'No products yet.\nAdd them in the Products module.',
                     )
                   : ListView.separated(
                       controller: scrollController,
                       padding: const EdgeInsets.symmetric(vertical: 4),
-                      itemCount: widget.products.length,
+                      itemCount: products.length,
                       separatorBuilder: (_, _) => Divider(
                         height: 1,
                         color: Theme.of(context).dividerColor,
                       ),
                       itemBuilder: (_, i) {
-                        final product = widget.products[i];
+                        final product = products[i];
                         final selected = _selectedIds.contains(product.id);
                         return CheckboxListTile(
                           value: selected,

@@ -23,9 +23,11 @@ import '../../domain/entities/sale.dart';
 import '../../../../shared/widgets/chip_filter_sheet.dart';
 import '../../../../shared/widgets/search_field.dart';
 import '../../domain/entities/sale_item.dart';
+import '../bills/sale_bill_page.dart';
 import '../providers/sales_provider.dart';
 import '../../../../shared/widgets/list_count_bar.dart';
 import '../../../../shared/widgets/module_title.dart';
+import '../../../../shared/widgets/pill_segmented_control.dart';
 
 class SalesPage extends ConsumerStatefulWidget {
   final bool fromMasters;
@@ -50,6 +52,9 @@ class _SalesPageState extends ConsumerState<SalesPage> {
   Map<String, Object?> _filters = {};
   String _search = '';
   Timer? _debounce;
+
+  /// Which tab is showing: GST bills or secondary bills.
+  String _billType = BillType.gst;
 
   /// Search + filters as API params, as a stable query string (the results
   /// provider's key). '' = neither → the full list. "days" → from/to.
@@ -276,7 +281,10 @@ class _SalesPageState extends ConsumerState<SalesPage> {
             GestureDetector(
               onTap: () => context.push(
                 AppRouter.createSale,
-                extra: widget.fromMasters ? 'masters' : null,
+                extra: {
+                  'fromMasters': widget.fromMasters,
+                  'billType': _billType,
+                },
               ),
               child: Container(
                 margin: const EdgeInsets.fromLTRB(0, 8, 16, 8),
@@ -322,6 +330,14 @@ class _SalesPageState extends ConsumerState<SalesPage> {
             onFilter: () => _openFilter(salesAsync.valueOrNull ?? const []),
           ),
           const SuperAdminCompanyFilterBar(),
+          _BillTypeTabs(
+            value: _billType,
+            onChanged: (v) => setState(() => _billType = v),
+            gstCount: salesAsync.valueOrNull?.where((s) => s.isGst).length,
+            secondaryCount: salesAsync.valueOrNull
+                ?.where((s) => !s.isGst)
+                .length,
+          ),
 
           // List
           Expanded(
@@ -332,7 +348,11 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                 onRetry: () => ref.invalidate(salesProvider),
               ),
               data: (all) {
-                final filtered = all;
+                final gst = _billType == BillType.gst;
+                final filtered = [
+                  for (final s in all)
+                    if (s.isGst == gst) s,
+                ];
 
                 if (filtered.isEmpty) {
                   return Center(
@@ -346,7 +366,11 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          query.isEmpty ? 'No sales yet' : 'No results',
+                          query.isEmpty
+                              ? (gst
+                                    ? 'No GST bills yet'
+                                    : 'No secondary bills yet')
+                              : 'No results',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -370,7 +394,10 @@ class _SalesPageState extends ConsumerState<SalesPage> {
 
                 return Column(
                   children: [
-                    ListCountBar(label: 'Total Sales', count: filtered.length),
+                    ListCountBar(
+                      label: gst ? 'GST Bills' : 'Secondary Bills',
+                      count: filtered.length,
+                    ),
                     Expanded(
                       child: ListView.separated(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
@@ -423,6 +450,7 @@ class _SaleCard extends ConsumerWidget {
         ? '₹${NumberFormat('#,##,##0', 'en_IN').format(v)}'
         : '₹${fmt.format(v)}';
     final meta = [
+      if (sale.billNo != null) sale.billNo!,
       DateFormat('d MMM yyyy').format(sale.billDate),
       if (sale.paymentType?.isNotEmpty == true) sale.paymentType!,
     ].join(' · ');
@@ -733,7 +761,10 @@ void _showSaleDetail(
       avatarText: title.trim().isNotEmpty ? title.trim()[0].toUpperCase() : '?',
       avatarGradient: AppColors.accentGradient(accent),
       title: title,
-      subtitle: sale.invoiceType,
+      subtitle: [
+        sale.isGst ? 'GST Bill' : 'Secondary Bill',
+        if (sale.billNo != null) sale.billNo!,
+      ].join(' · '),
       onEdit: !ref.read(moduleAccessProvider('Sales')).edit
           ? null
           : () {
@@ -844,6 +875,7 @@ void _showSaleDetail(
         ),
       ),
       sections: [
+        _GenerateBillButton(sale: sale),
         DetailSection(
           title: 'Invoice',
           items: [
@@ -877,12 +909,13 @@ void _showSaleDetail(
               label: 'Subtotal',
               value: '₹${fmt.format(sale.subtotal)}',
             ),
-            DetailRow(
-              icon: Icons.percent_rounded,
-              label: 'Tax',
-              value: '₹${fmt.format(sale.taxAmount)}',
-              iconColor: AppColors.positive,
-            ),
+            if (sale.isGst)
+              DetailRow(
+                icon: Icons.percent_rounded,
+                label: 'GST',
+                value: '₹${fmt.format(sale.taxAmount)}',
+                iconColor: AppColors.positive,
+              ),
             DetailRow(
               icon: Icons.account_balance_wallet_outlined,
               label: 'Total',
@@ -916,6 +949,75 @@ void _showSaleDetail(
       ],
     ),
   );
+}
+
+/// GST bills / Secondary bills switch above the list.
+class _BillTypeTabs extends StatelessWidget {
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  /// Counts per tab once the list has loaded (null while loading).
+  final int? gstCount, secondaryCount;
+  const _BillTypeTabs({
+    required this.value,
+    required this.onChanged,
+    this.gstCount,
+    this.secondaryCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+      child: PillSegmentedControl<String>(
+        value: value,
+        onChanged: onChanged,
+        segments: [
+          PillSegment(
+            value: BillType.gst,
+            label: 'GST Bills',
+            icon: Icons.verified_outlined,
+            count: gstCount,
+          ),
+          PillSegment(
+            value: BillType.secondary,
+            label: 'Secondary',
+            icon: Icons.receipt_long_outlined,
+            count: secondaryCount,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Opens the bill PDF: a GST tax invoice or a secondary bill.
+class _GenerateBillButton extends StatelessWidget {
+  final Sale sale;
+  const _GenerateBillButton({required this.sale});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton.icon(
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.brand,
+          foregroundColor: AppColors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        onPressed: () => SaleBillPage.open(context, sale),
+        icon: const Icon(Icons.picture_as_pdf_outlined),
+        label: Text(
+          sale.isGst ? 'Generate GST Bill' : 'Generate Bill',
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
 }
 
 /// The sale list response doesn't always carry `bill_image_path` (only the
