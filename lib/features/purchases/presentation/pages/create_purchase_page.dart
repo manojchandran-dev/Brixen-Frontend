@@ -49,7 +49,8 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
   // Step 2 — items (purchase categories) and payment
   final List<_Line> _lines = [];
   bool _loadingLines = false;
-  final _taxPercentCtrl = TextEditingController(text: '0');
+  // Number fields start empty (hint "0") so they can be typed straight in.
+  final _taxPercentCtrl = TextEditingController();
   final _amountPaidCtrl = TextEditingController();
   String? _paymentType;
   String? _paymentStatus;
@@ -81,9 +82,24 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
   ];
   static const _paymentStatuses = ['Paid', 'Pending', 'Partial', 'Cancelled'];
 
+  /// Units master names ("pcs", "m", "kg") for the per-line unit picker.
+  List<String> get _units => [
+    for (final u in masterCubit.itemsOfType('unit'))
+      if (u.name.isNotEmpty) u.name,
+  ];
+
+  /// New lines start in "pcs" when the company has it, else its first unit.
+  String? get _defaultUnit {
+    final units = _units;
+    return units.contains('pcs') ? 'pcs' : units.firstOrNull;
+  }
+
   @override
   void initState() {
     super.initState();
+    masterCubit.ensureLoaded('unit').then((_) {
+      if (mounted) setState(() {});
+    }, onError: (_) {});
     final p = widget.editPurchase;
     if (p != null) {
       _supplierCtrl.text = p.supplierName;
@@ -147,6 +163,7 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
             it.unitCost,
             purchaseCategoryId: it.purchaseCategoryId,
             productId: it.productId,
+            unit: it.unit,
           ),
       ]);
   }
@@ -170,7 +187,15 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
       if (existing != null) {
         existing.qty.text = '${(int.tryParse(existing.qty.text) ?? 0) + 1}';
       } else {
-        _lines.add(_Line(c.name, 1, 0, purchaseCategoryId: c.id));
+        _lines.add(
+          _Line(
+            c.name,
+            null,
+            null,
+            purchaseCategoryId: c.id,
+            unit: _defaultUnit,
+          ),
+        );
       }
     });
   }
@@ -291,6 +316,7 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
               purchaseCategoryId: l.purchaseCategoryId,
               productId: l.productId,
               productName: l.name,
+              unit: l.unit,
               quantity: int.tryParse(l.qty.text) ?? 0,
               unitCost: double.tryParse(l.cost.text) ?? 0,
             ),
@@ -525,6 +551,7 @@ class _CreatePurchasePageState extends ConsumerState<CreatePurchasePage> {
         return _ItemsStep(
           formKey: _step2Key,
           lines: _lines,
+          units: _units,
           loading: _loadingLines,
           onAdd: () => _pickCategory(context),
           onRemove: (l) => setState(() {
@@ -816,16 +843,21 @@ class _Line {
   final String name;
   final TextEditingController qty;
   final TextEditingController cost;
+  String? unit;
 
+  /// Null [quantity] / [unitCost] leave the field empty (a new line).
   _Line(
     this.name,
-    int quantity,
-    double unitCost, {
+    int? quantity,
+    double? unitCost, {
     this.purchaseCategoryId,
     this.productId = '',
-  }) : qty = TextEditingController(text: '$quantity'),
+    this.unit,
+  }) : qty = TextEditingController(text: quantity == null ? '' : '$quantity'),
        cost = TextEditingController(
-         text: unitCost % 1 == 0
+         text: unitCost == null
+             ? ''
+             : unitCost % 1 == 0
              ? unitCost.toStringAsFixed(0)
              : unitCost.toStringAsFixed(2),
        );
@@ -842,6 +874,9 @@ class _Line {
 class _ItemsStep extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final List<_Line> lines;
+
+  /// Unit names for each line's unit picker.
+  final List<String> units;
   final bool loading;
   final VoidCallback onAdd;
   final void Function(_Line) onRemove;
@@ -855,6 +890,7 @@ class _ItemsStep extends StatelessWidget {
   const _ItemsStep({
     required this.formKey,
     required this.lines,
+    required this.units,
     required this.loading,
     required this.onAdd,
     required this.onRemove,
@@ -940,6 +976,7 @@ class _ItemsStep extends StatelessWidget {
           else
             for (final l in lines) ...[
               _LineCard(
+                units: units,
                 line: l,
                 onRemove: () => onRemove(l),
                 onChanged: onChanged,
@@ -1054,105 +1091,196 @@ class _ItemsStep extends StatelessWidget {
 
 class _LineCard extends StatelessWidget {
   final _Line line;
+  final List<String> units;
   final VoidCallback onRemove;
   final VoidCallback onChanged;
   const _LineCard({
     required this.line,
+    required this.units,
     required this.onRemove,
     required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    InputDecoration box(String label, {String? prefix}) => InputDecoration(
-      labelText: label,
-      prefixText: prefix,
-      isDense: true,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-    );
+    InputDecoration box(String label, {String? prefix, String? hint}) =>
+        InputDecoration(
+          labelText: label,
+          hintText: hint,
+          prefixText: prefix,
+          isDense: true,
+          filled: true,
+          fillColor: AppColors.surfaceElevated,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 13,
+          ),
+          floatingLabelBehavior: FloatingLabelBehavior.always,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppColors.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppColors.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
+          ),
+        );
+    // A unit saved on an old line that's no longer in the master still shows.
+    final unitOptions = [
+      ...units,
+      if (line.unit != null && !units.contains(line.unit)) line.unit!,
+    ];
+    final qty = int.tryParse(line.qty.text) ?? 0;
+    final cost = double.tryParse(line.cost.text) ?? 0;
+    final money = _ItemsStep._money;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 6, 12),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.border),
+        boxShadow: AppColors.shadows([
+          BoxShadow(
+            color: AppColors.shadowDark.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ]),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.checkroom_rounded,
-                size: 18,
-                color: AppColors.brand,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  line.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              IconButton(
-                tooltip: 'Remove',
-                onPressed: onRemove,
-                icon: Icon(
-                  Icons.close_rounded,
-                  size: 18,
-                  color: AppColors.textHint,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
+          // Name + remove.
           Padding(
-            padding: const EdgeInsets.only(right: 6),
+            padding: const EdgeInsets.fromLTRB(14, 8, 4, 0),
             child: Row(
               children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: line.qty,
-                    keyboardType: TextInputType.number,
-                    decoration: box('Qty'),
-                    onChanged: (_) => onChanged(),
-                    validator: (v) => (int.tryParse(v?.trim() ?? '') ?? 0) < 1
-                        ? 'At least 1'
-                        : null,
+                Container(
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.brand.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.inventory_2_outlined,
+                    size: 17,
+                    color: AppColors.brand,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
+                  child: Text(
+                    line.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.ink,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Remove',
+                  onPressed: onRemove,
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    size: 20,
+                    color: AppColors.textHint,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Qty · unit · unit cost.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: TextFormField(
+                    controller: line.qty,
+                    keyboardType: TextInputType.number,
+                    decoration: box('Qty', hint: '0'),
+                    onChanged: (_) => onChanged(),
+                    validator: (v) => (int.tryParse(v?.trim() ?? '') ?? 0) < 1
+                        ? 'Enter qty'
+                        : null,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 4,
+                  child: DropdownButtonFormField<String>(
+                    initialValue: line.unit,
+                    isExpanded: true,
+                    decoration: box('Unit'),
+                    borderRadius: BorderRadius.circular(12),
+                    items: [
+                      for (final u in unitOptions)
+                        DropdownMenuItem(value: u, child: Text(u)),
+                    ],
+                    onChanged: (v) {
+                      line.unit = v;
+                      onChanged();
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 6,
                   child: TextFormField(
                     controller: line.cost,
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    decoration: box('Unit cost', prefix: '₹'),
+                    decoration: box('Unit cost', prefix: '₹ ', hint: '0'),
                     onChanged: (_) => onChanged(),
                     validator: (v) =>
                         (double.tryParse(v?.trim() ?? '') ?? -1) < 0
-                        ? 'Enter a cost'
+                        ? 'Enter cost'
                         : null,
                   ),
                 ),
-                const SizedBox(width: 10),
-                SizedBox(
-                  width: 78,
+              ],
+            ),
+          ),
+          // Full-width footer: the working and the full line total.
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+            decoration: BoxDecoration(
+              color: AppColors.brand.withValues(alpha: 0.06),
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(18),
+              ),
+              border: Border(top: BorderSide(color: AppColors.border)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
                   child: Text(
-                    '₹${_ItemsStep._money.format(line.total)}',
-                    textAlign: TextAlign.right,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    '$qty${line.unit == null ? '' : ' ${line.unit}'} × ₹${money.format(cost)}',
                     style: TextStyle(
-                      color: AppColors.ink,
-                      fontWeight: FontWeight.w800,
+                      color: AppColors.textSecondary,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
                     ),
+                  ),
+                ),
+                Text(
+                  '₹${money.format(line.total)}',
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ],

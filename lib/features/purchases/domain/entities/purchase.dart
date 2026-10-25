@@ -10,6 +10,9 @@ class PurchaseItem {
   /// The category's or product's name.
   final String productName;
   final int quantity;
+
+  /// What [quantity] counts, e.g. "pcs", "m", "kg" (null on older lines).
+  final String? unit;
   final double unitCost;
 
   const PurchaseItem({
@@ -17,6 +20,7 @@ class PurchaseItem {
     this.productId = '',
     required this.productName,
     required this.quantity,
+    this.unit,
     required this.unitCost,
   });
 

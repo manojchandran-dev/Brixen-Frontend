@@ -170,7 +170,10 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
                   ],
                 ),
               )
-            : ModuleTitle(title: 'Purchases', subtitle: 'Raw material purchases'),
+            : ModuleTitle(
+                title: 'Purchases',
+                subtitle: 'Raw material purchases',
+              ),
         actions: [
           GestureDetector(
             onTap: () => context.push(
@@ -736,6 +739,7 @@ void _showPurchaseDetail(
               ),
           ],
         ),
+        _PurchaseItemsSection(purchase: purchase),
         DetailSection(
           title: 'Amount',
           items: [
@@ -771,6 +775,69 @@ void _showPurchaseDetail(
       ],
     ),
   );
+}
+
+/// The bill's lines ("Elastic · 200 m × ₹3.00"). The list response may not
+/// carry them, so they're fetched when missing.
+class _PurchaseItemsSection extends ConsumerStatefulWidget {
+  final Purchase purchase;
+  const _PurchaseItemsSection({required this.purchase});
+
+  @override
+  ConsumerState<_PurchaseItemsSection> createState() =>
+      _PurchaseItemsSectionState();
+}
+
+class _PurchaseItemsSectionState extends ConsumerState<_PurchaseItemsSection> {
+  late List<PurchaseItem> _items = widget.purchase.items;
+  late bool _loading = _items.isEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!_loading) return;
+    ref
+        .read(purchasesProvider.notifier)
+        .fetch(widget.purchase.id)
+        .then((p) {
+          if (mounted) setState(() => _items = p.items);
+        }, onError: (_) {})
+        .whenComplete(() {
+          if (mounted) setState(() => _loading = false);
+        });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    if (_items.isEmpty) return const SizedBox.shrink();
+    final fmt = NumberFormat('#,##,##0.00', 'en_IN');
+    return DetailSection(
+      title: 'Items',
+      items: [
+        for (final it in _items)
+          DetailRow(
+            icon: Icons.inventory_2_outlined,
+            label: it.productName,
+            value:
+                '${it.quantity}${it.unit == null ? '' : ' ${it.unit}'} × '
+                '₹${fmt.format(it.unitCost)} = ₹${fmt.format(it.lineTotal)}',
+            iconColor: AppColors.accentIndigo,
+          ),
+      ],
+    );
+  }
 }
 
 class _StatusChip extends StatelessWidget {
