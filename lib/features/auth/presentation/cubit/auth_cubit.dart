@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/network/token_refresh_interceptor.dart';
 import '../../../../core/services/account_store.dart';
 import '../../../../core/services/push_token_service.dart';
 import '../../../../core/services/token_service.dart';
@@ -15,6 +16,18 @@ String _friendlyAuthError(Object e) =>
     e is ApiException ? e.message : e.toString();
 
 final authCubit = AuthCubit();
+
+/// Outcome of [AuthCubit.switchAccount].
+enum SwitchResult {
+  switched,
+
+  /// The account's session has ended; it must be signed into again. The
+  /// previous account stays active.
+  expired,
+
+  /// No saved account with that email.
+  notFound,
+}
 
 class AuthCubit extends Cubit<AuthState> {
   AuthCubit() : super(const AuthInitial());
@@ -57,11 +70,23 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
+  /// Signs the active account out: revokes its refresh token on the server
+  /// and forgets it in the account switcher (other saved accounts stay, and
+  /// the sign-in page offers them).
   Future<void> signOut() async {
     await PushTokenService.unregister();
+    final email = TokenService.email;
+    final refreshToken = TokenService.refreshToken;
+    if (refreshToken != null) {
+      unawaited(authRemoteDatasource.logout(refreshToken));
+    }
+    if (email != null) await AccountStore.remove(email);
     await TokenService.clear();
     emit(const AuthUnauthenticated());
   }
+
+  UserRole get _activeRole =>
+      UserRoleX.fromString(TokenService.userType ?? TokenService.role);
 
   /// Switches the active session to an already-signed-in saved account
   /// (see [AccountStore]) — e.g. tapping another entry in the "More" tab's
@@ -72,37 +97,49 @@ class AuthCubit extends Cubit<AuthState> {
   /// session-scoped Riverpod provider (dashboard/reports/modules) refetches
   /// for the new account instead of showing the previous one's cached data.
   ///
-  /// Returns `false` when the saved snapshot's token has since expired —
-  /// its whole point is catching that *before* switching in, since a saved
-  /// token can easily be stale (it's whatever was last active for that
-  /// account, with no refresh flow to keep it current). The dead snapshot
-  /// is dropped and the active session cleared so the caller can send the
-  /// user to sign back into that account, rather than landing them on a
-  /// dashboard where every request then fails with a confusing 401.
-  Future<bool> switchAccount(String email) async {
-    final snapshot = AccountStore.find(email);
-    if (snapshot == null) return false;
+  /// A saved account's access token has usually expired (they last ~15
+  /// minutes), so it's renewed with that account's refresh token. Only when
+  /// that fails too is the account really signed out: then the previous
+  /// account is put back — switching never logs anyone out — and
+  /// [SwitchResult.expired] tells the caller to offer signing in again.
+  Future<SwitchResult> switchAccount(String email) async {
+    final target = AccountStore.find(email);
+    if (target == null) return SwitchResult.notFound;
     await AccountStore.upsertCurrent();
+    final active = TokenService.email;
+    final previous = active == null ? null : AccountStore.find(active);
+
     emit(const AuthLoading());
-    await snapshot.restoreToTokenService();
-    try {
-      await authRemoteDatasource.validateSession();
-    } catch (e) {
-      if (e is ApiException && e.statusCode == 401) {
-        await AccountStore.remove(email);
+    await target.restoreToTokenService();
+    if (!await _sessionAlive()) {
+      if (previous != null) {
+        await previous.restoreToTokenService();
+        emit(AuthAuthenticated(role: _activeRole));
+      } else {
         await TokenService.clear();
         emit(const AuthUnauthenticated());
-        return false;
       }
-      // Any other failure (offline, timeout, server hiccup) shouldn't block
-      // the switch — the token itself may still be fine.
+      return SwitchResult.expired;
     }
-    final role = UserRoleX.fromString(
-      TokenService.userType ?? TokenService.role,
-    );
-    emit(AuthAuthenticated(role: role));
+    await AccountStore.upsertCurrent();
+    emit(AuthAuthenticated(role: _activeRole));
     unawaited(PushTokenService.register());
-    return true;
+    return SwitchResult.switched;
+  }
+
+  /// Whether the session now in [TokenService] works, renewing an expired
+  /// access token first. Offline or a server hiccup counts as alive — the
+  /// tokens may well be fine, and the app's own refresh handles it later.
+  Future<bool> _sessionAlive() async {
+    try {
+      await authRemoteDatasource.validateSession();
+      return true;
+    } on ApiException catch (e) {
+      if (e.statusCode != 401) return true;
+    } catch (_) {
+      return true;
+    }
+    return TokenRefreshInterceptor.refreshNow(signOutOnFailure: false);
   }
 
   /// Called by splash to auto-login from stored token.

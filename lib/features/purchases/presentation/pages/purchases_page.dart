@@ -827,13 +827,13 @@ class _PurchaseItemsSectionState extends ConsumerState<_PurchaseItemsSection> {
       title: 'Items',
       items: [
         for (final it in _items)
-          DetailRow(
+          DetailLineItem(
             icon: Icons.inventory_2_outlined,
-            label: it.productName,
-            value:
+            name: it.productName,
+            working:
                 '${it.quantity}${it.unit == null ? '' : ' ${it.unit}'} × '
-                '₹${fmt.format(it.unitCost)} = ₹${fmt.format(it.lineTotal)}',
-            iconColor: AppColors.accentIndigo,
+                '₹${fmt.format(it.unitCost)}',
+            total: '₹${fmt.format(it.lineTotal)}',
           ),
       ],
     );

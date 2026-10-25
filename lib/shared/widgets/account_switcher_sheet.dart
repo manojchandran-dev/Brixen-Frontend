@@ -8,8 +8,8 @@ import '../../features/auth/domain/entities/user_role.dart';
 import '../../features/auth/presentation/cubit/auth_cubit.dart';
 
 /// Opens the Gmail-style account switcher — every account signed into on
-/// this device (see [AccountStore]), plus "Add account". Call from a tap on
-/// the "More" tab's profile card.
+/// this device (see [AccountStore]), plus "Add another account". Call from a
+/// tap on the "More" tab's profile card.
 ///
 /// Snapshots whatever's currently active first: [AccountStore] otherwise
 /// only learns about an account when it's freshly signed into via
@@ -29,7 +29,8 @@ Future<void> showAccountSwitcher(BuildContext context) async {
   );
 }
 
-String _displayName(AccountSnapshot a) {
+/// Name shown for a saved account.
+String accountDisplayName(AccountSnapshot a) {
   switch (UserRoleX.fromString(a.userType ?? a.role)) {
     case UserRole.superAdmin:
       return 'Admin';
@@ -41,20 +42,19 @@ String _displayName(AccountSnapshot a) {
 }
 
 String _roleLabel(AccountSnapshot a) {
-  switch (UserRoleX.fromString(a.userType ?? a.role)) {
-    case UserRole.superAdmin:
-      return 'Super Admin';
-    case UserRole.companyAdmin:
-      return 'Company Admin';
-    case UserRole.employee:
-      return 'Employee';
-  }
+  final role = switch (UserRoleX.fromString(a.userType ?? a.role)) {
+    UserRole.superAdmin => 'Super Admin',
+    UserRole.companyAdmin => 'Company Admin',
+    UserRole.employee => 'Employee',
+  };
+  final company = a.companyName;
+  return company == null || company.isEmpty ? role : '$role · $company';
 }
 
 String _initials(String name) {
   final parts = name
       .trim()
-      .split(RegExp(r'\s+'))
+      .split(RegExp(r'[\s@.]+'))
       .where((p) => p.isNotEmpty)
       .toList();
   if (parts.isEmpty) return '?';
@@ -66,6 +66,33 @@ String _initials(String name) {
   return (parts.first[0] + parts[1][0]).toUpperCase();
 }
 
+/// Switches to [email] from anywhere (switcher sheet, sign-in page) and
+/// returns whether it switched; the caller then goes to the dashboard. If
+/// that account's session has ended, the current account stays active and a
+/// snack bar offers to sign in to it again.
+Future<bool> switchToAccount(BuildContext context, String email) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final router = GoRouter.of(context);
+  final result = await authCubit.switchAccount(email);
+  switch (result) {
+    case SwitchResult.switched:
+      return true;
+    case SwitchResult.expired:
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('$email was signed out. Sign in to use it again.'),
+          action: SnackBarAction(
+            label: 'Sign in',
+            onPressed: () => router.push(AppRouter.signIn, extra: email),
+          ),
+        ),
+      );
+      return false;
+    case SwitchResult.notFound:
+      return false;
+  }
+}
+
 class _AccountSwitcherSheet extends StatefulWidget {
   const _AccountSwitcherSheet();
 
@@ -74,34 +101,31 @@ class _AccountSwitcherSheet extends StatefulWidget {
 }
 
 class _AccountSwitcherSheetState extends State<_AccountSwitcherSheet> {
-  bool _busy = false;
+  /// The account being switched to, while it happens.
+  String? _switching;
 
   Future<void> _switchTo(String email) async {
-    if (_busy || email == TokenService.email) return;
-    setState(() => _busy = true);
-    final switched = await authCubit.switchAccount(email);
+    if (_switching != null || email == TokenService.email) return;
+    setState(() => _switching = email);
+    final navigator = Navigator.of(context);
+    final router = GoRouter.of(context);
+    final switched = await switchToAccount(context, email);
     if (!mounted) return;
-    if (!switched) {
-      setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Session for $email has expired — sign in again.'),
-        ),
-      );
-      return;
-    }
-    Navigator.of(context).pop();
-    context.go(AppRouter.dashboard);
+    // Closed either way: on failure the "Sign in" snack bar would otherwise
+    // sit hidden behind the sheet.
+    navigator.pop();
+    if (switched) router.go(AppRouter.dashboard);
   }
 
-  Future<void> _removeAccount(String email) async {
-    if (_busy) return;
+  Future<void> _removeAccount(AccountSnapshot a) async {
+    if (_switching != null) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Remove account?'),
         content: Text(
-          'You\'ll need to sign in again to use $email on this device.',
+          '${a.email} will be removed from this device. You can sign in '
+          'to it again any time.',
         ),
         actions: [
           TextButton(
@@ -116,12 +140,12 @@ class _AccountSwitcherSheetState extends State<_AccountSwitcherSheet> {
       ),
     );
     if (confirmed != true) return;
-    await AccountStore.remove(email);
+    await AccountStore.remove(a.email);
     if (mounted) setState(() {});
   }
 
   void _addAccount() {
-    if (_busy) return;
+    if (_switching != null) return;
     Navigator.of(context).pop();
     // Plain push, no session change here — AuthCubit.signIn() only touches
     // TokenService once the new login actually succeeds, so backing out of
@@ -132,14 +156,24 @@ class _AccountSwitcherSheetState extends State<_AccountSwitcherSheet> {
   @override
   Widget build(BuildContext context) {
     final accounts = AccountStore.accounts;
+    final activeEmail = TokenService.email;
+    final active = accounts.where((a) => a.email == activeEmail).firstOrNull;
+    final others = [
+      for (final a in accounts.reversed)
+        if (a.email != activeEmail) a,
+    ];
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.8,
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
           decoration: BoxDecoration(
             color: AppColors.surface,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(26),
             boxShadow: AppColors.shadows([
               BoxShadow(
                 color: AppColors.shadowDark.withValues(alpha: 0.18),
@@ -164,73 +198,78 @@ class _AccountSwitcherSheetState extends State<_AccountSwitcherSheet> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Switch account',
+                'Accounts',
                 style: TextStyle(
                   color: AppColors.ink,
-                  fontSize: 16,
+                  fontSize: 18,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 10),
-              for (final a in accounts)
-                _AccountRow(
-                  account: a,
-                  active: a.email == TokenService.email,
-                  onTap: () => _switchTo(a.email),
-                  onRemove: a.email == TokenService.email
-                      ? null
-                      : () => _removeAccount(a.email),
+              const SizedBox(height: 2),
+              Text(
+                others.isEmpty
+                    ? 'Add another account to switch between them'
+                    : 'Tap an account to switch to it',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12.5,
                 ),
-              if (accounts.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Divider(height: 1, color: AppColors.border),
-                ),
-              GestureDetector(
-                onTap: _addAccount,
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Row(
+              ),
+              const SizedBox(height: 14),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppColors.brand.withValues(alpha: 0.12),
-                          shape: BoxShape.circle,
+                      if (active != null) _ActiveAccountCard(account: active),
+                      if (others.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4, bottom: 4),
+                          child: Text(
+                            'OTHER ACCOUNTS',
+                            style: TextStyle(
+                              color: AppColors.textHint,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
                         ),
-                        child: Icon(
-                          Icons.add_rounded,
-                          color: AppColors.brand,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Text(
-                        'Add account',
-                        style: TextStyle(
-                          color: AppColors.ink,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                        for (final a in others)
+                          _AccountRow(
+                            account: a,
+                            switching: _switching == a.email,
+                            enabled: _switching == null,
+                            onTap: () => _switchTo(a.email),
+                            onRemove: () => _removeAccount(a),
+                          ),
+                      ],
                     ],
                   ),
                 ),
               ),
-              if (_busy)
-                const Padding(
-                  padding: EdgeInsets.only(top: 4, bottom: 6),
-                  child: Center(
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _switching == null ? _addAccount : null,
+                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 20),
+                  label: const Text('Add another account'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.brand,
+                    side: BorderSide(color: AppColors.border),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
+              ),
             ],
           ),
         ),
@@ -239,96 +278,218 @@ class _AccountSwitcherSheetState extends State<_AccountSwitcherSheet> {
   }
 }
 
+class _Avatar extends StatelessWidget {
+  final String name;
+  final double size;
+  const _Avatar(this.name, {this.size = 42});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    alignment: Alignment.center,
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [AppColors.brand, AppColors.brandDeep],
+      ),
+      shape: BoxShape.circle,
+    ),
+    child: Text(
+      _initials(name),
+      style: TextStyle(
+        color: AppColors.white,
+        fontWeight: FontWeight.w800,
+        fontSize: size * 0.33,
+      ),
+    ),
+  );
+}
+
+/// The signed-in account, highlighted at the top.
+class _ActiveAccountCard extends StatelessWidget {
+  final AccountSnapshot account;
+  const _ActiveAccountCard({required this.account});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = accountDisplayName(account);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.brand.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.brand.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          _Avatar(name, size: 48),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _roleLabel(account),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  account.email,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: AppColors.textHint, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.positive.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.check_circle_rounded,
+                  size: 14,
+                  color: AppColors.positive,
+                ),
+                SizedBox(width: 4),
+                Text(
+                  'Active',
+                  style: TextStyle(
+                    color: AppColors.positive,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AccountRow extends StatelessWidget {
   final AccountSnapshot account;
-  final bool active;
+  final bool switching;
+  final bool enabled;
   final VoidCallback onTap;
-  final VoidCallback? onRemove;
+  final VoidCallback onRemove;
   const _AccountRow({
     required this.account,
-    required this.active,
+    required this.switching,
+    required this.enabled,
     required this.onTap,
-    this.onRemove,
+    required this.onRemove,
   });
 
   @override
   Widget build(BuildContext context) {
-    final name = _displayName(account);
-    // Normal tap switches into the account; long-press (only offered for a
-    // non-active one — see onRemove's null check upstream) asks to remove
-    // it instead, so the two actions share the row without a dedicated
-    // remove button crowding it.
-    return GestureDetector(
-      onTap: onTap,
-      onLongPress: onRemove,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.brand, AppColors.positive],
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                _initials(name),
-                style: const TextStyle(
-                  color: AppColors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: AppColors.ink,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
+    final name = accountDisplayName(account);
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(4, 10, 0, 10),
+          child: Row(
+            children: [
+              _Avatar(name),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _roleLabel(account),
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: AppColors.textHint, fontSize: 11.5),
-                  ),
-                  Text(
-                    account.email,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: AppColors.textHint, fontSize: 11.5),
-                  ),
-                ],
-              ),
-            ),
-            if (active)
-              const Padding(
-                padding: EdgeInsets.only(left: 8),
-                child: Icon(
-                  Icons.check_circle_rounded,
-                  color: AppColors.positive,
-                  size: 20,
+                    const SizedBox(height: 1),
+                    Text(
+                      switching ? 'Switching…' : _roleLabel(account),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: switching
+                            ? AppColors.brand
+                            : AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      account.email,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: AppColors.textHint, fontSize: 12),
+                    ),
+                  ],
                 ),
-              )
-            else
-              Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.ink.withValues(alpha: 0.3),
-                size: 20,
               ),
-          ],
+              if (switching)
+                const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              else
+                PopupMenuButton<String>(
+                  enabled: enabled,
+                  tooltip: 'More',
+                  icon: Icon(
+                    Icons.more_vert_rounded,
+                    color: AppColors.textHint,
+                  ),
+                  onSelected: (_) => onRemove(),
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(
+                      value: 'remove',
+                      child: Row(
+                        children: [
+                          Icon(Icons.person_remove_outlined, size: 20),
+                          SizedBox(width: 10),
+                          Text('Remove from this device'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
         ),
       ),
     );

@@ -31,6 +31,8 @@ class SaleModel extends Sale {
       id: json['id'].toString(),
       companyId: json['company_id']?.toString(),
       customerId: json['customer_id']?.toString(),
+      // The server sends the customer's name too (even a deleted one's).
+      customerName: (json['customers'] as Map?)?['name']?.toString(),
       billDate: json['bill_date'] != null
           ? DateTime.tryParse(json['bill_date'].toString()) ?? DateTime.now()
           : DateTime.now(),

@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../router/app_router.dart';
 import '../router/route_names.dart';
+import '../services/account_store.dart';
 import '../services/token_service.dart';
 import 'api_endpoints.dart';
 
@@ -44,7 +45,7 @@ class TokenRefreshInterceptor extends Interceptor {
       return handler.next(err);
     }
 
-    final refreshed = await (_inFlight ??= _refresh().whenComplete(
+    final refreshed = await (_inFlight ??= refreshNow().whenComplete(
       () => _inFlight = null,
     ));
     if (!refreshed) return handler.next(err);
@@ -58,11 +59,18 @@ class TokenRefreshInterceptor extends Interceptor {
     }
   }
 
-  static Future<bool> _refresh() async {
+  /// Swaps the active session's refresh token for a new pair and saves it,
+  /// also into the account switcher's copy — the old refresh token is spent,
+  /// so a stale copy there would fail the next switch back. On failure the
+  /// session is over: with [signOutOnFailure] it's cleared and the user sent
+  /// to sign-in; without, the caller decides (e.g. account switching).
+  static Future<bool> refreshNow({bool signOutOnFailure = true}) async {
+    final refreshToken = TokenService.refreshToken;
+    if (refreshToken == null) return false;
     try {
       final resp = await _plain.post(
-        '/api/v1/auth/refresh',
-        data: {'refreshToken': TokenService.refreshToken},
+        ApiEndpoints.authRefresh,
+        data: {'refreshToken': refreshToken},
       );
       final data = resp.data['data'] as Map<String, dynamic>;
       await TokenService.save(
@@ -70,11 +78,14 @@ class TokenRefreshInterceptor extends Interceptor {
         role: TokenService.role ?? '',
         refreshToken: data['refreshToken'] as String?,
       );
+      await AccountStore.upsertCurrent();
       return true;
     } catch (e) {
-      debugPrint('[TokenRefreshInterceptor] refresh failed, signing out: $e');
-      await TokenService.clear();
-      AppRouter.router.go(RouteNames.signIn);
+      debugPrint('[TokenRefreshInterceptor] refresh failed: $e');
+      if (signOutOnFailure) {
+        await TokenService.clear();
+        AppRouter.router.go(RouteNames.signIn);
+      }
       return false;
     }
   }

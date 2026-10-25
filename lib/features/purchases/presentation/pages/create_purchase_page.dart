@@ -1219,19 +1219,39 @@ class _LineCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   flex: 4,
-                  child: DropdownButtonFormField<String>(
-                    initialValue: line.unit,
-                    isExpanded: true,
-                    decoration: box('Unit'),
+                  child: InkWell(
                     borderRadius: BorderRadius.circular(12),
-                    items: [
-                      for (final u in unitOptions)
-                        DropdownMenuItem(value: u, child: Text(u)),
-                    ],
-                    onChanged: (v) {
-                      line.unit = v;
+                    onTap: () async {
+                      final picked = await _pickUnit(
+                        context,
+                        current: line.unit,
+                        units: unitOptions,
+                      );
+                      if (picked == null) return;
+                      line.unit = picked;
                       onChanged();
                     },
+                    child: InputDecorator(
+                      decoration: box('Unit').copyWith(
+                        suffixIcon: Icon(
+                          Icons.expand_more_rounded,
+                          size: 18,
+                          color: AppColors.textHint,
+                        ),
+                        suffixIconConstraints: const BoxConstraints(
+                          minWidth: 26,
+                        ),
+                      ),
+                      child: Text(
+                        line.unit ?? '—',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1768,6 +1788,154 @@ class _NotesFieldState extends State<_NotesField> {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Bottom sheet of the company's units as chips ("pcs · Pieces"), the
+/// current one highlighted. Returns the picked unit name, or null.
+Future<String?> _pickUnit(
+  BuildContext context, {
+  required String? current,
+  required List<String> units,
+}) {
+  final fullForms = {
+    for (final u in masterCubit.itemsOfType('unit')) u.name: u.fullForm,
+  };
+  return showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (ctx) => SafeArea(
+      child: Container(
+        margin: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Select unit',
+              style: TextStyle(
+                color: AppColors.ink,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'What the quantity counts',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+            ),
+            const SizedBox(height: 14),
+            if (units.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'No units yet. Add them in Masters → Units.',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                ),
+              )
+            else
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final u in units)
+                        _UnitChip(
+                          unit: u,
+                          fullForm: fullForms[u],
+                          selected: u == current,
+                          onTap: () => Navigator.of(ctx).pop(u),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _UnitChip extends StatelessWidget {
+  final String unit;
+  final String? fullForm;
+  final bool selected;
+  final VoidCallback onTap;
+  const _UnitChip({
+    required this.unit,
+    required this.fullForm,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = selected ? AppColors.white : AppColors.ink;
+    return Material(
+      color: selected ? AppColors.brand : AppColors.surfaceElevated,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 92),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? AppColors.brand : AppColors.border,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                unit,
+                style: TextStyle(
+                  color: fg,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (fullForm != null && fullForm!.isNotEmpty)
+                Text(
+                  fullForm!,
+                  style: TextStyle(
+                    color: fg.withValues(alpha: 0.7),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -21,6 +21,8 @@ class ApiEndpoints {
   // OTP-verified). Sends the Bearer token instead of a reset token.
   static const String changePassword = '/api/v1/auth/change-password';
   static const String me = '/api/v1/auth/me';
+  static const String authRefresh = '/api/v1/auth/refresh';
+  static const String authLogout = '/api/v1/auth/logout';
   static const String companies = '/api/v1/companies';
   static const String expenseCategories = '/api/v1/expense-categories';
   static const String companyCategories = '/api/v1/company-categories';

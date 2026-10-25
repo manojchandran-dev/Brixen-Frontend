@@ -173,6 +173,17 @@ class AuthRemoteDatasource {
       throw ApiException(msg.toString(), statusCode: status);
     }
   }
+
+  /// Revokes [refreshToken] on the server (`POST /auth/logout`). Best
+  /// effort: signing out on this device goes ahead even if it fails.
+  Future<void> logout(String refreshToken) async {
+    try {
+      await _dio.post(
+        ApiEndpoints.authLogout,
+        data: {'refreshToken': refreshToken},
+      );
+    } catch (_) {}
+  }
 }
 
 final authRemoteDatasource = AuthRemoteDatasource();

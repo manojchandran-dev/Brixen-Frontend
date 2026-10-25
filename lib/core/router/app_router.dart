@@ -139,7 +139,8 @@ class AppRouter {
       GoRoute(path: splash, builder: (context, state) => const SplashPage()),
       GoRoute(
         path: signIn,
-        builder: (context, state) => const ExitGuard(child: SignInPage()),
+        builder: (context, state) =>
+            ExitGuard(child: SignInPage(initialEmail: state.extra as String?)),
       ),
       GoRoute(path: signUp, builder: (context, state) => const SignUpPage()),
       GoRoute(

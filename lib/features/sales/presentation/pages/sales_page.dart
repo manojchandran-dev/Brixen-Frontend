@@ -1220,18 +1220,16 @@ class _SaleItemsSectionState extends ConsumerState<_SaleItemsSection> {
     final fmt = NumberFormat('#,##,##0.00', 'en_IN');
     return DetailSection(
       title: 'Products',
-      items: _items
-          .map(
-            (it) => DetailRow(
-              icon: Icons.checkroom_rounded,
-              label:
-                  '${it.productName} (${it.priceType == 'wholesale' ? 'Wholesale' : 'Retail'})',
-              value:
-                  '${it.quantity} × ₹${fmt.format(it.price)} = ₹${fmt.format(it.amount)}',
-              iconColor: AppColors.accentIndigo,
-            ),
-          )
-          .toList(),
+      items: [
+        for (final it in _items)
+          DetailLineItem(
+            icon: Icons.checkroom_rounded,
+            name: it.productName,
+            tag: it.priceType == 'wholesale' ? 'Wholesale' : 'Retail',
+            working: '${it.quantity} × ₹${fmt.format(it.price)}',
+            total: '₹${fmt.format(it.amount)}',
+          ),
+      ],
     );
   }
 }

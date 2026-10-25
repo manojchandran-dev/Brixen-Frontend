@@ -1,25 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/services/account_store.dart';
+import '../../../../core/services/token_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/brand_illustration.dart';
 import '../../../../shared/widgets/brixen_button.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
+import '../../../../shared/widgets/account_switcher_sheet.dart'
+    show accountDisplayName;
 import '../cubit/auth_cubit.dart';
 import '../cubit/auth_state.dart';
 
 class SignInPage extends StatelessWidget {
-  const SignInPage({super.key});
+  /// Prefills the email, e.g. when an account's session ended and it has to
+  /// be signed into again.
+  final String? initialEmail;
+  const SignInPage({super.key, this.initialEmail});
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider.value(value: authCubit, child: const _SignInView());
+    return BlocProvider.value(
+      value: authCubit,
+      child: _SignInView(initialEmail: initialEmail),
+    );
   }
 }
 
 class _SignInView extends StatefulWidget {
-  const _SignInView();
+  final String? initialEmail;
+  const _SignInView({this.initialEmail});
 
   @override
   State<_SignInView> createState() => _SignInViewState();
@@ -27,8 +38,45 @@ class _SignInView extends StatefulWidget {
 
 class _SignInViewState extends State<_SignInView> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  late final _emailController = TextEditingController(
+    text: widget.initialEmail,
+  );
   final _passwordController = TextEditingController();
+
+  /// The saved account being switched to from "Continue as" (null = none).
+  /// While set, the sign-in listener below stays out of it.
+  String? _switching;
+
+  /// Saved accounts on this device other than the active one.
+  List<AccountSnapshot> get _saved => [
+    for (final a in AccountStore.accounts.reversed)
+      if (a.email != TokenService.email) a,
+  ];
+
+  Future<void> _continueAs(AccountSnapshot a) async {
+    if (_switching != null) return;
+    setState(() => _switching = a.email);
+    final router = GoRouter.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final result = await authCubit.switchAccount(a.email);
+    if (!mounted) return;
+    if (result == SwitchResult.switched) {
+      router.go(AppRouter.dashboard);
+      return;
+    }
+    setState(() {
+      _switching = null;
+      _emailController.text = a.email;
+      _passwordController.clear();
+    });
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          '${a.email} was signed out. Enter its password to sign in again.',
+        ),
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -50,6 +98,9 @@ class _SignInViewState extends State<_SignInView> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: BlocListener<AuthCubit, AuthState>(
+        // A "Continue as" switch also emits AuthAuthenticated; it goes
+        // straight to the dashboard instead of PIN setup.
+        listenWhen: (_, _) => _switching == null,
         listener: (context, state) {
           if (state is AuthAuthenticated) {
             context.go(
@@ -126,6 +177,14 @@ class _SignInViewState extends State<_SignInView> {
                           passwordController: _passwordController,
                           onSubmit: _submit,
                         ),
+                        if (_saved.isNotEmpty) ...[
+                          const SizedBox(height: 20),
+                          _SavedAccounts(
+                            accounts: _saved,
+                            switching: _switching,
+                            onTap: _continueAs,
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -134,6 +193,93 @@ class _SignInViewState extends State<_SignInView> {
             },
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Saved accounts ───────────────────────────────────────────────────────
+
+/// "Continue as" — accounts already signed into on this device, one tap
+/// to switch back in without a password.
+class _SavedAccounts extends StatelessWidget {
+  final List<AccountSnapshot> accounts;
+  final String? switching;
+  final ValueChanged<AccountSnapshot> onTap;
+  const _SavedAccounts({
+    required this.accounts,
+    required this.switching,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 10, bottom: 4),
+            child: Text(
+              'CONTINUE AS',
+              style: TextStyle(
+                color: AppColors.textHint,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
+          for (final a in accounts)
+            ListTile(
+              enabled: switching == null,
+              onTap: () => onTap(a),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              leading: CircleAvatar(
+                backgroundColor: AppColors.brand,
+                foregroundColor: AppColors.white,
+                child: Text(
+                  accountDisplayName(a).trim().isEmpty
+                      ? '?'
+                      : accountDisplayName(a).trim()[0].toUpperCase(),
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+              title: Text(
+                accountDisplayName(a),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: AppColors.ink,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              subtitle: Text(
+                a.email,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: switching == a.email
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      Icons.chevron_right_rounded,
+                      color: AppColors.textHint,
+                    ),
+            ),
+        ],
       ),
     );
   }

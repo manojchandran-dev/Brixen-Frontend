@@ -43,7 +43,8 @@ List<StockLine>? watchStockLines(WidgetRef ref) {
 }
 
 (String, Color) stockStatusLook(String status) => switch (status) {
-  'out' => ('Out of stock', AppColors.brandBlack),
+  // Theme ink, so it reads in dark mode too (brandBlack is fixed near-black).
+  'out' => ('Out of stock', AppColors.error),
   'low' => ('Low stock', AppColors.brandDeep),
   _ => ('In stock', AppColors.positive),
 };

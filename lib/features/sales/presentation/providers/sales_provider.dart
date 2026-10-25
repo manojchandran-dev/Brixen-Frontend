@@ -29,7 +29,9 @@ class SalesNotifier extends AsyncNotifier<List<Sale>> {
     final names = {for (final c in customers) c.id: c.name};
     return list
         .map(
-          (s) => s.copyWith(customerName: names[s.customerId] ?? s.customerId),
+          (s) => s.copyWith(
+            customerName: names[s.customerId] ?? s.customerName ?? s.customerId,
+          ),
         )
         .toList();
   }
