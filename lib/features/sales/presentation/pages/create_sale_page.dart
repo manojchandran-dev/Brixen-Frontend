@@ -32,17 +32,30 @@ const _priceTypes = ['Retail', 'Wholesale'];
 /// `subtotal`/`taxAmount`/`totalAmount` this feeds into.
 class _SaleLineItem {
   final Product product;
+
+  /// The size/colour being sold (null for a product without sizes).
+  final ProductVariant? variant;
   int quantity;
   String priceType; // one of _priceTypes
   _SaleLineItem({
     required this.product,
+    this.variant,
     required this.quantity,
     required this.priceType,
   });
-  double get unitPrice =>
-      priceType == 'Wholesale' ? product.wholesalePrice : product.retailPrice;
+
+  /// One line per product + size.
+  String get key => _lineKey(product, variant);
+  String get title => variant == null
+      ? product.productName
+      : '${product.productName} (${variant!.label})';
+  double get unitPrice => priceType == 'Wholesale'
+      ? product.wholesaleFor(variant)
+      : product.retailFor(variant);
   double get amount => unitPrice * quantity;
 }
+
+String _lineKey(Product p, ProductVariant? v) => '${p.id}|${v?.id ?? ''}';
 
 class CreateSalePage extends ConsumerStatefulWidget {
   final bool fromMenu;
@@ -162,6 +175,9 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
                 if (product == null) return null;
                 return _SaleLineItem(
                   product: product,
+                  variant: product.variants
+                      .where((v) => v.id == item.variantId)
+                      .firstOrNull,
                   quantity: item.quantity,
                   priceType: item.priceType == 'wholesale'
                       ? 'Wholesale'
@@ -224,17 +240,23 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
   static String _trimmed(double v) =>
       v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
 
-  /// Checking a product in the multi-select picker adds it as a row (default
-  /// qty 1, Retail); unchecking removes it. Price tier and quantity are then
-  /// adjusted per-row below, not at selection time.
-  void _toggleProduct(Product product) {
+  /// Checking a product (or one of its sizes) in the picker adds it as a
+  /// row (default qty 1, Retail); unchecking removes it. Price tier and
+  /// quantity are then adjusted per-row below, not at selection time.
+  void _toggleProduct(Product product, ProductVariant? variant) {
     setState(() {
-      final i = _lineItems.indexWhere((l) => l.product.id == product.id);
+      final key = _lineKey(product, variant);
+      final i = _lineItems.indexWhere((l) => l.key == key);
       if (i != -1) {
         _lineItems.removeAt(i);
       } else {
         _lineItems.add(
-          _SaleLineItem(product: product, quantity: 1, priceType: 'Retail'),
+          _SaleLineItem(
+            product: product,
+            variant: variant,
+            quantity: 1,
+            priceType: 'Retail',
+          ),
         );
       }
     });
@@ -407,6 +429,8 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
               (l) => SaleItem(
                 productId: l.product.id,
                 productName: l.product.productName,
+                variantId: l.variant?.id,
+                variantLabel: l.variant?.label,
                 priceType: l.priceType.toLowerCase(),
                 price: l.unitPrice,
                 quantity: l.quantity,
@@ -737,9 +761,7 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
     'Date': DateFormat('dd MMM yyyy').format(_billDate),
     'Invoice Type': _invoiceType ?? '—',
     if (_lineItems.isNotEmpty)
-      'Items': _lineItems
-          .map((l) => '${l.product.productName} ×${l.quantity}')
-          .join(', '),
+      'Items': _lineItems.map((l) => '${l.title} ×${l.quantity}').join(', '),
     'Subtotal': '₹${_subtotalCtrl.text.isEmpty ? '0.00' : _subtotalCtrl.text}',
     if (_isGst && _taxPercentCtrl.text.isNotEmpty)
       'GST %': _taxPercentCtrl.text,
@@ -1009,6 +1031,7 @@ class _Step1 extends StatelessWidget {
             value: selectedCustomer,
             items: customers,
             labelOf: (c) => c.name,
+            subtitleOf: (c) => c.shopName,
             icon: Icons.person_outline_rounded,
             onChanged: onCustomerChanged,
           ),
@@ -1041,7 +1064,7 @@ class _Step1 extends StatelessWidget {
 class _Step2 extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final List<_SaleLineItem> lineItems;
-  final void Function(Product) onToggleProduct;
+  final void Function(Product, ProductVariant?) onToggleProduct;
   final void Function(int index) onRemoveLineItem;
   final void Function(int index, int qty) onLineItemQtyChanged;
   final void Function(int index, String priceType) onLineItemPriceTypeChanged;
@@ -1415,7 +1438,7 @@ class _QtyButton extends StatelessWidget {
 /// a product adds it as a line item immediately, unchecking removes it.
 class _ProductMultiSelectField extends StatelessWidget {
   final List<_SaleLineItem> lineItems;
-  final void Function(Product) onToggle;
+  final void Function(Product, ProductVariant?) onToggle;
   const _ProductMultiSelectField({
     required this.lineItems,
     required this.onToggle,
@@ -1427,7 +1450,7 @@ class _ProductMultiSelectField extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final label = lineItems.isEmpty
         ? null
-        : '${lineItems.length} product(s) selected';
+        : '${lineItems.length} item${lineItems.length == 1 ? '' : 's'} selected';
 
     return GestureDetector(
       onTap: () => showModalBottomSheet(
@@ -1435,7 +1458,7 @@ class _ProductMultiSelectField extends StatelessWidget {
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (_) => _ProductMultiSelectSheet(
-          selectedIds: lineItems.map((l) => l.product.id).toSet(),
+          selectedKeys: lineItems.map((l) => l.key).toSet(),
           onToggle: onToggle,
         ),
       ),
@@ -1483,10 +1506,11 @@ class _ProductMultiSelectField extends StatelessWidget {
 /// Watches the products list itself, so a sheet opened before products
 /// finish loading fills in when they arrive instead of showing "none".
 class _ProductMultiSelectSheet extends ConsumerStatefulWidget {
-  final Set<String> selectedIds;
-  final void Function(Product) onToggle;
+  /// Picked lines, as [_lineKey]s.
+  final Set<String> selectedKeys;
+  final void Function(Product, ProductVariant?) onToggle;
   const _ProductMultiSelectSheet({
-    required this.selectedIds,
+    required this.selectedKeys,
     required this.onToggle,
   });
 
@@ -1497,7 +1521,16 @@ class _ProductMultiSelectSheet extends ConsumerStatefulWidget {
 
 class _ProductMultiSelectSheetState
     extends ConsumerState<_ProductMultiSelectSheet> {
-  late final Set<String> _selectedIds = {...widget.selectedIds};
+  late final Set<String> _selected = {...widget.selectedKeys};
+
+  void _toggle(Product p, ProductVariant? v) {
+    final key = _lineKey(p, v);
+    setState(
+      () =>
+          _selected.contains(key) ? _selected.remove(key) : _selected.add(key),
+    );
+    widget.onToggle(p, v);
+  }
 
   /// Skeleton rows shaped like the product tiles.
   Widget _loading() => Shimmer(
@@ -1597,7 +1630,7 @@ class _ProductMultiSelectSheetState
                     ),
                   ),
                   Text(
-                    '${_selectedIds.length} selected',
+                    '${_selected.length} selected',
                     style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                   ),
                 ],
@@ -1628,17 +1661,20 @@ class _ProductMultiSelectSheetState
                       ),
                       itemBuilder: (_, i) {
                         final product = products[i];
-                        final selected = _selectedIds.contains(product.id);
+                        // With sizes: pick the size(s) being sold.
+                        if (product.hasVariants) {
+                          return _VariantPickTile(
+                            product: product,
+                            selected: _selected,
+                            onToggle: (v) => _toggle(product, v),
+                          );
+                        }
+                        final selected = _selected.contains(
+                          _lineKey(product, null),
+                        );
                         return CheckboxListTile(
                           value: selected,
-                          onChanged: (_) {
-                            setState(() {
-                              selected
-                                  ? _selectedIds.remove(product.id)
-                                  : _selectedIds.add(product.id);
-                            });
-                            widget.onToggle(product);
-                          },
+                          onChanged: (_) => _toggle(product, null),
                           controlAffinity: ListTileControlAffinity.leading,
                           title: Text(
                             product.productName,
@@ -1716,6 +1752,123 @@ class _PriceTypeChips extends StatelessWidget {
   }
 }
 
+/// A product with sizes in the picker: its name, then one chip per
+/// size/colour (with stock); tapping a chip adds/removes that size.
+class _VariantPickTile extends StatelessWidget {
+  final Product product;
+  final Set<String> selected;
+  final ValueChanged<ProductVariant> onToggle;
+  const _VariantPickTile({
+    required this.product,
+    required this.selected,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            product.productName,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Pick the size(s) sold',
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final v in product.variants)
+                _SizeChip(
+                  label: v.label,
+                  stock: v.stockQuantity,
+                  price: product.retailFor(v),
+                  selected: selected.contains(_lineKey(product, v)),
+                  onTap: () => onToggle(v),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SizeChip extends StatelessWidget {
+  final String label;
+  final int stock;
+  final double price;
+  final bool selected;
+  final VoidCallback onTap;
+  const _SizeChip({
+    required this.label,
+    required this.stock,
+    required this.price,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = selected ? AppColors.white : AppColors.ink;
+    return Material(
+      color: selected ? AppColors.brand : AppColors.surfaceElevated,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? AppColors.brand : AppColors.border,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (selected) ...[
+                    Icon(Icons.check_rounded, size: 14, color: fg),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(
+                    label,
+                    style: TextStyle(color: fg, fontWeight: FontWeight.w800),
+                  ),
+                ],
+              ),
+              Text(
+                '₹${price.toStringAsFixed(0)} · ${stock <= 0 ? 'out' : '$stock left'}',
+                style: TextStyle(
+                  color: fg.withValues(alpha: 0.75),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _LineItemRow extends StatelessWidget {
   final _SaleLineItem item;
   final void Function(int) onQtyChanged;
@@ -1740,7 +1893,7 @@ class _LineItemRow extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  item.product.productName,
+                  item.title,
                   style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,

@@ -116,4 +116,5 @@ class ApiEndpoints {
   static String productStep2(String id) => '/api/v1/products/$id/step2';
   static String productStep3(String id) => '/api/v1/products/$id/step3';
   static String productStep4(String id) => '/api/v1/products/$id/step4';
+  static String productVariants(String id) => '/api/v1/products/$id/variants';
 }

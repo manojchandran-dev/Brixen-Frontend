@@ -6,6 +6,10 @@ class BrixenDropdown<T> extends StatefulWidget {
   final T? value;
   final List<T> items;
   final String Function(T) labelOf;
+
+  /// Optional smaller second line (e.g. a customer's shop name); null or
+  /// empty shows just the label.
+  final String? Function(T)? subtitleOf;
   final IconData icon;
   final Color iconColor;
   final void Function(T?) onChanged;
@@ -16,6 +20,7 @@ class BrixenDropdown<T> extends StatefulWidget {
     required this.value,
     required this.items,
     required this.labelOf,
+    this.subtitleOf,
     required this.icon,
     this.iconColor = AppColors.brand,
     required this.onChanged,
@@ -81,6 +86,7 @@ class _BrixenDropdownState<T> extends State<BrixenDropdown<T>>
                           items: widget.items,
                           value: widget.value,
                           labelOf: widget.labelOf,
+                          subtitleOf: widget.subtitleOf,
                           onSelect: (v) {
                             widget.onChanged(v);
                             _hide();
@@ -118,6 +124,9 @@ class _BrixenDropdownState<T> extends State<BrixenDropdown<T>>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final label = widget.value != null
         ? widget.labelOf(widget.value as T)
+        : null;
+    final sub = widget.value != null
+        ? widget.subtitleOf?.call(widget.value as T)
         : null;
 
     return CompositedTransformTarget(
@@ -186,13 +195,32 @@ class _BrixenDropdownState<T> extends State<BrixenDropdown<T>>
                     ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  label ?? widget.hint,
-                  style: TextStyle(
-                    color: label != null ? cs.onSurface : cs.onSurfaceVariant,
-                    fontSize: 15,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label ?? widget.hint,
+                      style: TextStyle(
+                        color: label != null
+                            ? cs.onSurface
+                            : cs.onSurfaceVariant,
+                        fontSize: 15,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (sub != null && sub.trim().isNotEmpty)
+                      Text(
+                        sub,
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
                 ),
               ),
               AnimatedRotation(
@@ -216,12 +244,14 @@ class _BrixenDropdownPanel<T> extends StatelessWidget {
   final List<T> items;
   final T? value;
   final String Function(T) labelOf;
+  final String? Function(T)? subtitleOf;
   final void Function(T) onSelect;
 
   const _BrixenDropdownPanel({
     required this.items,
     required this.value,
     required this.labelOf,
+    this.subtitleOf,
     required this.onSelect,
   });
 
@@ -284,6 +314,7 @@ class _BrixenDropdownPanel<T> extends StatelessWidget {
             itemBuilder: (_, i) {
               final item = items[i];
               final selected = item == value;
+              final sub = subtitleOf?.call(item);
               return GestureDetector(
                 onTap: () => onSelect(item),
                 child: Container(
@@ -297,19 +328,48 @@ class _BrixenDropdownPanel<T> extends StatelessWidget {
                   child: Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          labelOf(item),
-                          style: TextStyle(
-                            color: selected
-                                ? (isDark
-                                      ? AppColors.silver
-                                      : AppColors.lightPrimary)
-                                : cs.onSurface,
-                            fontSize: 15,
-                            fontWeight: selected
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              labelOf(item),
+                              style: TextStyle(
+                                color: selected
+                                    ? (isDark
+                                          ? AppColors.silver
+                                          : AppColors.lightPrimary)
+                                    : cs.onSurface,
+                                fontSize: 15,
+                                fontWeight: selected
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                              ),
+                            ),
+                            if (sub != null && sub.trim().isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.storefront_outlined,
+                                    size: 13,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      sub,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: cs.onSurfaceVariant,
+                                        fontSize: 12.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                       if (selected)

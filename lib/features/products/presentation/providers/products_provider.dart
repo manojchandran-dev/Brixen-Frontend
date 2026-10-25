@@ -59,9 +59,11 @@ class ProductsNotifier extends AsyncNotifier<List<Product>> {
 
   /// Sets stock and its low-stock level — PUT /products/:id with only
   /// those two fields (see [ProductModel.toStockBody]).
+  /// [stockQuantity] null = only the low-stock alert (a product with sizes:
+  /// its stock is per size, set through Inventory).
   Future<Product> updateStock(
     String id, {
-    required int stockQuantity,
+    required int? stockQuantity,
     required int lowStockThreshold,
     String? companyId,
   }) async {
@@ -140,6 +142,24 @@ class ProductsNotifier extends AsyncNotifier<List<Product>> {
         .updateStep4(
           id,
           ProductModel.toStep4Body(product),
+          companyId: companyId,
+        );
+    _replace(updated);
+    return updated;
+  }
+
+  /// Sizes/colours — PUT /:id/variants (the full list; see
+  /// [ProductModel.toVariantsBody]).
+  Future<Product> saveVariants(
+    String id,
+    List<ProductVariant> variants, {
+    String? companyId,
+  }) async {
+    final updated = await ref
+        .read(productsRepositoryProvider)
+        .updateVariants(
+          id,
+          ProductModel.toVariantsBody(variants),
           companyId: companyId,
         );
     _replace(updated);

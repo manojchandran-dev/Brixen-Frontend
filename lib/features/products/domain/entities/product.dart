@@ -1,3 +1,37 @@
+/// One size/colour of a product ("M / Blue") with its own code, prices and
+/// stock. A price left empty uses the product's.
+class ProductVariant {
+  /// Null for a row added in the form and not saved yet.
+  final String? id;
+  final String? size;
+  final String? color;
+  final String? sku;
+  final double? costPrice;
+  final double? retailPrice;
+  final double? wholesalePrice;
+  final int stockQuantity;
+
+  /// Opening stock for a new (unsaved) variant; ignored once saved — later
+  /// changes go through Inventory.
+  final int openingStock;
+
+  const ProductVariant({
+    this.id,
+    this.size,
+    this.color,
+    this.sku,
+    this.costPrice,
+    this.retailPrice,
+    this.wholesalePrice,
+    this.stockQuantity = 0,
+    this.openingStock = 0,
+  });
+
+  /// "M / Blue", "XL", "Blue".
+  String get label =>
+      [size, color].where((s) => s != null && s.trim().isNotEmpty).join(' / ');
+}
+
 class Product {
   final String id;
   final String? companyId;
@@ -25,6 +59,10 @@ class Product {
   final int lowStockThreshold;
   final DateTime createdAt;
 
+  /// Sizes/colours; empty for a product sold as one item. With variants,
+  /// [stockQuantity] is their total.
+  final List<ProductVariant> variants;
+
   const Product({
     required this.id,
     this.companyId,
@@ -47,7 +85,15 @@ class Product {
     this.stockQuantity = 0,
     this.lowStockThreshold = 5,
     required this.createdAt,
+    this.variants = const [],
   });
+
+  bool get hasVariants => variants.isNotEmpty;
+
+  /// A variant's prices, falling back to the product's.
+  double retailFor(ProductVariant? v) => v?.retailPrice ?? retailPrice;
+  double wholesaleFor(ProductVariant? v) => v?.wholesalePrice ?? wholesalePrice;
+  double costFor(ProductVariant? v) => v?.costPrice ?? costPrice;
 
   bool get isOutOfStock => stockQuantity <= 0;
   bool get isLowStock => !isOutOfStock && stockQuantity <= lowStockThreshold;
@@ -74,6 +120,7 @@ class Product {
     DateTime? createdAt,
     int? stockQuantity,
     int? lowStockThreshold,
+    List<ProductVariant>? variants,
   }) {
     return Product(
       id: id ?? this.id,
@@ -97,6 +144,7 @@ class Product {
       stockQuantity: stockQuantity ?? this.stockQuantity,
       lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
       createdAt: createdAt ?? this.createdAt,
+      variants: variants ?? this.variants,
     );
   }
 }

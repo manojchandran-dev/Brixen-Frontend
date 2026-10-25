@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../shared/widgets/deleted_items_button.dart';
@@ -431,27 +432,23 @@ class _CustomerCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Avatar colours rotate; the card itself stays one calm surface so the
+    // names and shop names carry the list.
     final accentColors = [
       AppColors.brand,
       AppColors.positive,
       AppColors.brandDeep,
       AppColors.brandLight,
-      AppColors.brandBlack,
     ];
     final accent = accentColors[index % accentColors.length];
 
-    final fg = AppColors.ink;
-    final fgMuted = AppColors.ink.withValues(alpha: 0.55);
-    final bg = Color.lerp(
-      AppColors.surface,
-      accent,
-      AppColors.cardTintBlend(accent),
-    )!;
     final phone = customer.phone?.trim() ?? '';
     final gst = customer.gstNumber?.trim() ?? '';
+    final shop = customer.shopName?.trim() ?? '';
+    // Brand blue reads on light cards; its lighter tint on dark ones.
+    final shopColor = AppColors.isDark ? AppColors.brandLight : AppColors.brand;
 
-    // Tinted card like the other module lists: avatar · name / shop /
-    // phone & GST chips · call button.
+    // Avatar · name / highlighted shop name / phone & GST chips · call.
     return SwipeActions(
       onTap: () => _showCustomerDetail(context, ref, customer, accent),
       actions: [
@@ -471,15 +468,23 @@ class _CustomerCard extends ConsumerWidget {
             onTap: () => _confirmDelete(context, ref),
           ),
       ],
-      child: RichCardShell(
-        accentColor: accent,
-        backgroundColor: bg,
-        backgroundGradient: AppColors.cardTintGradient(accent),
-        edgeColor: accent,
-        showAccentBar: false,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.border),
+          boxShadow: AppColors.shadows([
+            BoxShadow(
+              color: AppColors.shadowDark.withValues(alpha: 0.06),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ]),
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 46,
@@ -521,48 +526,66 @@ class _CustomerCard extends ConsumerWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 14.5,
+                        fontSize: 15.5,
                         fontWeight: FontWeight.w800,
-                        color: fg,
+                        color: AppColors.ink,
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.storefront_outlined,
-                          size: 12,
-                          color: fgMuted,
+                    const SizedBox(height: 6),
+                    // The shop name, highlighted.
+                    if (shop.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 5,
                         ),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            customer.shopName?.trim().isNotEmpty == true
-                                ? customer.shopName!.trim()
-                                : 'No shop name',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 12, color: fgMuted),
-                          ),
+                        decoration: BoxDecoration(
+                          color: shopColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 7),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.storefront_rounded,
+                              size: 15,
+                              color: shopColor,
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                shop,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: shopColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Text(
+                        'No shop name',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: AppColors.textHint,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    const SizedBox(height: 8),
                     Wrap(
                       spacing: 6,
-                      runSpacing: 4,
+                      runSpacing: 6,
                       children: [
                         if (phone.isNotEmpty)
-                          // Tap the number to call.
-                          GestureDetector(
-                            onTap: () => launchUrl(
-                              Uri(scheme: 'tel', path: phone),
-                            ).catchError((_) => false),
-                            child: _InfoChip(
-                              icon: Icons.call_rounded,
-                              text: phone,
-                              color: accent,
-                            ),
+                          _InfoChip(
+                            icon: Icons.call_rounded,
+                            text: phone,
+                            color: AppColors.textSecondary,
                           ),
                         _InfoChip(
                           icon: gst.isEmpty
@@ -579,6 +602,22 @@ class _CustomerCard extends ConsumerWidget {
                   ],
                 ),
               ),
+              if (phone.isNotEmpty)
+                // One tap to call.
+                IconButton(
+                  tooltip: 'Call $phone',
+                  onPressed: () => launchUrl(
+                    Uri(scheme: 'tel', path: phone),
+                  ).catchError((_) => false),
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.positive.withValues(alpha: 0.15),
+                  ),
+                  icon: const Icon(
+                    Icons.call_rounded,
+                    size: 20,
+                    color: AppColors.positive,
+                  ),
+                ),
             ],
           ),
         ),
@@ -754,11 +793,7 @@ void _showCustomerDetail(
                 iconColor: AppColors.positive,
               ),
             if (customer.address != null && customer.address!.isNotEmpty)
-              DetailRow(
-                icon: Icons.location_on_rounded,
-                label: 'Address',
-                value: customer.address!,
-              ),
+              _AddressBlock(address: customer.address!),
           ],
         ),
         DetailSection(
@@ -779,11 +814,112 @@ void _showCustomerDetail(
             DetailRow(
               icon: Icons.calendar_today_rounded,
               label: 'Added',
-              value: DateFormat('dd MMM yyyy').format(customer.createdAt),
+              // Stored in UTC; shown in the phone's time.
+              value: DateFormat(
+                'dd MMM yyyy · h:mm a',
+              ).format(customer.createdAt.toLocal()),
             ),
           ],
         ),
       ],
     ),
   );
+}
+
+/// The address on its own full-width block (a long address squeezed
+/// right-aligned next to its label is hard to read), with copy and map
+/// shortcuts.
+class _AddressBlock extends StatelessWidget {
+  final String address;
+  const _AddressBlock({required this.address});
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = address
+        .split(RegExp(r'[\n]+'))
+        .map((l) => l.trim().replaceAll(RegExp(r',$'), ''))
+        .where((l) => l.isNotEmpty)
+        .toList();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: AppColors.accentGradient(AppColors.brand),
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.location_on_rounded,
+                  size: 16,
+                  color: AppColors.white,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Address',
+                style: TextStyle(color: AppColors.textHint, fontSize: 12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceElevated,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(
+              lines.join('\n'),
+              style: TextStyle(
+                color: AppColors.ink,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                height: 1.5,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              TextButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: address));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Address copied')),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.copy_rounded, size: 18),
+                label: const Text('Copy'),
+              ),
+              TextButton.icon(
+                onPressed: () => launchUrl(
+                  Uri.https('www.google.com', '/maps/search/', {
+                    'api': '1',
+                    'query': lines.join(', '),
+                  }),
+                  mode: LaunchMode.externalApplication,
+                ).catchError((_) => false),
+                icon: const Icon(Icons.map_outlined, size: 18),
+                label: const Text('Open in Maps'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }

@@ -23,7 +23,23 @@ class ProductModel extends Product {
     super.stockQuantity,
     super.lowStockThreshold,
     required super.createdAt,
+    super.variants,
   });
+
+  static double? _price(Object? v) =>
+      v == null ? null : double.tryParse(v.toString());
+
+  static ProductVariant variantFromJson(Map<String, dynamic> j) =>
+      ProductVariant(
+        id: j['id']?.toString(),
+        size: j['size']?.toString(),
+        color: j['color']?.toString(),
+        sku: j['sku']?.toString(),
+        costPrice: _price(j['cost_price']),
+        retailPrice: _price(j['retail_price']),
+        wholesalePrice: _price(j['wholesale_price']),
+        stockQuantity: int.tryParse('${j['stock_quantity'] ?? 0}') ?? 0,
+      );
 
   /// `category`/`unit` (display names) aren't returned by the API — they're
   /// resolved client-side afterward from the already-loaded Masters data.
@@ -55,8 +71,33 @@ class ProductModel extends Product {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
+      variants: json['product_variants'] is List
+          ? [
+              for (final v in json['product_variants'] as List)
+                if (v is Map) variantFromJson(Map<String, dynamic>.from(v)),
+            ]
+          : const [],
     );
   }
+
+  /// PUT /products/:id/variants — the full list of sizes/colours. Rows
+  /// with an id are updated, new rows created (with their opening stock),
+  /// saved rows left out are removed.
+  static Map<String, dynamic> toVariantsBody(List<ProductVariant> vs) => {
+    'variants': [
+      for (final v in vs)
+        {
+          if (v.id != null) 'id': v.id,
+          'size': v.size,
+          'color': v.color,
+          'sku': v.sku,
+          'cost_price': v.costPrice,
+          'retail_price': v.retailPrice,
+          'wholesale_price': v.wholesalePrice,
+          if (v.id == null) 'opening_stock': v.openingStock,
+        },
+    ],
+  };
 
   /// Step 1 (Basic) — POST /products. Only `product_name`/`gender` are
   /// required; `category_id`/`design_pattern` are optional. `companyId` is
@@ -101,10 +142,10 @@ class ProductModel extends Product {
   /// status toggle or edit would otherwise send the card's (possibly stale)
   /// count and overwrite a change a sale just made.
   static Map<String, dynamic> toStockBody({
-    required int stockQuantity,
+    required int? stockQuantity,
     required int lowStockThreshold,
   }) => {
-    'stock_quantity': stockQuantity,
+    'stock_quantity': ?stockQuantity,
     'low_stock_threshold': lowStockThreshold,
   };
 

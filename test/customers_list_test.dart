@@ -55,8 +55,10 @@ void main() {
     expect(find.text('33ABCPR1111A1Z1'), findsOneWidget);
     expect(find.text('No GST'), findsOneWidget);
     expect(find.text('No shop name'), findsOneWidget);
-    // The phone chip is the call action; no order amounts on the cards.
-    expect(find.byIcon(Icons.call_rounded), findsOneWidget);
+    // A call button only for the customer with a phone; no order amounts
+    // on the cards.
+    expect(find.byTooltip('Call 9840012345'), findsOneWidget);
+    expect(find.byType(IconButton), findsWidgets);
     expect(find.textContaining('₹'), findsNothing);
   });
 }

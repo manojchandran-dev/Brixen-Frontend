@@ -61,6 +61,13 @@ class ProductsRepositoryImpl implements ProductsRepository {
   }) => _ds.updateStep4(id, body, companyId: companyId);
 
   @override
+  Future<Product> updateVariants(
+    String id,
+    Map<String, dynamic> body, {
+    String? companyId,
+  }) => _ds.updateVariants(id, body, companyId: companyId);
+
+  @override
   Future<void> deleteProduct(String id, {String? companyId}) =>
       _ds.deleteProduct(id, companyId: companyId);
 }

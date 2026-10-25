@@ -17,6 +17,7 @@ import '../../../masters/data/datasources/units_remote_datasource.dart';
 import '../../../masters/domain/entities/master_item.dart';
 import '../../domain/entities/product.dart';
 import '../providers/products_provider.dart';
+import '../widgets/variant_builder.dart';
 
 /// Optional gallery — the wizard's Step 4 caps it at this many photos.
 const _maxGalleryImages = 3;
@@ -86,6 +87,10 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
   final _colorCtrl = TextEditingController();
   final _sizeCtrl = TextEditingController();
 
+  /// Sold in sizes/colours (variants) instead of one item.
+  bool _hasVariants = false;
+  final _variants = VariantDrafts();
+
   // Step 3 — Pricing
   final _costPriceCtrl = TextEditingController();
   final _retailPriceCtrl = TextEditingController();
@@ -134,6 +139,10 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
       _designPattern = p.designPattern;
       _colorCtrl.text = p.color ?? '';
       _sizeCtrl.text = p.size ?? '';
+      if (p.hasVariants) {
+        _hasVariants = true;
+        _variants.load(p.variants);
+      }
       _costPriceCtrl.text = p.costPrice == 0 ? '' : p.costPrice.toString();
       _stockCtrl.text = '${p.stockQuantity}';
       _lowStockCtrl.text = '${p.lowStockThreshold}';
@@ -239,6 +248,7 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
     _wholesalePriceCtrl.dispose();
     _stockCtrl.dispose();
     _lowStockCtrl.dispose();
+    _variants.dispose();
     super.dispose();
   }
 
@@ -400,6 +410,15 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
       );
       return;
     }
+    if (_currentStep == 1 && _hasVariants && _variants.rows.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pick at least one size or colour'),
+          backgroundColor: AppColors.dangerFill,
+        ),
+      );
+      return;
+    }
     if (_currentStep == 3 && _gallery.any((p) => p.uploading)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -467,10 +486,12 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
             category: '',
             gender: '',
             unitId: _selectedUnit?.id,
-            color: _colorCtrl.text.trim().isEmpty
+            color: _hasVariants || _colorCtrl.text.trim().isEmpty
                 ? null
                 : _colorCtrl.text.trim(),
-            size: _sizeCtrl.text.trim().isEmpty ? null : _sizeCtrl.text.trim(),
+            size: _hasVariants || _sizeCtrl.text.trim().isEmpty
+                ? null
+                : _sizeCtrl.text.trim(),
             costPrice: 0,
             retailPrice: 0,
             wholesalePrice: 0,
@@ -499,12 +520,36 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
             pricing,
             companyId: _effectiveCompanyId,
           );
-          await notifier.updateStock(
-            _productId!,
-            stockQuantity: int.tryParse(_stockCtrl.text.trim()) ?? 0,
-            lowStockThreshold: int.tryParse(_lowStockCtrl.text.trim()) ?? 5,
-            companyId: _effectiveCompanyId,
-          );
+          final lowStock = int.tryParse(_lowStockCtrl.text.trim()) ?? 5;
+          if (_hasVariants) {
+            // Each size/colour with its prices and opening stock; the
+            // product's stock becomes their total.
+            await notifier.saveVariants(_productId!, [
+              for (final r in _variants.rows) r.toVariant(),
+            ], companyId: _effectiveCompanyId);
+            await notifier.updateStock(
+              _productId!,
+              stockQuantity: null,
+              lowStockThreshold: lowStock,
+              companyId: _effectiveCompanyId,
+            );
+          } else {
+            // Sizes switched off on a product that had them: remove them
+            // first, then its single stock applies.
+            if (widget.editProduct?.hasVariants ?? false) {
+              await notifier.saveVariants(
+                _productId!,
+                const [],
+                companyId: _effectiveCompanyId,
+              );
+            }
+            await notifier.updateStock(
+              _productId!,
+              stockQuantity: int.tryParse(_stockCtrl.text.trim()) ?? 0,
+              lowStockThreshold: lowStock,
+              companyId: _effectiveCompanyId,
+            );
+          }
           setState(() => _currentStep = 3);
         case 3:
           final galleryAndStatus = Product(
@@ -737,6 +782,10 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
           onUnitChanged: (v) => setState(() => _selectedUnit = v),
           colorCtrl: _colorCtrl,
           sizeCtrl: _sizeCtrl,
+          hasVariants: _hasVariants,
+          onHasVariantsChanged: (v) => setState(() => _hasVariants = v),
+          variants: _variants,
+          onVariantsChanged: () => setState(() {}),
         );
       case 2:
         return _Step3(
@@ -746,6 +795,8 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
           wholesalePriceCtrl: _wholesalePriceCtrl,
           stockCtrl: _stockCtrl,
           lowStockCtrl: _lowStockCtrl,
+          variantRows: _hasVariants ? _variants.rows : const [],
+          onChanged: () => setState(() {}),
         );
       default:
         return _Step4(
@@ -762,6 +813,8 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
                 ? '—'
                 : _nameCtrl.text.trim(),
             'Category': _selectedCategory?.name ?? '—',
+            if (_hasVariants)
+              'Sizes / colours': _variants.rows.map((r) => r.label).join(', '),
             'Cost Price':
                 '₹${_costPriceCtrl.text.isEmpty ? '0.00' : _costPriceCtrl.text}',
             'Retail Price':
@@ -1041,6 +1094,10 @@ class _Step2 extends StatelessWidget {
   final MasterItem? selectedUnit;
   final void Function(MasterItem?) onUnitChanged;
   final TextEditingController colorCtrl, sizeCtrl;
+  final bool hasVariants;
+  final ValueChanged<bool> onHasVariantsChanged;
+  final VariantDrafts variants;
+  final VoidCallback onVariantsChanged;
 
   const _Step2({
     required this.formKey,
@@ -1050,6 +1107,10 @@ class _Step2 extends StatelessWidget {
     required this.onUnitChanged,
     required this.colorCtrl,
     required this.sizeCtrl,
+    required this.hasVariants,
+    required this.onHasVariantsChanged,
+    required this.variants,
+    required this.onVariantsChanged,
   });
 
   @override
@@ -1069,22 +1130,61 @@ class _Step2 extends StatelessWidget {
             icon: Icons.straighten_rounded,
             onChanged: onUnitChanged,
           ),
-          const SizedBox(height: 22),
-          BrixenTextField(
-            label: 'Color',
-            hint: 'e.g. Navy Blue',
-            controller: colorCtrl,
-            textInputAction: TextInputAction.next,
-            prefixIcon: const Icon(Icons.palette_outlined),
+          const SizedBox(height: 18),
+          // One item, or many sizes/colours each with its own price & stock.
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: hasVariants ? AppColors.brand : AppColors.border,
+              ),
+            ),
+            child: SwitchListTile(
+              value: hasVariants,
+              onChanged: onHasVariantsChanged,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              secondary: const Icon(
+                Icons.grid_view_rounded,
+                color: AppColors.brand,
+              ),
+              title: Text(
+                'Sizes / colours',
+                style: TextStyle(
+                  color: AppColors.ink,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              subtitle: Text(
+                hasVariants
+                    ? 'Each size/colour has its own price and stock'
+                    : 'Turn on if this comes in S, M, L… or 28, 30, 32…',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+            ),
           ),
           const SizedBox(height: 22),
-          BrixenTextField(
-            label: 'Size',
-            hint: 'e.g. M, L, 32, 34',
-            controller: sizeCtrl,
-            textInputAction: TextInputAction.done,
-            prefixIcon: const Icon(Icons.straighten_outlined),
-          ),
+          if (hasVariants)
+            SizeColourPicker(drafts: variants, onChanged: onVariantsChanged)
+          else ...[
+            BrixenTextField(
+              label: 'Color',
+              hint: 'e.g. Navy Blue',
+              controller: colorCtrl,
+              textInputAction: TextInputAction.next,
+              prefixIcon: const Icon(Icons.palette_outlined),
+            ),
+            const SizedBox(height: 22),
+            BrixenTextField(
+              label: 'Size',
+              hint: 'e.g. M, L, 32, 34',
+              controller: sizeCtrl,
+              textInputAction: TextInputAction.done,
+              prefixIcon: const Icon(Icons.straighten_outlined),
+            ),
+          ],
           const SizedBox(height: 22),
         ],
       ),
@@ -1102,6 +1202,10 @@ class _Step3 extends StatelessWidget {
       stockCtrl,
       lowStockCtrl;
 
+  /// The sizes/colours to price (empty = one item).
+  final List<VariantDraft> variantRows;
+  final VoidCallback onChanged;
+
   const _Step3({
     required this.formKey,
     required this.costPriceCtrl,
@@ -1109,6 +1213,8 @@ class _Step3 extends StatelessWidget {
     required this.wholesalePriceCtrl,
     required this.stockCtrl,
     required this.lowStockCtrl,
+    required this.variantRows,
+    required this.onChanged,
   });
 
   @override
@@ -1118,6 +1224,22 @@ class _Step3 extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
         children: [
+          if (variantRows.isNotEmpty) ...[
+            Text(
+              'Default prices',
+              style: TextStyle(
+                color: AppColors.ink,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Used for every size unless you change it below.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            ),
+            const SizedBox(height: 14),
+          ],
           BrixenTextField(
             label: 'Cost Price *',
             hint: '0.00',
@@ -1151,22 +1273,29 @@ class _Step3 extends StatelessWidget {
                 (v == null || v.trim().isEmpty) ? 'Required' : null,
           ),
           const SizedBox(height: 22),
-          // Stock: sales take from it automatically; correct it here.
+          // Stock: sales take from it automatically; correct it here. With
+          // sizes it's per size (opening stock below).
+          if (variantRows.isEmpty) ...[
+            BrixenTextField(
+              label: 'Stock quantity',
+              hint: '0',
+              controller: stockCtrl,
+              keyboardType: const TextInputType.numberWithOptions(signed: true),
+              textInputAction: TextInputAction.next,
+              prefixIcon: const Icon(Icons.inventory_2_outlined),
+              validator: (v) =>
+                  v == null ||
+                      v.trim().isEmpty ||
+                      int.tryParse(v.trim()) != null
+                  ? null
+                  : 'Whole number',
+            ),
+            const SizedBox(height: 22),
+          ],
           BrixenTextField(
-            label: 'Stock quantity',
-            hint: '0',
-            controller: stockCtrl,
-            keyboardType: const TextInputType.numberWithOptions(signed: true),
-            textInputAction: TextInputAction.next,
-            prefixIcon: const Icon(Icons.inventory_2_outlined),
-            validator: (v) =>
-                v == null || v.trim().isEmpty || int.tryParse(v.trim()) != null
-                ? null
-                : 'Whole number',
-          ),
-          const SizedBox(height: 22),
-          BrixenTextField(
-            label: 'Low-stock alert at',
+            label: variantRows.isEmpty
+                ? 'Low-stock alert at'
+                : 'Low-stock alert at (per size)',
             hint: '5',
             controller: lowStockCtrl,
             keyboardType: TextInputType.number,
@@ -1180,6 +1309,24 @@ class _Step3 extends StatelessWidget {
             },
           ),
           const SizedBox(height: 22),
+          if (variantRows.isNotEmpty) ...[
+            ListenableBuilder(
+              // Hints follow the default prices as they're typed.
+              listenable: Listenable.merge([
+                retailPriceCtrl,
+                wholesalePriceCtrl,
+                costPriceCtrl,
+              ]),
+              builder: (context, _) => VariantPriceList(
+                rows: variantRows,
+                defaultRetail: retailPriceCtrl.text.trim(),
+                defaultWholesale: wholesalePriceCtrl.text.trim(),
+                defaultCost: costPriceCtrl.text.trim(),
+                onChanged: onChanged,
+              ),
+            ),
+            const SizedBox(height: 22),
+          ],
         ],
       ),
     );

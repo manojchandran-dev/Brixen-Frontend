@@ -497,6 +497,19 @@ class _ProductCard extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 12, color: fgMuted),
                     ),
+                    if (product.hasVariants) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        _sizesSummary(product),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: fg,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     // Wraps to a second line when the name column is narrow.
                     Wrap(
@@ -1031,8 +1044,24 @@ void _showProductDetail(
               ),
           ],
         ),
+        if (product.hasVariants)
+          DetailSection(
+            title: 'Sizes & stock',
+            items: [
+              for (final v in product.variants)
+                DetailLineItem(
+                  icon: Icons.straighten_rounded,
+                  name: v.label,
+                  tag: v.sku,
+                  working:
+                      'Retail ₹${product.retailFor(v).toStringAsFixed(2)} · '
+                      'Wholesale ₹${product.wholesaleFor(v).toStringAsFixed(2)}',
+                  total: '${v.stockQuantity} in stock',
+                ),
+            ],
+          ),
         DetailSection(
-          title: 'Pricing',
+          title: product.hasVariants ? 'Default pricing' : 'Pricing',
           items: [
             DetailRow(
               icon: Icons.sell_outlined,
@@ -1146,4 +1175,21 @@ class _ProductGallerySectionState
       ],
     );
   }
+}
+
+/// "Sizes: S, M, L, XL · 2 colours" for a product card.
+String _sizesSummary(Product p) {
+  final sizes = <String>[];
+  final colours = <String>{};
+  for (final v in p.variants) {
+    final s = v.size?.trim();
+    if (s != null && s.isNotEmpty && !sizes.contains(s)) sizes.add(s);
+    final c = v.color?.trim();
+    if (c != null && c.isNotEmpty) colours.add(c);
+  }
+  return [
+    if (sizes.isNotEmpty) 'Sizes: ${sizes.join(', ')}',
+    if (colours.isNotEmpty)
+      colours.length == 1 ? colours.first : '${colours.length} colours',
+  ].join(' · ');
 }

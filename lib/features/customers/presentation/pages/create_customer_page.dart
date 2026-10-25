@@ -399,9 +399,21 @@ class _AddressFieldState extends State<_AddressField> {
                 child: TextFormField(
                   controller: widget.controller,
                   focusNode: _focus,
-                  maxLines: 3,
-                  style: TextStyle(color: cs.onSurface, fontSize: 15),
+                  // Starts at 3 lines and grows with the address, so no
+                  // line scrolls out of sight.
+                  minLines: 3,
+                  maxLines: null,
+                  keyboardType: TextInputType.multiline,
+                  textCapitalization: TextCapitalization.words,
+                  style: TextStyle(
+                    color: cs.onSurface,
+                    fontSize: 15,
+                    height: 1.4,
+                  ),
                   decoration: InputDecoration(
+                    // Same background as the box around it (the theme's
+                    // fill would make the text area a different shade).
+                    filled: false,
                     hintText: showLabel
                         ? 'Street, City, State, PIN'
                         : 'Address',

@@ -469,7 +469,7 @@ pw.Page _bill(SaleBillData d, _Money money, pw.ImageProvider? logo) {
               children: [
                 _cell('${i + 1}', color: _muted),
                 _cell(
-                  it.productName,
+                  it.displayName,
                   sub: it.priceType == 'wholesale' ? 'Wholesale' : null,
                 ),
                 _cell('${it.quantity}', align: pw.TextAlign.right),

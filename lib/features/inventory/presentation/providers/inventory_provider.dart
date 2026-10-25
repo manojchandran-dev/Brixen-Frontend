@@ -7,9 +7,15 @@ import '../../../products/presentation/providers/products_provider.dart';
 double _num(Object? v) => double.tryParse('${v ?? ''}') ?? 0;
 int _int(Object? v) => int.tryParse('${v ?? ''}') ?? _num(v).round();
 
-/// One product's stock (`GET /inventory`).
+/// One stock row (`GET /inventory`): a product, or one size/colour of it.
 class StockItem {
   final String productId;
+
+  /// Set for a size/colour row of a product with variants.
+  final String? variantId;
+  final String? size;
+  final String? color;
+  final String? sku;
   final String name;
   final String category;
   final int quantity;
@@ -21,6 +27,10 @@ class StockItem {
 
   const StockItem({
     required this.productId,
+    this.variantId,
+    this.size,
+    this.color,
+    this.sku,
     required this.name,
     required this.category,
     required this.quantity,
@@ -37,6 +47,10 @@ class StockItem {
         : '${j['category_name'] ?? j['category'] ?? ''}';
     return StockItem(
       productId: '${j['id'] ?? j['product_id']}',
+      variantId: j['variant_id']?.toString(),
+      size: j['size']?.toString(),
+      color: j['color']?.toString(),
+      sku: j['sku']?.toString(),
       name: '${j['product_name'] ?? j['name'] ?? ''}',
       category: category,
       quantity: qty,
@@ -129,6 +143,9 @@ class StockMovement {
   final String productId;
   final String productName;
 
+  /// "M / Blue" for a size/colour's movement.
+  final String? variantLabel;
+
   /// 'purchase' | 'sale' | 'adjustment'.
   final String type;
 
@@ -145,6 +162,7 @@ class StockMovement {
   const StockMovement({
     required this.productId,
     required this.productName,
+    this.variantLabel,
     required this.type,
     required this.reason,
     required this.quantity,
@@ -165,6 +183,9 @@ class StockMovement {
       productId: '${j['product_id'] ?? ''}',
       productName:
           '${j['product_name'] ?? (j['product'] is Map ? (j['product'] as Map)['product_name'] : '') ?? ''}',
+      variantLabel: (j['variant_label'] as String?)?.trim().isEmpty ?? true
+          ? null
+          : j['variant_label'] as String,
       type: '${j['type'] ?? ''}'.toLowerCase(),
       reason: j['reason']?.toString(),
       quantity: _int(j['quantity']),
@@ -182,6 +203,7 @@ class StockMovement {
 /// [type]: purchase | sale | adjustment; dates are inclusive days.
 String movementsQuery({
   String? productId,
+  String? variantId,
   String? type,
   DateTime? from,
   DateTime? to,
@@ -193,6 +215,7 @@ String movementsQuery({
       if (from != null) 'from': day(from),
       if (productId != null && productId.isNotEmpty) 'product_id': productId,
       if (to != null) 'to': day(to),
+      if (variantId != null && variantId.isNotEmpty) 'variant_id': variantId,
       'type': ?type,
     },
   ).query;
@@ -228,6 +251,9 @@ const stockReasons = ['opening', 'correction', 'damage', 'return', 'other'];
 Future<void> adjustStock(
   WidgetRef ref, {
   required String productId,
+
+  /// The size/colour, for a product with variants.
+  String? variantId,
   int? change,
   int? setTo,
   required String reason,
@@ -241,6 +267,7 @@ Future<void> adjustStock(
           ApiEndpoints.inventoryAdjustments,
           data: {
             'product_id': int.tryParse(productId) ?? productId,
+            'variant_id': ?variantId,
             'quantity': ?change,
             'set_to': ?setTo,
             'reason': reason,

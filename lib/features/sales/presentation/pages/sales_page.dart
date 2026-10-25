@@ -1224,7 +1224,7 @@ class _SaleItemsSectionState extends ConsumerState<_SaleItemsSection> {
         for (final it in _items)
           DetailLineItem(
             icon: Icons.checkroom_rounded,
-            name: it.productName,
+            name: it.displayName,
             tag: it.priceType == 'wholesale' ? 'Wholesale' : 'Retail',
             working: '${it.quantity} × ₹${fmt.format(it.price)}',
             total: '₹${fmt.format(it.amount)}',

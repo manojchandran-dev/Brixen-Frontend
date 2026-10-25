@@ -29,5 +29,12 @@ abstract class ProductsRepository {
     Map<String, dynamic> body, {
     String? companyId,
   });
+
+  /// PUT /:id/variants — the product's sizes/colours (full list).
+  Future<Product> updateVariants(
+    String id,
+    Map<String, dynamic> body, {
+    String? companyId,
+  });
   Future<void> deleteProduct(String id, {String? companyId});
 }

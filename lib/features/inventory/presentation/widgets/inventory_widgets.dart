@@ -14,13 +14,25 @@ class StockLine {
   final Product? product;
   const StockLine(this.item, this.product);
 
+  /// The size/colour this row is for (null: a product without sizes).
+  ProductVariant? get variant => item.variantId == null
+      ? null
+      : product?.variants.where((v) => v.id == item.variantId).firstOrNull;
+
   String get name => product?.productName ?? item.name;
-  String get sku => product?.productCode ?? '';
-  String get size => product?.size ?? '';
-  String get color => product?.color ?? '';
+  String get sku => item.sku ?? variant?.sku ?? product?.productCode ?? '';
+  String get size => item.size ?? product?.size ?? '';
+  String get color => item.color ?? product?.color ?? '';
+
+  /// "Polo T-Shirt (M / Blue)".
+  String get title {
+    final label = [size, color].where((s) => s.isNotEmpty).join(' / ');
+    return item.variantId == null || label.isEmpty ? name : '$name ($label)';
+  }
+
   String get category =>
       item.category.isNotEmpty ? item.category : product?.category ?? '';
-  double get unitCost => product?.costPrice ?? 0;
+  double get unitCost => product?.costFor(variant) ?? 0;
 
   /// Stock value: the server's figure, else quantity × cost.
   double get value => item.value != 0
@@ -354,7 +366,10 @@ class MovementTile extends StatelessWidget {
       ),
     };
     final sub = [
-      if (showProduct && m.productName.isNotEmpty) m.productName,
+      if (showProduct && m.productName.isNotEmpty)
+        m.variantLabel == null
+            ? m.productName
+            : '${m.productName} (${m.variantLabel})',
       DateFormat('d MMM, h:mm a').format(m.at),
       if (m.by?.isNotEmpty == true) m.by!,
       if (m.note?.isNotEmpty == true) m.note!,

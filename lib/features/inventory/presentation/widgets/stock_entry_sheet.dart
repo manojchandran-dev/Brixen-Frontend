@@ -114,6 +114,7 @@ class _StockEntrySheetState extends ConsumerState<StockEntrySheet> {
       await adjustStock(
         ref,
         productId: line.item.productId,
+        variantId: line.item.variantId,
         change: _count
             ? null
             : switch (widget.mode) {
@@ -303,7 +304,7 @@ class _StockEntrySheetState extends ConsumerState<StockEntrySheet> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                line.name,
+                                line.title,
                                 style: TextStyle(
                                   color: AppColors.ink,
                                   fontWeight: FontWeight.w800,
@@ -492,7 +493,10 @@ class _StockEntrySheetState extends ConsumerState<StockEntrySheet> {
             ref
                 .watch(
                   stockMovementsProvider(
-                    movementsQuery(productId: line.item.productId),
+                    movementsQuery(
+                      productId: line.item.productId,
+                      variantId: line.item.variantId,
+                    ),
                   ),
                 )
                 .when(

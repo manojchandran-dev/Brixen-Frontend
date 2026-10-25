@@ -129,6 +129,24 @@ class ProductsRemoteDatasource {
     }
   }
 
+  Future<ProductModel> updateVariants(
+    String id,
+    Map<String, dynamic> body, {
+    String? companyId,
+  }) async {
+    try {
+      final resp = await _dio.put(
+        ApiEndpoints.productVariants(id),
+        data: body,
+        queryParameters: _companyIdParam(companyId),
+      );
+      final data = resp.data['data'] ?? resp.data;
+      return ProductModel.fromJson(data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
   Map<String, dynamic>? _companyIdParam(String? companyId) =>
       companyId != null ? {'company_id': companyId} : null;
 
