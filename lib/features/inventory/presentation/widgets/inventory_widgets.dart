@@ -71,7 +71,7 @@ class InvStatTile extends StatelessWidget {
   final IconData icon;
   final Color color;
 
-  /// The exact rupee amount behind a compact [value]; long-press shows it.
+  /// The exact rupee amount behind a compact [value]; tap shows it.
   final double? amount;
   const InvStatTile(
     this.label,

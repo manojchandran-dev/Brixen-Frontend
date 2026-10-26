@@ -185,7 +185,7 @@ class ReportStat {
   /// True when the number ignores the date filter (e.g. total companies).
   final bool allTime;
 
-  /// The exact rupee amount behind a compact [value]; long-press shows it.
+  /// The exact rupee amount behind a compact [value]; tap shows it.
   final double? amount;
   const ReportStat(
     this.icon,
@@ -1040,7 +1040,7 @@ class ReportRow extends StatelessWidget {
   final String? subtitle;
   final String? trailing;
 
-  /// The exact rupee amount behind a compact [trailing]; long-press shows it.
+  /// The exact rupee amount behind a compact [trailing]; tap shows it.
   final double? trailingAmount;
   const ReportRow({
     super.key,

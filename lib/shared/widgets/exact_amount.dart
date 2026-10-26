@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/utils/money.dart';
 
-/// Long-press [child] to see [amount] in full (₹1,23,456) — for figures
-/// shown compact (₹1.2L). Without an amount it's just [child].
+/// Tap [child] to see [amount] in full (₹1,23,456) for 10 seconds — for
+/// figures shown compact (₹1.2L). Without an amount it's just [child].
 class ExactAmount extends StatelessWidget {
   final double? amount;
   final Widget child;
@@ -15,10 +15,10 @@ class ExactAmount extends StatelessWidget {
     if (a == null) return child;
     return Tooltip(
       message: rupeesExact(a),
-      triggerMode: TooltipTriggerMode.longPress,
+      triggerMode: TooltipTriggerMode.tap,
       enableFeedback: true,
       preferBelow: false,
-      showDuration: const Duration(seconds: 3),
+      showDuration: const Duration(seconds: 10),
       textStyle: const TextStyle(
         color: Colors.white,
         fontSize: 15,

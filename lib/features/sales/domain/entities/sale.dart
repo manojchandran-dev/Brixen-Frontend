@@ -68,15 +68,6 @@ class Sale {
   /// A GST bill with a secondary bill is left out of sales totals.
   bool get countsInSales => !(isGst && hasSecondaryBill);
 
-  /// This GST sale printed as a secondary bill: same lines, no GST.
-  Sale asSecondaryBill() => copyWith(
-    billType: BillType.secondary,
-    hasSecondaryBill: false,
-    taxPercentage: 0,
-    taxAmount: 0,
-    totalAmount: subtotal,
-  );
-
   /// Still owed: total − amount paid. Without [amountPaid] (old data), a
   /// Paid sale owes nothing and any other owes the full total.
   double get balance {

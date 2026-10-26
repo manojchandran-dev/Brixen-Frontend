@@ -1166,8 +1166,8 @@ class _SecondaryBillToggle extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   value
-                      ? 'Enabled · can also print this as a bill without GST'
-                      : 'Disabled',
+                      ? 'This bill has a secondary bill'
+                      : 'No secondary bill',
                   style: TextStyle(
                     fontSize: 11,
                     color: cs.onSurfaceVariant.withValues(alpha: 0.7),

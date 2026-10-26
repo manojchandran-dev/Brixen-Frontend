@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../../customers/domain/entities/customer.dart';
+import '../../../customers/presentation/providers/customers_provider.dart';
 import '../../../permissions/presentation/providers/module_access_provider.dart';
 import '../../../../core/services/session_service.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -454,11 +456,16 @@ class _SaleCard extends ConsumerWidget {
     String money(double v) => v % 1 == 0
         ? '₹${NumberFormat('#,##,##0', 'en_IN').format(v)}'
         : '₹${fmt.format(v)}';
+    // Date first, so a long bill number can't push it out of view.
     final meta = [
-      if (sale.billNo != null) sale.billNo!,
       DateFormat('d MMM yyyy').format(sale.billDate),
+      if (sale.billNo != null) sale.billNo!,
       if (sale.paymentType?.isNotEmpty == true) sale.paymentType!,
     ].join(' · ');
+    final shopName = _customerOf(
+      ref.watch(customersProvider).valueOrNull,
+      sale,
+    )?.shopName?.trim();
 
     return SwipeActions(
       onTap: () => _showSaleDetail(context, ref, sale, accent),
@@ -564,6 +571,31 @@ class _SaleCard extends ConsumerWidget {
                               color: fg,
                             ),
                           ),
+                          if (shopName != null && shopName.isNotEmpty) ...[
+                            const SizedBox(height: 3),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.storefront_rounded,
+                                  size: 12,
+                                  color: fgMuted,
+                                ),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    shopName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: fgMuted,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                           const SizedBox(height: 3),
                           Row(
                             children: [
@@ -616,6 +648,38 @@ class _SaleCard extends ConsumerWidget {
                                       fontWeight: FontWeight.w800,
                                       color: fg,
                                     ),
+                                  ),
+                                ),
+                              if (sale.isGst && sale.hasSecondaryBill)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surface.withValues(
+                                      alpha: 0.7,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.receipt_long_outlined,
+                                        size: 12,
+                                        color: fg,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Secondary bill',
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w800,
+                                          color: fg,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                             ],
@@ -881,8 +945,10 @@ void _showSaleDetail(
       ),
       sections: [
         _GenerateBillButton(sale: sale),
-        if (sale.isGst && sale.hasSecondaryBill)
-          _GenerateBillButton(sale: sale.asSecondaryBill()),
+        _customerSection(
+          _customerOf(ref.read(customersProvider).valueOrNull, sale),
+          sale,
+        ),
         DetailSection(
           title: 'Invoice',
           items: [
@@ -955,6 +1021,50 @@ void _showSaleDetail(
           ),
       ],
     ),
+  );
+}
+
+/// The sale's customer from the loaded Customers list (null for walk-ins
+/// or while it loads).
+Customer? _customerOf(List<Customer>? customers, Sale sale) {
+  final id = sale.customerId;
+  if (id == null) return null;
+  return customers?.where((c) => c.id == id).firstOrNull;
+}
+
+/// Everything known about the buyer; just the name for a walk-in or a
+/// customer no longer in the list.
+Widget _customerSection(Customer? c, Sale sale) {
+  String? has(String? v) => v != null && v.trim().isNotEmpty ? v.trim() : null;
+  final name =
+      c?.name ??
+      sale.customerName ??
+      (sale.customerId == null ? 'Walk-in' : 'Customer');
+  return DetailSection(
+    title: 'Customer',
+    items: [
+      DetailRow(icon: Icons.person_outline_rounded, label: 'Name', value: name),
+      if (has(c?.shopName) case final v?)
+        DetailRow(icon: Icons.storefront_rounded, label: 'Shop', value: v),
+      if (has(c?.phone) case final v?)
+        DetailRow(icon: Icons.phone_outlined, label: 'Phone', value: v),
+      if (has(c?.email) case final v?)
+        DetailRow(icon: Icons.email_outlined, label: 'Email', value: v),
+      if (has(c?.address) case final v?)
+        DetailRow(
+          icon: Icons.location_on_outlined,
+          label: 'Address',
+          value: v,
+          stacked: true,
+        ),
+      if (has(c?.gstNumber) case final v?)
+        DetailRow(
+          icon: Icons.verified_outlined,
+          label: 'GSTIN',
+          value: v.toUpperCase(),
+          iconColor: AppColors.positive,
+        ),
+    ],
   );
 }
 
