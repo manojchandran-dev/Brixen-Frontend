@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 
-class BrixenButton extends StatelessWidget {
+/// The app's main button. While an async [onPressed] is still running the
+/// button shows its spinner and ignores further taps, so a double tap can
+/// never create the same record twice — even where a form forgets to set
+/// its own [isLoading].
+class BrixenButton extends StatefulWidget {
   final String label;
   final VoidCallback? onPressed;
   final bool isLoading;
@@ -18,14 +22,40 @@ class BrixenButton extends StatelessWidget {
   });
 
   @override
+  State<BrixenButton> createState() => _BrixenButtonState();
+}
+
+class _BrixenButtonState extends State<BrixenButton> {
+  bool _busy = false;
+
+  Future<void> _press() async {
+    if (_busy) return;
+    // An `async` handler passed as a VoidCallback still returns its Future.
+    final Object? result = (widget.onPressed as dynamic)();
+    if (result is! Future) return;
+    setState(() => _busy = true);
+    try {
+      await result;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return isOutlined
-        ? _OutlinedBtn(label: label, onPressed: onPressed, isLoading: isLoading)
-        : _FilledBtn(
-            label: label,
+    final onPressed = widget.onPressed == null ? null : _press;
+    final loading = widget.isLoading || _busy;
+    return widget.isOutlined
+        ? _OutlinedBtn(
+            label: widget.label,
             onPressed: onPressed,
-            isLoading: isLoading,
-            trailingIcon: trailingIcon,
+            isLoading: loading,
+          )
+        : _FilledBtn(
+            label: widget.label,
+            onPressed: onPressed,
+            isLoading: loading,
+            trailingIcon: widget.trailingIcon,
           );
   }
 }

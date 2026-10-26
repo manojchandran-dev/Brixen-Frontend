@@ -114,9 +114,13 @@ class AppTheme {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     ),
     dividerColor: AppColors.lightBorder,
+    // Dark bar, light text. Error snack bars pass their own near-black
+    // background (AppColors.dangerFill), so the text must be light here or
+    // their message is black on black.
     snackBarTheme: const SnackBarThemeData(
-      backgroundColor: AppColors.lightSurface,
-      contentTextStyle: TextStyle(color: AppColors.lightTextPrimary),
+      backgroundColor: AppColors.lightTextPrimary,
+      contentTextStyle: TextStyle(color: Color(0xFFF2F5F6)),
+      actionTextColor: AppColors.positive,
     ),
   );
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -14,6 +15,7 @@ import '../../../../shared/widgets/brixen_dropdown.dart';
 import '../../../../shared/widgets/pill_segmented_control.dart';
 import '../../../../shared/widgets/skeleton.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
+import '../../../../shared/widgets/review_row.dart';
 import '../../../../shared/widgets/company_selector_field.dart';
 import '../../../companies/domain/entities/company.dart';
 import '../../data/repositories/sales_repository_impl.dart';
@@ -424,6 +426,13 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
                   : Session.companyId)!,
             );
       if (_lineItems.isNotEmpty) {
+        // A new sale is created first, then its lines; if the lines fail,
+        // delete the empty sale so no ₹0 bill is left behind.
+        final undoNew = _isEditing
+            ? null
+            : () => notifier
+                  .deleteSale(saved.id, companyId: _effectiveCompanyId)
+                  .catchError((_) {});
         final items = _lineItems
             .map(
               (l) => SaleItem(
@@ -440,12 +449,17 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
         final taxPct = _isGst
             ? double.tryParse(_taxPercentCtrl.text) ?? 0
             : 0.0;
-        await notifier.updateSaleItems(
-          saved.id,
-          items,
-          taxPct,
-          companyId: _effectiveCompanyId,
-        );
+        try {
+          await notifier.updateSaleItems(
+            saved.id,
+            items,
+            taxPct,
+            companyId: _effectiveCompanyId,
+          );
+        } catch (_) {
+          await undoNew?.call();
+          rethrow;
+        }
       }
       if (!mounted) return;
       if (widget.fromMenu || widget.fromMasters) {
@@ -761,7 +775,7 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
     'Date': DateFormat('dd MMM yyyy').format(_billDate),
     'Invoice Type': _invoiceType ?? '—',
     if (_lineItems.isNotEmpty)
-      'Items': _lineItems.map((l) => '${l.title} ×${l.quantity}').join(', '),
+      'Items': _lineItems.map((l) => '${l.title} ×${l.quantity}').join('\n'),
     'Subtotal': '₹${_subtotalCtrl.text.isEmpty ? '0.00' : _subtotalCtrl.text}',
     if (_isGst && _taxPercentCtrl.text.isNotEmpty)
       'GST %': _taxPercentCtrl.text,
@@ -1323,27 +1337,12 @@ class _Step3 extends StatelessWidget {
                         horizontal: 16,
                         vertical: 13,
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            e.key,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: cs.onSurfaceVariant,
-                            ),
-                          ),
-                          Text(
-                            e.value,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: e.key == 'Total'
-                                  ? AppColors.accentEmerald
-                                  : cs.onSurface,
-                            ),
-                          ),
-                        ],
+                      child: ReviewRow(
+                        label: e.key,
+                        value: e.value,
+                        valueColor: e.key == 'Total'
+                            ? AppColors.accentEmerald
+                            : cs.onSurface,
                       ),
                     ),
                     if (!isLast)
@@ -1365,14 +1364,66 @@ class _Step3 extends StatelessWidget {
 
 // ── Line-item picker (Sales — Amounts step) ────────────────────────────────
 
-class _QtyStepper extends StatelessWidget {
+/// − [qty] +: the number can be typed (e.g. 100) as well as stepped.
+class _QtyStepper extends StatefulWidget {
   final int value;
   final void Function(int) onChanged;
   const _QtyStepper({required this.value, required this.onChanged});
 
   @override
+  State<_QtyStepper> createState() => _QtyStepperState();
+}
+
+class _QtyStepperState extends State<_QtyStepper> {
+  late final _ctrl = TextEditingController(text: '${widget.value}');
+  final _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (_focus.hasFocus) {
+        // Tap to type over the old number.
+        _ctrl.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: _ctrl.text.length,
+        );
+      } else {
+        _commit();
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(_QtyStepper old) {
+    super.didUpdateWidget(old);
+    if (!_focus.hasFocus && _ctrl.text != '${widget.value}') {
+      _ctrl.text = '${widget.value}';
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  /// An empty or 0 field goes back to the last good quantity.
+  void _commit() {
+    final n = int.tryParse(_ctrl.text.trim());
+    if (n == null || n < 1) {
+      _ctrl.text = '${widget.value}';
+    } else if (n != widget.value) {
+      widget.onChanged(n);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final value = widget.value;
+    final onChanged = widget.onChanged;
     return Container(
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
@@ -1387,15 +1438,34 @@ class _QtyStepper extends StatelessWidget {
             onTap: value > 1 ? () => onChanged(value - 1) : null,
           ),
           SizedBox(
-            width: 28,
-            child: Text(
-              '$value',
+            width: 48,
+            child: TextField(
+              controller: _ctrl,
+              focusNode: _focus,
               textAlign: TextAlign.center,
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(5),
+              ],
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
                 color: cs.onSurface,
               ),
+              decoration: const InputDecoration(
+                isDense: true,
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 8),
+              ),
+              onChanged: (t) {
+                final n = int.tryParse(t);
+                if (n != null && n >= 1) onChanged(n);
+              },
+              onSubmitted: (_) => _commit(),
             ),
           ),
           _QtyButton(

@@ -10,6 +10,7 @@ import '../../../../core/services/session_service.dart';
 import '../../../../shared/widgets/brixen_button.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
+import '../../../../shared/widgets/review_row.dart';
 import '../../../../shared/widgets/company_selector_field.dart';
 import '../../../companies/domain/entities/company.dart';
 import '../../../masters/data/datasources/product_categories_remote_datasource.dart';
@@ -1241,14 +1242,20 @@ class _Step3 extends StatelessWidget {
             const SizedBox(height: 14),
           ],
           BrixenTextField(
-            label: 'Cost Price *',
+            // Optional: without it, profit reports count this product's
+            // cost as 0 (and say so).
+            label: 'Cost Price (optional)',
             hint: '0.00',
             controller: costPriceCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textInputAction: TextInputAction.next,
             prefixIcon: const Icon(Icons.currency_rupee_rounded),
-            validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Required' : null,
+            validator: (v) {
+              final t = v?.trim() ?? '';
+              return t.isEmpty || double.tryParse(t) != null
+                  ? null
+                  : 'Enter a number';
+            },
           ),
           const SizedBox(height: 22),
           BrixenTextField(
@@ -1427,27 +1434,12 @@ class _Step4 extends StatelessWidget {
                         horizontal: 16,
                         vertical: 13,
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            e.key,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: cs.onSurfaceVariant,
-                            ),
-                          ),
-                          Text(
-                            e.value,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: e.key == 'Retail Price'
-                                  ? AppColors.positive
-                                  : cs.onSurface,
-                            ),
-                          ),
-                        ],
+                      child: ReviewRow(
+                        label: e.key,
+                        value: e.value,
+                        valueColor: e.key == 'Retail Price'
+                            ? AppColors.positive
+                            : cs.onSurface,
                       ),
                     ),
                     if (!isLast)
