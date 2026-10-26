@@ -15,6 +15,7 @@ import '../../../products/presentation/providers/products_provider.dart';
 import '../../../sales/domain/entities/sale.dart';
 import '../../../sales/presentation/providers/sales_provider.dart';
 import '../superadmin/report_kit.dart';
+import 'category_size_sales.dart';
 import 'company_report_kit.dart';
 import 'company_reports_data.dart';
 
@@ -464,24 +465,27 @@ class CompanyCustomerReport extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final customers = ref.watch(customersProvider);
     final sales = ref.watch(salesProvider);
-    final parts = [customers, sales];
+    final products = ref.watch(productsProvider);
+    final parts = [customers, sales, products];
     return CompanyReportScreen(
       loading: parts.any((p) => p.isLoading && !p.hasValue),
       error: parts.where((p) => !p.hasValue && p.hasError).firstOrNull?.error,
       onRetry: () {
         ref.invalidate(customersProvider);
         ref.invalidate(salesProvider);
+        ref.invalidate(productsProvider);
       },
       body: (period) {
         final now = DateTime.now();
         final all = customers.valueOrNull ?? const <Customer>[];
+        final prods = products.valueOrNull ?? const <Product>[];
         final added = [
           for (final c in all)
             if (inPeriod(c.createdAt, period, now)) c,
         ];
         final periodSales = [
           for (final s in sales.valueOrNull ?? const <Sale>[])
-            if (inPeriod(s.billDate, period, now)) s,
+            if (s.countsInSales && inPeriod(s.billDate, period, now)) s,
         ];
         final purchases = purchasesByCustomer(periodSales, all);
         final buyers = purchases.where((t) => t.label != 'Walk-in').length;
@@ -517,12 +521,13 @@ class CompanyCustomerReport extends ConsumerWidget {
           ]),
           ReportList<Tally>(
             title: 'Customer purchases',
-            caption: 'Invoices and spend in this period',
+            caption: 'Top buyers first · tap one for categories & sizes',
             items: purchases,
             searchText: (t) => '${t.label} ${t.sub}',
             sorts: [
               ReportSort('Spend', (a, b) => b.amount.compareTo(a.amount)),
               ReportSort('Invoices', (a, b) => b.count.compareTo(a.count)),
+              ReportSort('Units', (a, b) => b.quantity.compareTo(a.quantity)),
               ReportSort(
                 'Recent',
                 (a, b) =>
@@ -534,17 +539,31 @@ class CompanyCustomerReport extends ConsumerWidget {
                     a.label.toLowerCase().compareTo(b.label.toLowerCase()),
               ),
             ],
-            row: (t, i) => _RankRow(
-              rank: i + 1,
-              title: t.label,
-              subtitle: [
-                if (t.sub.isNotEmpty) t.sub,
-                '${t.count} invoice${t.count == 1 ? '' : 's'}',
-                if (t.last != null)
-                  'last ${DateFormat('d MMM').format(t.last!)}',
-              ].join(' · '),
-              value: rupees(t.amount),
-              amount: t.amount,
+            row: (t, i) => InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => showCustomerBreakdown(
+                context,
+                customer: t,
+                categories: salesByCategorySize([
+                  for (final s in periodSales)
+                    if ((s.customerId ?? '') == t.key) s,
+                ], prods),
+                periodLabel: period.label,
+              ),
+              child: _RankRow(
+                rank: i + 1,
+                title: t.label,
+                subtitle: [
+                  if (t.sub.isNotEmpty) t.sub,
+                  '${t.count} invoice${t.count == 1 ? '' : 's'}',
+                  '${t.quantity} units',
+                  if (t.last != null)
+                    'last ${DateFormat('d MMM').format(t.last!)}',
+                ].join(' · '),
+                value: rupees(t.amount),
+                amount: t.amount,
+                valueSub: 'View ›',
+              ),
             ),
           ),
           ReportList<Customer>(
@@ -605,9 +624,10 @@ class CompanyProductReport extends ConsumerWidget {
             .length;
         final periodSales = [
           for (final s in sales.valueOrNull ?? const <Sale>[])
-            if (inPeriod(s.billDate, period, now)) s,
+            if (s.countsInSales && inPeriod(s.billDate, period, now)) s,
         ];
         final sold = salesByProduct(periodSales, all);
+        final categorySizes = salesByCategorySize(periodSales, all);
         final byCategory = <String, int>{};
         for (final p in all) {
           final c = p.category.isEmpty ? 'Uncategorised' : p.category;
@@ -645,6 +665,11 @@ class CompanyProductReport extends ConsumerWidget {
               AppColors.brandDeep,
             ),
           ]),
+          ReportCard(
+            title: 'Category & size sales',
+            caption: 'Units sold · tap a category for its sizes',
+            child: CategorySizeList(categorySizes),
+          ),
           ReportCard(
             title: 'Stock summary',
             caption: 'Right now',

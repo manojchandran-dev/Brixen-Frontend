@@ -3,6 +3,7 @@ import '../../../customers/domain/entities/customer.dart';
 import '../../../expenses/domain/entities/expense.dart';
 import '../../../products/domain/entities/product.dart';
 import '../../../sales/domain/entities/sale.dart';
+import '../../../sales/domain/entities/sale_item.dart';
 import '../superadmin/superadmin_reports_data.dart';
 
 // Company reports are worked out from the module lists the app loads in
@@ -107,7 +108,10 @@ class Tally {
   /// Cost of what was sold (product cost price × quantity), for profit.
   double cost = 0;
   DateTime? last;
-  Tally(this.label, [this.sub = '']);
+
+  /// What the row groups by (e.g. the customer id; '' for walk-ins).
+  final String key;
+  Tally(this.label, [this.sub = '', this.key = '']);
 
   void add({
     int count = 1,
@@ -178,9 +182,69 @@ List<Tally> purchasesByCustomer(
     (m[key] ??= Tally(
       c?.name ?? (key.isEmpty ? 'Walk-in' : (s.customerName ?? 'Customer')),
       c?.shopName ?? c?.phone ?? '',
-    )).add(amount: s.totalAmount, at: s.billDate);
+      key,
+    )).add(
+      quantity: s.items.fold(0, (a, it) => a + it.quantity),
+      amount: s.totalAmount,
+      at: s.billDate,
+    );
   }
   return _sorted(m);
+}
+
+/// Units and revenue in one product category, split by size.
+class CategorySales {
+  final String name;
+  int quantity = 0;
+  double amount = 0;
+  final _sizes = <String, Tally>{};
+  CategorySales(this.name);
+
+  /// Sizes, most units sold first.
+  List<Tally> get sizes =>
+      _sizes.values.toList()..sort((a, b) => b.quantity.compareTo(a.quantity));
+}
+
+/// A sold line's size: its variant's size, else the size in the saved
+/// label ("M / Blue"), else the product's own size.
+String _sizeOf(SaleItem it, Product? p) {
+  if (it.variantId != null && p != null) {
+    final v = p.variants.where((v) => v.id == it.variantId).firstOrNull;
+    if (v != null) {
+      final s = v.size?.trim() ?? '';
+      return s.isEmpty ? 'No size' : s;
+    }
+  }
+  final fromLabel = it.variantLabel?.split(' / ').first.trim() ?? '';
+  if (fromLabel.isNotEmpty) return fromLabel;
+  final own = p?.size?.trim() ?? '';
+  return own.isEmpty ? 'No size' : own;
+}
+
+/// Units and revenue per category and, within it, per size — categories
+/// with the most units first.
+List<CategorySales> salesByCategorySize(
+  Iterable<Sale> sales,
+  List<Product> products,
+) {
+  final byId = {for (final p in products) p.id: p};
+  final m = <String, CategorySales>{};
+  for (final s in sales) {
+    for (final it in s.items) {
+      final p = byId[it.productId];
+      final c = p?.category ?? '';
+      final cat = m[c.isEmpty ? 'Uncategorised' : c] ??= CategorySales(
+        c.isEmpty ? 'Uncategorised' : c,
+      );
+      cat.quantity += it.quantity;
+      cat.amount += it.amount;
+      final size = _sizeOf(it, p);
+      (cat._sizes[size] ??= Tally(
+        size,
+      )).add(quantity: it.quantity, amount: it.amount, at: s.billDate);
+    }
+  }
+  return m.values.toList()..sort((a, b) => b.quantity.compareTo(a.quantity));
 }
 
 /// Spend and entries per expense category.
