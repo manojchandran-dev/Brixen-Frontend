@@ -276,6 +276,87 @@ List<CategorySales> salesByCategorySize(
   return m.values.toList()..sort((a, b) => b.quantity.compareTo(a.quantity));
 }
 
+/// One product's sales: units and revenue per size, and how many of each
+/// size every customer bought.
+class ProductSales {
+  final String name, category;
+  int quantity = 0;
+  double amount = 0;
+  DateTime? last;
+
+  /// The product's own size order (S, M, L…); sizes no longer on it follow.
+  final List<String> _order;
+  final _sizes = <String, Tally>{};
+  final _buyers = <String, Tally>{};
+  final _buyerSizes = <String, Map<String, int>>{};
+  ProductSales(this.name, this.category, this._order);
+
+  /// Sizes in the product's order, then any others by units.
+  List<Tally> get sizes {
+    int rank(String s) {
+      final i = _order.indexOf(s);
+      return i == -1 ? _order.length : i;
+    }
+
+    return _sizes.values.toList()..sort((a, b) {
+      final r = rank(a.label).compareTo(rank(b.label));
+      return r != 0 ? r : b.quantity.compareTo(a.quantity);
+    });
+  }
+
+  /// Customers, most units first (key = customer id, '' = walk-in).
+  List<Tally> get buyers =>
+      _buyers.values.toList()..sort((a, b) => b.quantity.compareTo(a.quantity));
+
+  /// Units of [size] bought by the customer with [buyerKey].
+  int unitsOf(String buyerKey, String size) =>
+      _buyerSizes[buyerKey]?[size] ?? 0;
+}
+
+/// Per product: units and revenue by size and by customer × size — most
+/// revenue first.
+List<ProductSales> salesByProductSize(
+  Iterable<Sale> sales,
+  List<Product> products, [
+  List<Customer> customers = const [],
+]) {
+  final byId = {for (final p in products) p.id: p};
+  final people = {for (final c in customers) c.id: c};
+  final m = <String, ProductSales>{};
+  for (final s in sales) {
+    final buyerKey = s.customerId ?? '';
+    final buyer = people[s.customerId];
+    for (final it in s.items) {
+      final p = byId[it.productId];
+      final key = it.productId.isEmpty ? it.productName : it.productId;
+      final ps = m[key] ??= ProductSales(
+        p?.productName ?? it.productName,
+        p?.category ?? '',
+        <String>{
+          for (final v in p?.variants ?? const <ProductVariant>[])
+            if ((v.size?.trim() ?? '').isNotEmpty) v.size!.trim(),
+        }.toList(),
+      );
+      final size = _sizeOf(it, p);
+      ps.quantity += it.quantity;
+      ps.amount += it.amount;
+      if (ps.last == null || s.billDate.isAfter(ps.last!)) ps.last = s.billDate;
+      (ps._sizes[size] ??= Tally(
+        size,
+      )).add(quantity: it.quantity, amount: it.amount, at: s.billDate);
+      (ps._buyers[buyerKey] ??= Tally(
+        buyer?.name ??
+            (buyerKey.isEmpty ? 'Walk-in' : (s.customerName ?? 'Customer')),
+        buyer?.shopName ?? '',
+        buyerKey,
+      )).add(quantity: it.quantity, amount: it.amount, at: s.billDate);
+      final bs = ps._buyerSizes[buyerKey] ??= {};
+      bs[size] = (bs[size] ?? 0) + it.quantity;
+    }
+  }
+  return m.values.toList()..sort((a, b) => b.amount.compareTo(a.amount));
+}
+
 /// Spend and entries per expense category.
 List<Tally> expensesByCategory(Iterable<Expense> expenses) {
   final m = <String, Tally>{};

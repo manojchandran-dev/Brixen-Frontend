@@ -18,6 +18,7 @@ import '../superadmin/report_kit.dart';
 import 'category_size_sales.dart';
 import 'company_report_kit.dart';
 import 'company_reports_data.dart';
+import 'product_size_sales.dart';
 
 final _day = DateFormat('d MMM yyyy');
 String _money(int v) => rupees(v.toDouble());
@@ -626,12 +627,9 @@ class CompanyProductReport extends ConsumerWidget {
           for (final s in sales.valueOrNull ?? const <Sale>[])
             if (s.countsInSales && inPeriod(s.billDate, period, now)) s,
         ];
-        final sold = salesByProduct(periodSales, all);
-        final categorySizes = salesByCategorySize(
-          periodSales,
-          all,
-          ref.watch(customersProvider).valueOrNull ?? const [],
-        );
+        final people = ref.watch(customersProvider).valueOrNull ?? const [];
+        final sold = salesByProductSize(periodSales, all, people);
+        final categorySizes = salesByCategorySize(periodSales, all, people);
         final byCategory = <String, int>{};
         for (final p in all) {
           final c = p.category.isEmpty ? 'Uncategorised' : p.category;
@@ -732,11 +730,13 @@ class CompanyProductReport extends ConsumerWidget {
                 ),
             ]),
           ),
-          ReportList<Tally>(
+          ReportList<ProductSales>(
             title: 'Product sales',
-            caption: '${sold.length} of ${all.length} products sold',
+            caption:
+                '${sold.length} of ${all.length} sold · tap a product for sizes & customers',
             items: sold,
-            searchText: (t) => '${t.label} ${t.sub}',
+            searchText: (p) => '${p.name} ${p.category}',
+            searchHint: 'Search products',
             sorts: [
               ReportSort('Revenue', (a, b) => b.amount.compareTo(a.amount)),
               ReportSort(
@@ -745,20 +745,10 @@ class CompanyProductReport extends ConsumerWidget {
               ),
               ReportSort(
                 'Name',
-                (a, b) =>
-                    a.label.toLowerCase().compareTo(b.label.toLowerCase()),
+                (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
               ),
             ],
-            row: (t, i) => _RankRow(
-              rank: i + 1,
-              title: t.label,
-              subtitle:
-                  '${t.sub.isEmpty ? 'Uncategorised' : t.sub}'
-                  '${t.last == null ? '' : ' · last sold ${DateFormat('d MMM').format(t.last!)}'}',
-              value: rupees(t.amount),
-              amount: t.amount,
-              valueSub: '${t.quantity} sold',
-            ),
+            row: (p, i) => ProductSizeRow(rank: i + 1, product: p),
           ),
         ];
       },

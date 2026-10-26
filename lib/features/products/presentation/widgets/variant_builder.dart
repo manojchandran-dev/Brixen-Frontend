@@ -616,7 +616,8 @@ class _VariantCard extends StatelessWidget {
                 child: TextFormField(
                   controller: draft.sku,
                   textCapitalization: TextCapitalization.characters,
-                  decoration: _box('Code / SKU', hint: 'optional'),
+                  // Blank: the server makes one from the product, size and colour.
+                  decoration: _box('Code / SKU', hint: 'Auto if blank'),
                 ),
               ),
               const SizedBox(width: 8),

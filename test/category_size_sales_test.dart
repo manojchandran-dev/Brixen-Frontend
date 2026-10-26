@@ -133,4 +133,26 @@ void main() {
     expect(shirts.productsOf('M').single.label, 'Shirt');
     expect(shirts.buyersOf('XXL'), isEmpty);
   });
+
+  test('per product: sizes in the product\'s order, customer × size', () {
+    final products = salesByProductSize(
+      sales,
+      [_shirt, _sock],
+      [Customer(id: 'c1', name: 'Ravi', createdAt: _day)],
+    );
+    final shirt = products.firstWhere((p) => p.name == 'Shirt');
+    expect(shirt.quantity, 9);
+    // M, L as on the product; sizes not on it (no size, XL) after.
+    expect([for (final s in shirt.sizes) s.label].take(2), ['M', 'L']);
+    expect(
+      {for (final s in shirt.sizes) s.label: s.quantity},
+      {'M': 5, 'L': 1, 'No size': 1, 'XL': 2},
+    );
+    expect(shirt.unitsOf('c1', 'M'), 3);
+    expect(shirt.unitsOf('c1', 'L'), 1);
+    expect(shirt.unitsOf('c2', 'M'), 2);
+    expect(shirt.unitsOf('', 'XL'), 2);
+    expect(shirt.unitsOf('c1', 'XL'), 0);
+    expect(shirt.buyers.first.label, 'Ravi'); // 4 units, the most
+  });
 }
