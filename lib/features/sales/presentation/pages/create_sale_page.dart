@@ -94,6 +94,9 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
   /// GST bill or secondary bill; fixed once the sale is saved.
   late String _billType = widget.editSale?.billType ?? widget.billType;
   bool get _isGst => _billType != BillType.secondary;
+
+  /// GST bill only: it can also be printed as a secondary bill.
+  late bool _hasSecondaryBill = widget.editSale?.hasSecondaryBill ?? false;
   DateTime _billDate = DateTime.now();
   String? _invoiceType;
   XFile? _billImage;
@@ -422,6 +425,7 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
       customerId: _selectedCustomer?.id,
       billDate: _billDate,
       billType: _billType,
+      hasSecondaryBill: _isGst && _hasSecondaryBill,
       invoiceType: _invoiceType,
       subtotal: manual ? double.tryParse(_subtotalCtrl.text) ?? 0 : 0,
       taxPercentage: manual && _isGst
@@ -756,6 +760,9 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
                   setState(() => _billType = v);
                   _recalcTaxAndTotal();
                 },
+          hasSecondaryBill: _hasSecondaryBill,
+          onHasSecondaryBillChanged: (v) =>
+              setState(() => _hasSecondaryBill = v),
           billDate: _billDate,
           invoiceType: _invoiceType,
           invoiceTypes: _invoiceTypes,
@@ -806,6 +813,7 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
 
   Map<String, String> _buildPreview() => {
     'Bill': _isGst ? 'GST Bill' : 'Secondary Bill (no GST)',
+    if (_isGst) 'Secondary Bill': _hasSecondaryBill ? 'Enabled' : 'Disabled',
     if (_selectedCustomer != null) 'Customer': _selectedCustomer!.name,
     'Date': DateFormat('dd MMM yyyy').format(_billDate),
     'Invoice Type': _invoiceType ?? '—',
@@ -979,6 +987,8 @@ class _Step1 extends StatelessWidget {
 
   /// Null when the bill type is locked (editing a saved sale).
   final ValueChanged<String>? onBillTypeChanged;
+  final bool hasSecondaryBill;
+  final ValueChanged<bool> onHasSecondaryBillChanged;
   final DateTime billDate;
   final String? invoiceType;
   final List<String> invoiceTypes;
@@ -998,6 +1008,8 @@ class _Step1 extends StatelessWidget {
     required this.formKey,
     required this.billType,
     required this.onBillTypeChanged,
+    required this.hasSecondaryBill,
+    required this.onHasSecondaryBillChanged,
     required this.billDate,
     required this.invoiceType,
     required this.invoiceTypes,
@@ -1067,6 +1079,13 @@ class _Step1 extends StatelessWidget {
               ).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
             ),
           ),
+          if (billType == BillType.gst) ...[
+            const SizedBox(height: 14),
+            _SecondaryBillToggle(
+              value: hasSecondaryBill,
+              onChanged: onHasSecondaryBillChanged,
+            ),
+          ],
           const SizedBox(height: 22),
           BrixenDateField(
             label: 'Bill Date *',
@@ -1102,6 +1121,66 @@ class _Step1 extends StatelessWidget {
             onRemove: onRemoveImage,
           ),
           const SizedBox(height: 22),
+        ],
+      ),
+    );
+  }
+}
+
+/// GST bill: on/off for also printing it as a secondary bill (no GST).
+class _SecondaryBillToggle extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  const _SecondaryBillToggle({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.receipt_long_outlined,
+            size: 20,
+            color: cs.onSurfaceVariant,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Secondary bill',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value
+                      ? 'Enabled · can also print this as a bill without GST'
+                      : 'Disabled',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            value: value,
+            activeTrackColor: AppColors.brand,
+            onChanged: onChanged,
+          ),
         ],
       ),
     );

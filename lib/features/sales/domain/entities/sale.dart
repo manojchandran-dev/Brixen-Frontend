@@ -28,6 +28,10 @@ class Sale {
   /// [BillType.gst] or [BillType.secondary].
   final String billType;
 
+  /// A GST bill that can also be printed as a secondary bill (no GST).
+  /// Always false on a secondary bill.
+  final bool hasSecondaryBill;
+
   /// Server-set running number, e.g. "C7G2627/0001" (company 7, GST,
   /// 2026-27); unique across companies. Null on old sales.
   final String? billNo;
@@ -53,12 +57,25 @@ class Sale {
     this.billImagePath,
     this.items = const [],
     this.billType = BillType.gst,
+    this.hasSecondaryBill = false,
     this.billNo,
     this.amountPaid,
     required this.createdAt,
   });
 
   bool get isGst => billType != BillType.secondary;
+
+  /// A GST bill with a secondary bill is left out of sales totals.
+  bool get countsInSales => !(isGst && hasSecondaryBill);
+
+  /// This GST sale printed as a secondary bill: same lines, no GST.
+  Sale asSecondaryBill() => copyWith(
+    billType: BillType.secondary,
+    hasSecondaryBill: false,
+    taxPercentage: 0,
+    taxAmount: 0,
+    totalAmount: subtotal,
+  );
 
   /// Still owed: total − amount paid. Without [amountPaid] (old data), a
   /// Paid sale owes nothing and any other owes the full total.
@@ -85,6 +102,7 @@ class Sale {
     String? billImagePath,
     List<SaleItem>? items,
     String? billType,
+    bool? hasSecondaryBill,
     String? billNo,
     DateTime? createdAt,
     double? amountPaid,
@@ -106,6 +124,7 @@ class Sale {
       billImagePath: billImagePath ?? this.billImagePath,
       items: items ?? this.items,
       billType: billType ?? this.billType,
+      hasSecondaryBill: hasSecondaryBill ?? this.hasSecondaryBill,
       billNo: billNo ?? this.billNo,
       amountPaid: amountPaid ?? this.amountPaid,
       createdAt: createdAt ?? this.createdAt,

@@ -6,6 +6,7 @@ import '../../../../../core/router/app_router.dart';
 import '../../../../../core/services/session_service.dart';
 import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/utils/date_utils.dart';
+import '../../../../../shared/widgets/exact_amount.dart';
 import '../../../../../shared/widgets/session_icon.dart';
 import '../../../../../shared/widgets/skeleton.dart';
 import '../../../../customers/presentation/providers/customers_provider.dart';
@@ -598,16 +599,19 @@ class _MoneyCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(6),
                           ),
                         )
-                      : FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            rupees(value!),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 26,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.5,
+                      : ExactAmount(
+                          amount: value,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              rupees(value!),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.5,
+                              ),
                             ),
                           ),
                         ),
@@ -1060,15 +1064,18 @@ class _BusinessStatus extends StatelessWidget {
           const SizedBox(height: 4),
           v == null
               ? const Shimmer(child: SkeletonBox(width: 60, height: 18))
-              : FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    rupees(v),
-                    style: TextStyle(
-                      color: AppColors.ink,
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
+              : ExactAmount(
+                  amount: v,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      rupees(v),
+                      style: TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                 ),
@@ -1128,12 +1135,15 @@ class _BusinessStatus extends StatelessWidget {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          Text(
-                            t == null ? '…' : rupees(t.net),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
+                          ExactAmount(
+                            amount: t?.net,
+                            child: Text(
+                              t == null ? '…' : rupees(t.net),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
                         ],

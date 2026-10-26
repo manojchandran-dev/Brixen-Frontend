@@ -80,7 +80,9 @@ class TodayStats {
     ]..sort((a, b) => b.at.compareTo(a.at));
 
     return TodayStats(
-      sales: salesToday.fold(0, (a, s) => a + s.totalAmount),
+      sales: salesToday
+          .where((s) => s.countsInSales)
+          .fold(0, (a, s) => a + s.totalAmount),
       invoices: salesToday.length,
       expenses: expenses
           .where((e) => today(e.expenseDate))

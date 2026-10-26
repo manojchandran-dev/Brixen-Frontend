@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/money.dart';
+import '../../../../shared/widgets/exact_amount.dart';
 import '../../../customers/domain/entities/customer.dart';
 import '../../../customers/presentation/providers/customers_provider.dart';
 import '../../../employees/domain/entities/employee.dart';
@@ -45,12 +46,16 @@ class _RankRow extends StatelessWidget {
   final String title;
   final String subtitle;
   final String value;
+
+  /// The exact rupee amount behind a compact [value]; long-press shows it.
+  final double? amount;
   final String? valueSub;
   const _RankRow({
     required this.rank,
     required this.title,
     required this.subtitle,
     required this.value,
+    this.amount,
     this.valueSub,
   });
 
@@ -105,12 +110,15 @@ class _RankRow extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                value,
-                style: TextStyle(
-                  color: AppColors.ink,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
+              ExactAmount(
+                amount: amount,
+                child: Text(
+                  value,
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
               if (valueSub != null)
@@ -152,7 +160,8 @@ class CompanySalesReport extends ConsumerWidget {
             if (inPeriod(s.billDate, period, now)) s,
         ];
         final prods = products.valueOrNull ?? const <Product>[];
-        final total = list.fold<double>(0, (a, s) => a + s.totalAmount);
+        final counted = list.where((s) => s.countsInSales);
+        final total = counted.fold<double>(0, (a, s) => a + s.totalAmount);
         final unpaid = list.where((s) => s.balance > 0);
         final byProduct = salesByProduct(list, prods);
         final gstBills = list.where((s) => s.isGst).toList();
@@ -166,39 +175,38 @@ class CompanySalesReport extends ConsumerWidget {
           ReportSummary([
             ReportStat(
               Icons.point_of_sale_rounded,
-              'Total sales · ${list.length}',
+              'Total sales · ${counted.length}',
               rupees(total),
               AppColors.positive,
+              amount: total,
             ),
             ReportStat(
               Icons.pending_actions_rounded,
               'Unpaid · ${unpaid.length}',
               rupees(unpaid.fold<double>(0, (a, s) => a + s.balance)),
               AppColors.brandBlack,
+              amount: unpaid.fold<double>(0, (a, s) => a + s.balance),
             ),
             ReportStat(
               Icons.verified_outlined,
               'GST bills · ${gstBills.length}',
               rupees(sum(gstBills, (s) => s.totalAmount)),
               AppColors.brand,
+              amount: sum(gstBills, (s) => s.totalAmount),
             ),
             ReportStat(
               Icons.receipt_long_outlined,
               'Secondary bills · ${secBills.length}',
               rupees(sum(secBills, (s) => s.totalAmount)),
               AppColors.brandDeep,
+              amount: sum(secBills, (s) => s.totalAmount),
             ),
             ReportStat(
               Icons.account_balance_rounded,
               'GST collected',
               rupees(gstCollected),
               AppColors.brandLight,
-            ),
-            ReportStat(
-              Icons.functions_rounded,
-              'Avg invoice',
-              rupees(list.isEmpty ? 0 : total / list.length),
-              AppColors.brandDeep,
+              amount: gstCollected,
             ),
           ]),
           ReportCard(
@@ -246,6 +254,7 @@ class CompanySalesReport extends ConsumerWidget {
                           'Taxable ${rupees(r.taxable)} · '
                           'CGST ${rupees(r.tax / 2)} + SGST ${rupees(r.tax / 2)}',
                       value: rupees(r.tax),
+                      amount: r.tax,
                     ),
                 ],
               ),
@@ -277,6 +286,7 @@ class CompanySalesReport extends ConsumerWidget {
               title: t.label,
               subtitle: t.sub.isEmpty ? 'Uncategorised' : t.sub,
               value: rupees(t.amount),
+              amount: t.amount,
               valueSub: '${t.quantity} sold',
             ),
           ),
@@ -313,6 +323,7 @@ class CompanySalesReport extends ConsumerWidget {
                   '${s.billNo == null ? '' : ' ${s.billNo}'} · '
                   '${_day.format(s.billDate)} · ${_cap(s.paymentStatus)}',
               trailing: rupees(s.totalAmount),
+              trailingAmount: s.totalAmount,
             ),
           ),
         ];
@@ -348,6 +359,7 @@ class CompanyExpenseReport extends ConsumerWidget {
               'Total expenses',
               rupees(total),
               AppColors.brand,
+              amount: total,
             ),
             ReportStat(
               Icons.format_list_numbered_rounded,
@@ -360,6 +372,7 @@ class CompanyExpenseReport extends ConsumerWidget {
               'Avg entry',
               rupees(list.isEmpty ? 0 : total / list.length),
               AppColors.brandDeep,
+              amount: list.isEmpty ? 0 : total / list.length,
             ),
             ReportStat(
               Icons.category_rounded,
@@ -404,6 +417,7 @@ class CompanyExpenseReport extends ConsumerWidget {
                   '${t.count} entr${t.count == 1 ? 'y' : 'ies'}'
                   '${total > 0 ? ' · ${(t.amount / total * 100).round()}% of spend' : ''}',
               value: rupees(t.amount),
+              amount: t.amount,
             ),
           ),
           ReportList<Expense>(
@@ -432,6 +446,7 @@ class CompanyExpenseReport extends ConsumerWidget {
                   '${e.category.isEmpty ? 'Other' : e.category} · ${_day.format(e.expenseDate)}'
                   '${e.paymentMethod == null ? '' : ' · ${e.paymentMethod}'}',
               trailing: rupees(e.amount),
+              trailingAmount: e.amount,
             ),
           ),
         ];
@@ -497,6 +512,7 @@ class CompanyCustomerReport extends ConsumerWidget {
               'Avg spend',
               rupees(purchases.isEmpty ? 0 : revenue / purchases.length),
               AppColors.brandBlack,
+              amount: purchases.isEmpty ? 0 : revenue / purchases.length,
             ),
           ]),
           ReportList<Tally>(
@@ -528,6 +544,7 @@ class CompanyCustomerReport extends ConsumerWidget {
                   'last ${DateFormat('d MMM').format(t.last!)}',
               ].join(' · '),
               value: rupees(t.amount),
+              amount: t.amount,
             ),
           ),
           ReportList<Customer>(
@@ -710,6 +727,7 @@ class CompanyProductReport extends ConsumerWidget {
                   '${t.sub.isEmpty ? 'Uncategorised' : t.sub}'
                   '${t.last == null ? '' : ' · last sold ${DateFormat('d MMM').format(t.last!)}'}',
               value: rupees(t.amount),
+              amount: t.amount,
               valueSub: '${t.quantity} sold',
             ),
           ),
@@ -891,18 +909,21 @@ class CompanyProfitLossReport extends ConsumerWidget {
               'Net sales',
               rupees(pl.netSales),
               AppColors.brand,
+              amount: pl.netSales,
             ),
             ReportStat(
               Icons.trending_up_rounded,
               'Gross profit · ${_pct(pl.margin(pl.grossProfit))}',
               rupees(pl.grossProfit),
               AppColors.positive,
+              amount: pl.grossProfit,
             ),
             ReportStat(
               Icons.receipt_long_rounded,
               'Expenses',
               rupees(pl.expenses),
               AppColors.brandDeep,
+              amount: pl.expenses,
             ),
             ReportStat(
               pl.netProfit >= 0
@@ -911,6 +932,7 @@ class CompanyProfitLossReport extends ConsumerWidget {
               '${pl.netProfit >= 0 ? 'Net profit' : 'Net loss'} · ${_pct(pl.margin(pl.netProfit))}',
               rupees(pl.netProfit),
               pl.netProfit >= 0 ? AppColors.positive : AppColors.brandBlack,
+              amount: pl.netProfit,
             ),
           ]),
           ReportCard(
@@ -985,6 +1007,7 @@ class CompanyProfitLossReport extends ConsumerWidget {
               title: t.label,
               subtitle: 'Revenue ${rupees(t.amount)} · Cost ${rupees(t.cost)}',
               value: rupees(t.amount - t.cost),
+              amount: t.amount - t.cost,
               valueSub: t.amount == 0
                   ? null
                   : _pct((t.amount - t.cost) / t.amount * 100),
@@ -1036,12 +1059,15 @@ class _Statement extends StatelessWidget {
               ),
             ),
           ),
-          Text(
-            rupees(v),
-            style: TextStyle(
-              color: color ?? AppColors.ink,
-              fontSize: total ? 15 : 13,
-              fontWeight: total ? FontWeight.w800 : FontWeight.w600,
+          ExactAmount(
+            amount: v,
+            child: Text(
+              rupees(v),
+              style: TextStyle(
+                color: color ?? AppColors.ink,
+                fontSize: total ? 15 : 13,
+                fontWeight: total ? FontWeight.w800 : FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -1143,12 +1169,15 @@ class _ProfitRowTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            _money(profit),
-            style: TextStyle(
-              color: up ? AppColors.positive : AppColors.ink,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
+          ExactAmount(
+            amount: profit.toDouble(),
+            child: Text(
+              _money(profit),
+              style: TextStyle(
+                color: up ? AppColors.positive : AppColors.ink,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
@@ -1174,38 +1203,45 @@ class _StockSummary extends StatelessWidget {
       0,
       (a, p) => a + (p.stockQuantity > 0 ? p.stockQuantity * p.costPrice : 0),
     );
-    Widget cell(String label, String v, Color color) => Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                v,
-                style: TextStyle(
-                  color: AppColors.ink,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
+    Widget cell(String label, String v, Color color, {double? amount}) =>
+        Expanded(
+          child: ExactAmount(
+            amount: amount,
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      v,
+                      style: TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
               ),
             ),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
-            ),
-          ],
-        ),
-      ),
-    );
+          ),
+        );
     return Column(
       children: [
         Row(
@@ -1226,7 +1262,12 @@ class _StockSummary extends StatelessWidget {
           children: [
             cell('Units on hand', '$units', AppColors.brand),
             const SizedBox(width: 8),
-            cell('Stock value at cost', rupees(value), AppColors.brand),
+            cell(
+              'Stock value at cost',
+              rupees(value),
+              AppColors.brand,
+              amount: value,
+            ),
           ],
         ),
       ],

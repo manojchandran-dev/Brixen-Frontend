@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/error_state.dart';
+import '../../../../shared/widgets/exact_amount.dart';
 import '../../../../shared/widgets/skeleton.dart';
 import 'report_date_range_sheet.dart';
 import 'superadmin_reports_data.dart';
@@ -183,12 +184,16 @@ class ReportStat {
 
   /// True when the number ignores the date filter (e.g. total companies).
   final bool allTime;
+
+  /// The exact rupee amount behind a compact [value]; long-press shows it.
+  final double? amount;
   const ReportStat(
     this.icon,
     this.label,
     this.value,
     this.color, {
     this.allTime = false,
+    this.amount,
   });
 }
 
@@ -335,88 +340,91 @@ class _StatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = stat.color;
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: AppColors.accentGradient(c),
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppColors.shadows([
-          BoxShadow(
-            color: Color.lerp(c, Colors.black, 0.3)!.withValues(alpha: 0.3),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
+    return ExactAmount(
+      amount: stat.amount,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: AppColors.accentGradient(c),
           ),
-        ]),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Stack(
-          children: [
-            // Large faded icon in the corner for depth.
-            Positioned(
-              right: -10,
-              bottom: -14,
-              child: Icon(
-                stat.icon,
-                size: 72,
-                color: Colors.white.withValues(alpha: 0.12),
-              ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: AppColors.shadows([
+            BoxShadow(
+              color: Color.lerp(c, Colors.black, 0.3)!.withValues(alpha: 0.3),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
             ),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(stat.icon, color: Colors.white, size: 17),
-                      ),
-                      const SizedBox(width: 6),
-                      const Spacer(),
-                      Flexible(
-                        flex: 6,
-                        child: ReportScopeTag(
-                          allTime: stat.allTime,
-                          onColor: c,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    stat.value,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      height: 1,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    stat.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.88),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+          ]),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            children: [
+              // Large faded icon in the corner for depth.
+              Positioned(
+                right: -10,
+                bottom: -14,
+                child: Icon(
+                  stat.icon,
+                  size: 72,
+                  color: Colors.white.withValues(alpha: 0.12),
+                ),
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(stat.icon, color: Colors.white, size: 17),
+                        ),
+                        const SizedBox(width: 6),
+                        const Spacer(),
+                        Flexible(
+                          flex: 6,
+                          child: ReportScopeTag(
+                            allTime: stat.allTime,
+                            onColor: c,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      stat.value,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      stat.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.88),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -522,21 +530,26 @@ class ReportCard extends StatelessWidget {
                 ),
               ),
               if (total != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.positive.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${c is ReportTrendChart && c.valueLabel != null ? c.valueLabel!(total) : total} total',
-                    style: const TextStyle(
-                      color: AppColors.positive,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
+                ExactAmount(
+                  amount: c is ReportTrendChart && c.valueLabel != null
+                      ? total.toDouble()
+                      : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.positive.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${c is ReportTrendChart && c.valueLabel != null ? c.valueLabel!(total) : total} total',
+                      style: const TextStyle(
+                        color: AppColors.positive,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                 ),
@@ -610,16 +623,21 @@ class ReportTrendChart extends StatelessWidget {
                             if (buckets[i].count > 0)
                               // One line, shrunk to the bar width — amounts
                               // like "₹1.2L" would wrap on narrow bars.
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  valueLabel?.call(buckets[i].count) ??
-                                      '${buckets[i].count}',
-                                  maxLines: 1,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
+                              ExactAmount(
+                                amount: valueLabel == null
+                                    ? null
+                                    : buckets[i].count.toDouble(),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    valueLabel?.call(buckets[i].count) ??
+                                        '${buckets[i].count}',
+                                    maxLines: 1,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -719,42 +737,45 @@ class ReportGroupedBarChart extends StatelessWidget {
           runSpacing: 8,
           children: [
             for (final s in series)
-              Container(
-                padding: const EdgeInsets.fromLTRB(8, 6, 10, 6),
-                decoration: BoxDecoration(
-                  color: s.color.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: s.color,
-                        borderRadius: BorderRadius.circular(3),
+              ExactAmount(
+                amount: valueLabel == null ? null : s.total.toDouble(),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(8, 6, 10, 6),
+                  decoration: BoxDecoration(
+                    color: s.color.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: s.color,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 7),
-                    Text(
-                      s.label,
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                      const SizedBox(width: 7),
+                      Text(
+                        s.label,
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      fmt(s.total),
-                      style: TextStyle(
-                        color: AppColors.ink,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w800,
+                      const SizedBox(width: 6),
+                      Text(
+                        fmt(s.total),
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
           ],
@@ -879,13 +900,16 @@ class ReportBreakdown extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    valueLabel?.call(total) ?? '$total',
-                    style: TextStyle(
-                      color: AppColors.ink,
-                      fontSize: valueLabel == null ? 22 : 15,
-                      fontWeight: FontWeight.w800,
-                      height: 1,
+                  ExactAmount(
+                    amount: valueLabel == null ? null : total.toDouble(),
+                    child: Text(
+                      valueLabel?.call(total) ?? '$total',
+                      style: TextStyle(
+                        color: AppColors.ink,
+                        fontSize: valueLabel == null ? 22 : 15,
+                        fontWeight: FontWeight.w800,
+                        height: 1,
+                      ),
                     ),
                   ),
                   Text(
@@ -927,12 +951,15 @@ class ReportBreakdown extends StatelessWidget {
                           ),
                         ),
                       ),
-                      Text(
-                        valueLabel?.call(it.count) ?? '${it.count}',
-                        style: TextStyle(
-                          color: AppColors.ink,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
+                      ExactAmount(
+                        amount: valueLabel == null ? null : it.count.toDouble(),
+                        child: Text(
+                          valueLabel?.call(it.count) ?? '${it.count}',
+                          style: TextStyle(
+                            color: AppColors.ink,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -1012,6 +1039,9 @@ class ReportRow extends StatelessWidget {
   final String title;
   final String? subtitle;
   final String? trailing;
+
+  /// The exact rupee amount behind a compact [trailing]; long-press shows it.
+  final double? trailingAmount;
   const ReportRow({
     super.key,
     required this.icon,
@@ -1019,6 +1049,7 @@ class ReportRow extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.trailing,
+    this.trailingAmount,
   });
 
   @override
@@ -1068,18 +1099,21 @@ class ReportRow extends StatelessWidget {
           ),
           if (trailing != null) ...[
             const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                trailing!,
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
+            ExactAmount(
+              amount: trailingAmount,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  trailing!,
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/money.dart';
+import '../../../../shared/widgets/exact_amount.dart';
 import '../../../products/domain/entities/product.dart';
 import '../../../products/presentation/providers/products_provider.dart';
 import '../providers/inventory_provider.dart';
@@ -69,10 +70,24 @@ class InvStatTile extends StatelessWidget {
   final String label, value;
   final IconData icon;
   final Color color;
-  const InvStatTile(this.label, this.value, this.icon, this.color, {super.key});
+
+  /// The exact rupee amount behind a compact [value]; long-press shows it.
+  final double? amount;
+  const InvStatTile(
+    this.label,
+    this.value,
+    this.icon,
+    this.color, {
+    super.key,
+    this.amount,
+  });
 
   @override
   Widget build(BuildContext context) {
+    return ExactAmount(amount: amount, child: _tile());
+  }
+
+  Widget _tile() {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -325,12 +340,15 @@ class StockLineTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    rupees(line.value),
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
+                  ExactAmount(
+                    amount: line.value,
+                    child: Text(
+                      rupees(line.value),
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],

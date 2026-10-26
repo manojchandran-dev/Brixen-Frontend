@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/money.dart';
+import '../../../../shared/widgets/exact_amount.dart';
 import '../../../../shared/widgets/error_state.dart';
 import '../../../../shared/widgets/module_title.dart';
 import '../../../../shared/widgets/search_field.dart';
@@ -273,6 +274,7 @@ class _OverviewTab extends ConsumerWidget {
                 'Stock value',
                 rupees(s.value),
                 Icons.account_balance_wallet_rounded,
+                amount: s.value,
                 AppColors.positive,
               ),
               InvStatTile(
@@ -604,7 +606,13 @@ class _ReportsTab extends ConsumerWidget {
         ),
       );
 
-      Widget row(String a, String b, String c, {bool bold = false}) => Padding(
+      Widget row(
+        String a,
+        String b,
+        String c, {
+        bool bold = false,
+        double? amount,
+      }) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 5),
         child: Row(
           children: [
@@ -636,15 +644,18 @@ class _ReportsTab extends ConsumerWidget {
             ),
             Expanded(
               flex: 2,
-              child: Text(
-                c,
-                textAlign: TextAlign.right,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: AppColors.ink,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
+              child: ExactAmount(
+                amount: amount,
+                child: Text(
+                  c,
+                  textAlign: TextAlign.right,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ),
@@ -667,6 +678,7 @@ class _ReportsTab extends ConsumerWidget {
                     '${e.key} (${e.value.$1})',
                     '${e.value.$2}',
                     rupees(e.value.$3),
+                    amount: e.value.$3,
                   ),
               ],
             ),
@@ -748,6 +760,7 @@ class _ReportsTab extends ConsumerWidget {
                     l.name,
                     '${l.item.quantity} × ${rupees(l.unitCost)}',
                     rupees(l.value),
+                    amount: l.value,
                   ),
               ],
             ),

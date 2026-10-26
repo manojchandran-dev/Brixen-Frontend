@@ -881,6 +881,8 @@ void _showSaleDetail(
       ),
       sections: [
         _GenerateBillButton(sale: sale),
+        if (sale.isGst && sale.hasSecondaryBill)
+          _GenerateBillButton(sale: sale.asSecondaryBill()),
         DetailSection(
           title: 'Invoice',
           items: [
@@ -1051,7 +1053,9 @@ class _GenerateBillButton extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        sale.isGst ? 'Generate GST Bill' : 'Generate Bill',
+                        sale.isGst
+                            ? 'Generate GST Bill'
+                            : 'Generate Secondary Bill',
                         style: TextStyle(
                           color: fg,
                           fontSize: 15,

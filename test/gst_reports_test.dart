@@ -51,4 +51,25 @@ void main() {
     expect(pl.tax, 50 + 240 + 20);
     expect(pl.netSales, 1000 + 2000 + 400 + 700);
   });
+
+  test('a GST bill with a secondary bill is left out of sales', () {
+    final withSecondary = _sale(
+      BillType.gst,
+      DateTime(2026, 10, 24),
+      5000,
+      5,
+    ).copyWith(hasSecondaryBill: true);
+    final pl = ProfitLoss.of([...sales, withSecondary], const [], const []);
+    expect(pl.grossSales, ProfitLoss.of(sales, const [], const []).grossSales);
+    // The flag means nothing on a secondary bill.
+    expect(
+      _sale(
+        BillType.secondary,
+        DateTime(2026, 10, 24),
+        700,
+        0,
+      ).copyWith(hasSecondaryBill: true).countsInSales,
+      isTrue,
+    );
+  });
 }

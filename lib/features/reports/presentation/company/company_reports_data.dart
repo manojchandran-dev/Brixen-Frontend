@@ -222,10 +222,11 @@ class ProfitLoss {
   double? margin(double v) => netSales == 0 ? null : v / netSales * 100;
 
   factory ProfitLoss.of(
-    Iterable<Sale> sales,
+    Iterable<Sale> allSales,
     Iterable<Expense> expenses,
     List<Product> products,
   ) {
+    final sales = allSales.where((s) => s.countsInSales);
     final cost = {for (final p in products) p.id: p.costPrice};
     var cogs = 0.0, uncosted = 0;
     for (final s in sales) {
@@ -257,12 +258,13 @@ typedef ProfitRow = ({String label, int sales, int cogs, int expenses});
 /// Net sales, cost of goods and expenses per chart bucket of [p] (same
 /// buckets as the charts), so each row's profit is sales − cogs − expenses.
 List<ProfitRow> profitByPeriod(
-  Iterable<Sale> sales,
+  Iterable<Sale> allSales,
   Iterable<Expense> expenses,
   List<Product> products,
   ReportPeriod p,
   DateTime now,
 ) {
+  final sales = allSales.where((s) => s.countsInSales);
   final cost = {for (final pr in products) pr.id: pr.costPrice};
   final s = [for (final x in sales) (x.billDate, x.totalAmount - x.taxAmount)];
   final c = [
