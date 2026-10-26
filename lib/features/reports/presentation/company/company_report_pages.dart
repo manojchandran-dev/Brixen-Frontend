@@ -627,7 +627,11 @@ class CompanyProductReport extends ConsumerWidget {
             if (s.countsInSales && inPeriod(s.billDate, period, now)) s,
         ];
         final sold = salesByProduct(periodSales, all);
-        final categorySizes = salesByCategorySize(periodSales, all);
+        final categorySizes = salesByCategorySize(
+          periodSales,
+          all,
+          ref.watch(customersProvider).valueOrNull ?? const [],
+        );
         final byCategory = <String, int>{};
         for (final p in all) {
           final c = p.category.isEmpty ? 'Uncategorised' : p.category;

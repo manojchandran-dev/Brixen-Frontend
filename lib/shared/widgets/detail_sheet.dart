@@ -324,29 +324,34 @@ class DetailRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (stacked) {
+      // Label above the value, both beside the icon, so the wrapped text
+      // lines up under the label instead of running under the icon.
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                _icon(),
-                const SizedBox(width: 12),
-                Text(
-                  label,
-                  style: TextStyle(color: AppColors.textHint, fontSize: 12),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(
-                color: AppColors.ink,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                height: 1.4,
+            _icon(),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(color: AppColors.textHint, fontSize: 12),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      color: AppColors.ink,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

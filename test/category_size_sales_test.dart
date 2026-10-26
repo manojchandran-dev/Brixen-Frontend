@@ -81,12 +81,10 @@ void main() {
     final shirts = cats.first;
     expect(shirts.quantity, 9);
     expect(shirts.amount, 9 * 500);
-    expect({for (final s in shirts.sizes) s.label: s.quantity}, {
-      'M': 5,
-      'L': 1,
-      'No size': 1,
-      'XL': 2,
-    });
+    expect(
+      {for (final s in shirts.sizes) s.label: s.quantity},
+      {'M': 5, 'L': 1, 'No size': 1, 'XL': 2},
+    );
     expect(shirts.sizes.first.label, 'M');
     expect(cats.last.sizes.single.label, 'No size');
   });
@@ -102,12 +100,37 @@ void main() {
     expect(rows.firstWhere((t) => t.label == 'Walk-in').key, '');
 
     // One customer's categories and sizes.
-    final mine = salesByCategorySize(
-      sales.where((s) => s.customerId == 'c2'),
-      [_shirt, _sock],
-    );
+    final mine = salesByCategorySize(sales.where((s) => s.customerId == 'c2'), [
+      _shirt,
+      _sock,
+    ]);
     // 4 socks beat 3 shirts.
     expect(mine.map((c) => c.name), ['Uncategorised', 'Shirts']);
     expect(mine.last.sizes.first.label, 'M');
+  });
+
+  test('each size lists who bought it and which products', () {
+    final shirts = salesByCategorySize(
+      sales,
+      [_shirt, _sock],
+      [
+        Customer(
+          id: 'c1',
+          name: 'Ravi',
+          shopName: 'Ravi Stores',
+          createdAt: _day,
+        ),
+        Customer(id: 'c2', name: 'Meena', createdAt: _day),
+      ],
+    ).first;
+    final m = shirts.buyersOf('M');
+    expect(
+      [for (final t in m) (t.label, t.quantity)],
+      [('Ravi', 3), ('Meena', 2)],
+    );
+    expect(m.first.sub, 'Ravi Stores');
+    expect(shirts.buyersOf('XL').single.label, 'Walk-in');
+    expect(shirts.productsOf('M').single.label, 'Shirt');
+    expect(shirts.buyersOf('XXL'), isEmpty);
   });
 }

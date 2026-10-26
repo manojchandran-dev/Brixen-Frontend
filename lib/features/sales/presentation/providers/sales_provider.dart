@@ -82,6 +82,19 @@ class SalesNotifier extends AsyncNotifier<List<Sale>> {
     return updated;
   }
 
+  /// Fetches the list again without a loading state, so a sale just saved
+  /// shows in the server's order (newest first) with its final totals.
+  Future<void> reload() async {
+    try {
+      final list = await ref.read(salesRepositoryProvider).getSales();
+      final customers = ref.read(customersProvider).value ?? [];
+      _all = _resolveNames(list, customers);
+      state = AsyncData(List.from(_all));
+    } catch (_) {
+      // Keep the list as it is; pull-to-refresh can try again.
+    }
+  }
+
   Future<void> deleteSale(String id, {String? companyId}) async {
     await ref
         .read(salesRepositoryProvider)

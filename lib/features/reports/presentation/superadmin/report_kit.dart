@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/money.dart';
 import '../../../../shared/widgets/error_state.dart';
 import '../../../../shared/widgets/exact_amount.dart';
 import '../../../../shared/widgets/skeleton.dart';
@@ -800,11 +801,14 @@ class ReportGroupedBarChart extends StatelessWidget {
                 children: [
                   for (var i = 0; i < labels.length; i++)
                     Expanded(
+                      // Tap a group for its values in full.
                       child: Tooltip(
+                        triggerMode: TooltipTriggerMode.tap,
+                        showDuration: const Duration(seconds: 10),
                         message: [
                           labels[i],
                           for (final s in series)
-                            '${s.label}: ${fmt(s.values[i])}',
+                            '${s.label}: ${valueLabel == null ? s.values[i] : rupeesExact(s.values[i].toDouble())}',
                         ].join('\n'),
                         child: Padding(
                           padding: EdgeInsets.symmetric(
@@ -815,21 +819,47 @@ class ReportGroupedBarChart extends StatelessWidget {
                             children: [
                               for (final s in series)
                                 Expanded(
-                                  child: Container(
-                                    margin: const EdgeInsets.symmetric(
-                                      horizontal: 1,
-                                    ),
-                                    height: s.values[i] == 0
-                                        ? 0
-                                        : 3 +
-                                              (s.values[i] / max) *
-                                                  (chartHeight - 8),
-                                    decoration: BoxDecoration(
-                                      color: s.color,
-                                      borderRadius: const BorderRadius.vertical(
-                                        top: Radius.circular(5),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      // Short value over each bar; shrinks
+                                      // to the bar's width when narrow.
+                                      if (s.values[i] > 0)
+                                        FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text(
+                                            valueLabel == null
+                                                ? '${s.values[i]}'
+                                                : rupeesShort(
+                                                    s.values[i].toDouble(),
+                                                  ),
+                                            maxLines: 1,
+                                            style: TextStyle(
+                                              color: AppColors.ink,
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ),
+                                      const SizedBox(height: 2),
+                                      Container(
+                                        margin: const EdgeInsets.symmetric(
+                                          horizontal: 1,
+                                        ),
+                                        height: s.values[i] == 0
+                                            ? 0
+                                            : 3 +
+                                                  (s.values[i] / max) *
+                                                      (chartHeight - 24),
+                                        decoration: BoxDecoration(
+                                          color: s.color,
+                                          borderRadius:
+                                              const BorderRadius.vertical(
+                                                top: Radius.circular(5),
+                                              ),
+                                        ),
                                       ),
-                                    ),
+                                    ],
                                   ),
                                 ),
                             ],

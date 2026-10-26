@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -500,6 +502,9 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
           rethrow;
         }
       }
+      // Fresh list (new sale on top) and stock, without a manual refresh.
+      unawaited(notifier.reload());
+      ref.invalidate(productsProvider);
       if (!mounted) return;
       if (widget.fromMenu || widget.fromMasters) {
         context.pop();
@@ -1714,6 +1719,7 @@ class _ProductMultiSelectSheet extends ConsumerStatefulWidget {
 class _ProductMultiSelectSheetState
     extends ConsumerState<_ProductMultiSelectSheet> {
   late final Set<String> _selected = {...widget.selectedKeys};
+  String _query = '';
 
   void _toggle(Product p, ProductVariant? v) {
     final key = _lineKey(p, v);
@@ -1791,6 +1797,16 @@ class _ProductMultiSelectSheetState
       for (final p in async.valueOrNull ?? const <Product>[])
         if (p.status.toLowerCase() != 'inactive') p,
     ];
+    final q = _query.trim().toLowerCase();
+    final shown = q.isEmpty
+        ? products
+        : [
+            for (final p in products)
+              if ('${p.productName} ${p.category} ${p.productCode}'
+                  .toLowerCase()
+                  .contains(q))
+                p,
+          ];
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
       minChildSize: 0.35,
@@ -1832,6 +1848,30 @@ class _ProductMultiSelectSheetState
                 ],
               ),
             ),
+            if (products.length > 3)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                child: TextField(
+                  onChanged: (v) => setState(() => _query = v),
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    hintText: 'Search products',
+                    prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                    isDense: true,
+                    filled: true,
+                    fillColor: AppColors.surface,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.border),
+                    ),
+                  ),
+                ),
+              ),
             Divider(height: 1, color: Theme.of(context).dividerColor),
             Expanded(
               child: products.isEmpty && async.isLoading
@@ -1847,49 +1887,20 @@ class _ProductMultiSelectSheetState
                       Icons.checkroom_rounded,
                       'No products yet.\nAdd them in the Products module.',
                     )
-                  : ListView.separated(
+                  : shown.isEmpty
+                  ? _message(
+                      Icons.search_off_rounded,
+                      'No products match "${_query.trim()}"',
+                    )
+                  : ListView.builder(
                       controller: scrollController,
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      itemCount: products.length,
-                      separatorBuilder: (_, _) => Divider(
-                        height: 1,
-                        color: Theme.of(context).dividerColor,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: shown.length,
+                      itemBuilder: (_, i) => _ProductPickCard(
+                        product: shown[i],
+                        selected: _selected,
+                        onToggle: (v) => _toggle(shown[i], v),
                       ),
-                      itemBuilder: (_, i) {
-                        final product = products[i];
-                        // With sizes: pick the size(s) being sold.
-                        if (product.hasVariants) {
-                          return _VariantPickTile(
-                            product: product,
-                            selected: _selected,
-                            onToggle: (v) => _toggle(product, v),
-                          );
-                        }
-                        final selected = _selected.contains(
-                          _lineKey(product, null),
-                        );
-                        return CheckboxListTile(
-                          value: selected,
-                          onChanged: (_) => _toggle(product, null),
-                          controlAffinity: ListTileControlAffinity.leading,
-                          title: Text(
-                            product.productName,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: cs.onSurface,
-                            ),
-                          ),
-                          subtitle: Text(
-                            'Retail ₹${product.retailPrice.toStringAsFixed(0)} · '
-                            'Wholesale ₹${product.wholesalePrice.toStringAsFixed(0)}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: cs.onSurfaceVariant,
-                            ),
-                          ),
-                        );
-                      },
                     ),
             ),
             Padding(
@@ -1961,13 +1972,14 @@ class _PriceTypeChips extends StatelessWidget {
   }
 }
 
-/// A product with sizes in the picker: its name, then one chip per
-/// size/colour (with stock); tapping a chip adds/removes that size.
-class _VariantPickTile extends StatelessWidget {
+/// One product in the picker, as a card: name and category, then either a
+/// grid of its sizes (tap to add/remove each) or, without sizes, one
+/// tappable row.
+class _ProductPickCard extends StatelessWidget {
   final Product product;
   final Set<String> selected;
-  final ValueChanged<ProductVariant> onToggle;
-  const _VariantPickTile({
+  final ValueChanged<ProductVariant?> onToggle;
+  const _ProductPickCard({
     required this.product,
     required this.selected,
     required this.onToggle,
@@ -1975,47 +1987,165 @@ class _VariantPickTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            product.productName,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: cs.onSurface,
-            ),
+    final p = product;
+    final picked = p.hasVariants
+        ? p.variants.where((v) => selected.contains(_lineKey(p, v))).length
+        : (selected.contains(_lineKey(p, null)) ? 1 : 0);
+    final header = Row(
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: AppColors.brand.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(11),
           ),
-          const SizedBox(height: 2),
-          Text(
-            'Pick the size(s) sold',
-            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+          child: Icon(
+            Icons.checkroom_rounded,
+            size: 19,
+            color: AppColors.brand,
           ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              for (final v in product.variants)
-                _SizeChip(
-                  label: v.label,
-                  stock: v.stockQuantity,
-                  retail: product.retailFor(v),
-                  wholesale: product.wholesaleFor(v),
-                  selected: selected.contains(_lineKey(product, v)),
-                  onTap: () => onToggle(v),
+              Text(
+                p.productName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: AppColors.ink,
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w800,
                 ),
+              ),
+              Text(
+                p.hasVariants
+                    ? [
+                        if (p.category.isNotEmpty) p.category,
+                        'Pick the sizes sold',
+                      ].join(' · ')
+                    : [
+                        if (p.category.isNotEmpty) p.category,
+                        'R ₹${p.retailPrice.toStringAsFixed(0)}',
+                        'W ₹${p.wholesalePrice.toStringAsFixed(0)}',
+                        p.stockQuantity <= 0
+                            ? 'Out of stock'
+                            : '${p.stockQuantity} in stock',
+                      ].join(' · '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: AppColors.textHint, fontSize: 11.5),
+              ),
             ],
           ),
-        ],
+        ),
+        const SizedBox(width: 8),
+        if (p.hasVariants)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+            decoration: BoxDecoration(
+              color: picked > 0
+                  ? AppColors.positive.withValues(alpha: 0.15)
+                  : AppColors.surfaceElevated,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '$picked of ${p.variants.length}',
+              style: TextStyle(
+                color: picked > 0 ? AppColors.positive : AppColors.textHint,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          )
+        else
+          _PickCheck(on: picked > 0),
+      ],
+    );
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: picked > 0 ? AppColors.brand : AppColors.border,
+          width: picked > 0 ? 1.4 : 1,
+        ),
       ),
+      child: p.hasVariants
+          ? Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  header,
+                  const SizedBox(height: 12),
+                  // Even 3-up grid, so sizes line up row to row.
+                  LayoutBuilder(
+                    builder: (context, box) {
+                      const gap = 8.0;
+                      final w = (box.maxWidth - gap * 2) / 3;
+                      return Wrap(
+                        spacing: gap,
+                        runSpacing: gap,
+                        children: [
+                          for (final v in p.variants)
+                            SizedBox(
+                              width: w,
+                              child: _SizeChip(
+                                label: v.label,
+                                stock: v.stockQuantity,
+                                retail: p.retailFor(v),
+                                wholesale: p.wholesaleFor(v),
+                                selected: selected.contains(_lineKey(p, v)),
+                                onTap: () => onToggle(v),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            )
+          : InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => onToggle(null),
+              child: Padding(padding: const EdgeInsets.all(12), child: header),
+            ),
     );
   }
 }
 
+/// Round tick for a product without sizes.
+class _PickCheck extends StatelessWidget {
+  final bool on;
+  const _PickCheck({required this.on});
+
+  @override
+  Widget build(BuildContext context) => AnimatedContainer(
+    duration: const Duration(milliseconds: 150),
+    width: 26,
+    height: 26,
+    decoration: BoxDecoration(
+      color: on ? AppColors.brand : Colors.transparent,
+      shape: BoxShape.circle,
+      border: Border.all(
+        color: on ? AppColors.brand : AppColors.border,
+        width: 2,
+      ),
+    ),
+    child: on
+        ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
+        : null,
+  );
+}
+
+/// One size: the size large, retail and wholesale price, and stock. Picked
+/// = filled brand tint with a tick in the corner.
 class _SizeChip extends StatelessWidget {
   final String label;
   final int stock;
@@ -2033,46 +2163,94 @@ class _SizeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = selected ? AppColors.white : AppColors.ink;
+    final out = stock <= 0;
+    final priceStyle = TextStyle(
+      color: AppColors.textSecondary,
+      fontSize: 10.5,
+      fontWeight: FontWeight.w600,
+    );
     return Material(
-      color: selected ? AppColors.brand : AppColors.surfaceElevated,
+      color: selected
+          ? AppColors.brand.withValues(alpha: 0.12)
+          : AppColors.background,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: selected ? AppColors.brand : AppColors.border,
+              width: selected ? 1.6 : 1,
             ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          child: Stack(
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (selected) ...[
-                    Icon(Icons.check_rounded, size: 14, color: fg),
-                    const SizedBox(width: 4),
-                  ],
                   Text(
                     label,
-                    style: TextStyle(color: fg, fontWeight: FontWeight.w800),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: selected ? AppColors.brand : AppColors.ink,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'R ₹${retail.toStringAsFixed(0)}',
+                      style: priceStyle,
+                    ),
+                  ),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'W ₹${wholesale.toStringAsFixed(0)}',
+                      style: priceStyle,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    decoration: BoxDecoration(
+                      color: (out ? AppColors.dangerFill : AppColors.positive)
+                          .withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        out ? 'Out of stock' : '$stock left',
+                        style: TextStyle(
+                          color: out
+                              ? AppColors.dangerFill
+                              : AppColors.positive,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
-              Text(
-                'R ₹${retail.toStringAsFixed(0)} · W ₹${wholesale.toStringAsFixed(0)}\n${stock <= 0 ? 'Out of stock' : '$stock in stock'}',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: fg.withValues(alpha: 0.75),
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w600,
+              if (selected)
+                const Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Icon(
+                    Icons.check_circle_rounded,
+                    size: 16,
+                    color: AppColors.brand,
+                  ),
                 ),
-              ),
             ],
           ),
         ),

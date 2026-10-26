@@ -198,11 +198,26 @@ class CategorySales {
   int quantity = 0;
   double amount = 0;
   final _sizes = <String, Tally>{};
+
+  /// Per size: who bought it, and which products, keyed by customer id
+  /// ('' = walk-in) and product id.
+  final _buyers = <String, Map<String, Tally>>{};
+  final _products = <String, Map<String, Tally>>{};
   CategorySales(this.name);
 
   /// Sizes, most units sold first.
   List<Tally> get sizes =>
       _sizes.values.toList()..sort((a, b) => b.quantity.compareTo(a.quantity));
+
+  /// Customers who bought [size], most units first.
+  List<Tally> buyersOf(String size) => _byUnits(_buyers[size]);
+
+  /// Products sold in [size], most units first.
+  List<Tally> productsOf(String size) => _byUnits(_products[size]);
+
+  static List<Tally> _byUnits(Map<String, Tally>? m) =>
+      (m?.values.toList() ?? <Tally>[])
+        ..sort((a, b) => b.quantity.compareTo(a.quantity));
 }
 
 /// A sold line's size: its variant's size, else the size in the saved
@@ -221,15 +236,20 @@ String _sizeOf(SaleItem it, Product? p) {
   return own.isEmpty ? 'No size' : own;
 }
 
-/// Units and revenue per category and, within it, per size — categories
-/// with the most units first.
+/// Units and revenue per category and, within it, per size (with who
+/// bought each size and which products) — categories with the most units
+/// first.
 List<CategorySales> salesByCategorySize(
   Iterable<Sale> sales,
-  List<Product> products,
-) {
+  List<Product> products, [
+  List<Customer> customers = const [],
+]) {
   final byId = {for (final p in products) p.id: p};
+  final people = {for (final c in customers) c.id: c};
   final m = <String, CategorySales>{};
   for (final s in sales) {
+    final buyerKey = s.customerId ?? '';
+    final buyer = people[s.customerId];
     for (final it in s.items) {
       final p = byId[it.productId];
       final c = p?.category ?? '';
@@ -241,6 +261,15 @@ List<CategorySales> salesByCategorySize(
       final size = _sizeOf(it, p);
       (cat._sizes[size] ??= Tally(
         size,
+      )).add(quantity: it.quantity, amount: it.amount, at: s.billDate);
+      ((cat._buyers[size] ??= {})[buyerKey] ??= Tally(
+        buyer?.name ??
+            (buyerKey.isEmpty ? 'Walk-in' : (s.customerName ?? 'Customer')),
+        buyer?.shopName ?? '',
+        buyerKey,
+      )).add(quantity: it.quantity, amount: it.amount, at: s.billDate);
+      ((cat._products[size] ??= {})[it.productId] ??= Tally(
+        p?.productName ?? it.productName,
       )).add(quantity: it.quantity, amount: it.amount, at: s.billDate);
     }
   }

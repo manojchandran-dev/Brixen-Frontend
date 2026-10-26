@@ -1,3 +1,5 @@
+import 'package:brixen/features/customers/domain/entities/customer.dart';
+import 'package:brixen/features/customers/presentation/providers/customers_provider.dart';
 import 'package:brixen/features/navigation/presentation/providers/nav_modules_provider.dart';
 import 'package:brixen/features/permissions/presentation/providers/module_access_provider.dart';
 import 'package:brixen/features/sales/domain/entities/sale.dart';
@@ -33,6 +35,11 @@ class _Sales extends SalesNotifier {
   Future<List<Sale>> build() async => _sales;
 }
 
+class _Customers extends CustomersNotifier {
+  @override
+  Future<List<Customer>> build() async => const [];
+}
+
 void main() {
   testWidgets('Sale cards: compact, total pill, balance for partial', (tester) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
@@ -42,6 +49,7 @@ void main() {
       ProviderScope(
         overrides: [
           salesProvider.overrideWith(_Sales.new),
+          customersProvider.overrideWith(_Customers.new),
           navModulesProvider.overrideWith((ref) async => const []),
           listFilterOptionsProvider.overrideWith((ref, _) async => const {}),
           moduleAccessProvider.overrideWith(

@@ -9,7 +9,11 @@ import 'company_reports_data.dart';
 /// with units, revenue and a bar against the category's best-selling size.
 class CategorySizeList extends StatefulWidget {
   final List<CategorySales> categories;
-  const CategorySizeList(this.categories, {super.key});
+
+  /// Whether an open size lists who bought it (off inside one customer's
+  /// own breakdown).
+  final bool showBuyers;
+  const CategorySizeList(this.categories, {super.key, this.showBuyers = true});
 
   @override
   State<CategorySizeList> createState() => _CategorySizeListState();
@@ -41,6 +45,7 @@ class _CategorySizeListState extends State<CategorySizeList> {
             category: c,
             share: total == 0 ? 0 : c.quantity / total,
             open: _open.contains(c.name),
+            showBuyers: widget.showBuyers,
             onTap: () => setState(
               () => _open.contains(c.name)
                   ? _open.remove(c.name)
@@ -58,11 +63,13 @@ class _CategoryTile extends StatelessWidget {
   /// Fraction of all units sold in the period.
   final double share;
   final bool open;
+  final bool showBuyers;
   final VoidCallback onTap;
   const _CategoryTile({
     required this.category,
     required this.share,
     required this.open,
+    required this.showBuyers,
     required this.onTap,
   });
 
@@ -155,7 +162,12 @@ class _CategoryTile extends StatelessWidget {
               child: Column(
                 children: [
                   for (final s in sizes)
-                    _SizeRow(size: s, fraction: s.quantity / best),
+                    _SizeRow(
+                      category: c,
+                      size: s,
+                      fraction: s.quantity / best,
+                      showBuyers: showBuyers,
+                    ),
                 ],
               ),
             ),
@@ -165,15 +177,71 @@ class _CategoryTile extends StatelessWidget {
   }
 }
 
-class _SizeRow extends StatelessWidget {
+/// One size: units, revenue and a bar; tap to see who bought it and which
+/// products, each with units and revenue.
+class _SizeRow extends StatefulWidget {
+  final CategorySales category;
   final Tally size;
 
   /// Units against the category's best-selling size, for the bar.
   final double fraction;
-  const _SizeRow({required this.size, required this.fraction});
+  final bool showBuyers;
+  const _SizeRow({
+    required this.category,
+    required this.size,
+    required this.fraction,
+    required this.showBuyers,
+  });
+
+  @override
+  State<_SizeRow> createState() => _SizeRowState();
+}
+
+class _SizeRowState extends State<_SizeRow> {
+  bool _open = false;
 
   @override
   Widget build(BuildContext context) {
+    final size = widget.size;
+    final fraction = widget.fraction;
+    return Column(
+      children: [
+        InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => setState(() => _open = !_open),
+          child: _row(size, fraction),
+        ),
+        if (_open)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 6, left: 4),
+            padding: const EdgeInsets.fromLTRB(10, 4, 10, 8),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (widget.showBuyers)
+                  _Group(
+                    title: 'Bought by',
+                    icon: Icons.person_rounded,
+                    rows: widget.category.buyersOf(size.label),
+                  ),
+                _Group(
+                  title: 'Products',
+                  icon: Icons.checkroom_rounded,
+                  rows: widget.category.productsOf(size.label),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _row(Tally size, double fraction) {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Row(
@@ -232,8 +300,96 @@ class _SizeRow extends StatelessWidget {
               ),
             ),
           ),
+          Icon(
+            _open
+                ? Icons.keyboard_arrow_up_rounded
+                : Icons.keyboard_arrow_down_rounded,
+            size: 18,
+            color: AppColors.textHint,
+          ),
         ],
       ),
+    );
+  }
+}
+
+/// "Bought by" / "Products" under an open size: name (and shop), units,
+/// revenue.
+class _Group extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final List<Tally> rows;
+  const _Group({required this.title, required this.icon, required this.rows});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 2),
+          child: Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              color: AppColors.textHint,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.6,
+            ),
+          ),
+        ),
+        for (final t in rows)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Icon(icon, size: 14, color: AppColors.brand),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text.rich(
+                    TextSpan(
+                      text: t.label,
+                      children: [
+                        if (t.sub.isNotEmpty)
+                          TextSpan(
+                            text: ' · ${t.sub}',
+                            style: TextStyle(
+                              color: AppColors.textHint,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                      ],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.ink,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${t.quantity} sold',
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ExactAmount(
+                  amount: t.amount,
+                  child: Text(
+                    rupees(t.amount),
+                    style: TextStyle(color: AppColors.textHint, fontSize: 11.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
@@ -314,7 +470,7 @@ Future<void> showCustomerBreakdown(
             ),
           ),
           const SizedBox(height: 10),
-          CategorySizeList(categories),
+          CategorySizeList(categories, showBuyers: false),
         ],
       ),
     ),
