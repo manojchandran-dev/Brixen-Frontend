@@ -263,9 +263,10 @@ class StockLineTile extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 50,
-                height: 50,
+                width: 56,
+                height: 52,
                 alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(14),
@@ -273,13 +274,18 @@ class StockLineTile extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      '${line.item.quantity}',
-                      style: TextStyle(
-                        color: color,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        height: 1.1,
+                    // One line, shrunk to fit: "-3383" never splits.
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '${line.item.quantity}',
+                        maxLines: 1,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          height: 1.1,
+                        ),
                       ),
                     ),
                     Text('qty', style: TextStyle(color: color, fontSize: 9.5)),

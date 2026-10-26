@@ -307,6 +307,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
           const SuperAdminCompanyFilterBar(),
           Expanded(
             child: customersAsync.when(
+              skipError: true,
               loading: () => const SkeletonListView(),
               error: (e, _) => ErrorCard(
                 error: e,
@@ -438,8 +439,7 @@ class _CustomerCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Avatar colours rotate; the card itself stays one calm surface so the
-    // names and shop names carry the list.
+    // Accent colours rotate: each card's tint and avatar share one.
     final accentColors = [
       AppColors.brand,
       AppColors.positive,
@@ -474,16 +474,22 @@ class _CustomerCard extends ConsumerWidget {
             onTap: () => _confirmDelete(context, ref),
           ),
       ],
+      // Tinted with the card's accent (light or dark theme), like the sales
+      // cards; opaque, so the swipe buttons stay hidden until swiped.
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: AppColors.cardTintGradient(accent),
+          ),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: accent.withValues(alpha: 0.18)),
           boxShadow: AppColors.shadows([
             BoxShadow(
-              color: AppColors.shadowDark.withValues(alpha: 0.06),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
+              color: accent.withValues(alpha: 0.22),
+              blurRadius: 12,
+              offset: const Offset(2, 6),
             ),
           ]),
         ),

@@ -13,7 +13,16 @@ class CategorySizeList extends StatefulWidget {
   /// Whether an open size lists who bought it (off inside one customer's
   /// own breakdown).
   final bool showBuyers;
-  const CategorySizeList(this.categories, {super.key, this.showBuyers = true});
+
+  /// Sizes straight away, in size order, without category headers — for
+  /// one group covering every product.
+  final bool flat;
+  const CategorySizeList(
+    this.categories, {
+    super.key,
+    this.showBuyers = true,
+    this.flat = false,
+  });
 
   @override
   State<CategorySizeList> createState() => _CategorySizeListState();
@@ -35,6 +44,22 @@ class _CategorySizeListState extends State<CategorySizeList> {
           'Nothing sold in this period',
           style: TextStyle(color: AppColors.textHint, fontSize: 13),
         ),
+      );
+    }
+    if (widget.flat) {
+      return Column(
+        children: [
+          for (final c in cats)
+            for (final s in c.sizesInOrder)
+              _SizeRow(
+                category: c,
+                size: s,
+                fraction: c.sizes.first.quantity == 0
+                    ? 0
+                    : s.quantity / c.sizes.first.quantity,
+                showBuyers: widget.showBuyers,
+              ),
+        ],
       );
     }
     final total = cats.fold<int>(0, (a, c) => a + c.quantity);
@@ -392,129 +417,4 @@ class _Group extends StatelessWidget {
       ],
     );
   }
-}
-
-/// A customer's buying in the period: spend, invoices, units, then what
-/// they bought by category and size.
-Future<void> showCustomerBreakdown(
-  BuildContext context, {
-  required Tally customer,
-  required List<CategorySales> categories,
-  required String periodLabel,
-}) => showModalBottomSheet(
-  context: context,
-  isScrollControlled: true,
-  backgroundColor: Colors.transparent,
-  builder: (_) => DraggableScrollableSheet(
-    initialChildSize: 0.75,
-    minChildSize: 0.4,
-    maxChildSize: 0.95,
-    expand: false,
-    builder: (context, scroll) => Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      child: ListView(
-        controller: scroll,
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
-        children: [
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            customer.label,
-            style: TextStyle(
-              color: AppColors.ink,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          Text(
-            [
-              if (customer.sub.isNotEmpty) customer.sub,
-              periodLabel,
-            ].join(' · '),
-            style: TextStyle(color: AppColors.textHint, fontSize: 12.5),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              _Figure(
-                'Spent',
-                rupees(customer.amount),
-                AppColors.brand,
-                amount: customer.amount,
-              ),
-              const SizedBox(width: 8),
-              _Figure('Invoices', '${customer.count}', AppColors.positive),
-              const SizedBox(width: 8),
-              _Figure('Units', '${customer.quantity}', AppColors.brandDeep),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Text(
-            'Bought by category & size',
-            style: TextStyle(
-              color: AppColors.ink,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 10),
-          CategorySizeList(categories, showBuyers: false),
-        ],
-      ),
-    ),
-  ),
-);
-
-class _Figure extends StatelessWidget {
-  final String label, value;
-  final Color color;
-  final double? amount;
-  const _Figure(this.label, this.value, this.color, {this.amount});
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-    child: ExactAmount(
-      amount: amount,
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                value,
-                style: TextStyle(
-                  color: AppColors.ink,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-            Text(
-              label,
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
 }

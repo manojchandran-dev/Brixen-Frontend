@@ -203,6 +203,7 @@ class _PushNotificationsPageState extends ConsumerState<PushNotificationsPage> {
                   // reload() keeps the previous list in the loading state — show
                   // the skeleton anyway, so a search/filter visibly reloads.
                   child: notificationsAsync.when(
+                    skipError: true,
                     skipLoadingOnRefresh: false,
                     skipLoadingOnReload: false,
                     loading: () => const SkeletonListView(),

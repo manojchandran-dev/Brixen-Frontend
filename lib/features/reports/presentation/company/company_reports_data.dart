@@ -209,6 +209,10 @@ class CategorySales {
   List<Tally> get sizes =>
       _sizes.values.toList()..sort((a, b) => b.quantity.compareTo(a.quantity));
 
+  /// Sizes in size order (S, M, L, XL…), for charts.
+  List<Tally> get sizesInOrder =>
+      _sizes.values.toList()..sort((a, b) => compareSizes(a.label, b.label));
+
   /// Customers who bought [size], most units first.
   List<Tally> buyersOf(String size) => _byUnits(_buyers[size]);
 
@@ -243,7 +247,56 @@ List<CategorySales> salesByCategorySize(
   Iterable<Sale> sales,
   List<Product> products, [
   List<Customer> customers = const [],
-]) {
+]) => _bySize(sales, products, customers, (p) {
+  final c = p?.category ?? '';
+  return c.isEmpty ? 'Uncategorised' : c;
+});
+
+/// Every product together, by size: units, revenue, who bought each size
+/// and which products. Null when nothing was sold.
+CategorySales? salesBySize(
+  Iterable<Sale> sales,
+  List<Product> products, [
+  List<Customer> customers = const [],
+]) => _bySize(sales, products, customers, (_) => 'All products').firstOrNull;
+
+/// Size order for charts: XS, S, M, L, XL, XXL, 3XL…, then numbers
+/// (28, 30, 32…), then anything else A–Z, "No size" last.
+int compareSizes(String a, String b) {
+  const order = [
+    'XXS',
+    'XS',
+    'S',
+    'M',
+    'L',
+    'XL',
+    'XXL',
+    '2XL',
+    '3XL',
+    '4XL',
+    '5XL',
+  ];
+  int rank(String s) {
+    final u = s.toUpperCase();
+    if (u == 'NO SIZE') return 3000;
+    final i = order.indexOf(u);
+    if (i != -1) return i;
+    return num.tryParse(s) != null ? 1000 : 2000;
+  }
+
+  final r = rank(a).compareTo(rank(b));
+  if (r != 0) return r;
+  final na = num.tryParse(a), nb = num.tryParse(b);
+  if (na != null && nb != null) return na.compareTo(nb);
+  return a.toLowerCase().compareTo(b.toLowerCase());
+}
+
+List<CategorySales> _bySize(
+  Iterable<Sale> sales,
+  List<Product> products,
+  List<Customer> customers,
+  String Function(Product?) group,
+) {
   final byId = {for (final p in products) p.id: p};
   final people = {for (final c in customers) c.id: c};
   final m = <String, CategorySales>{};
@@ -252,10 +305,8 @@ List<CategorySales> salesByCategorySize(
     final buyer = people[s.customerId];
     for (final it in s.items) {
       final p = byId[it.productId];
-      final c = p?.category ?? '';
-      final cat = m[c.isEmpty ? 'Uncategorised' : c] ??= CategorySales(
-        c.isEmpty ? 'Uncategorised' : c,
-      );
+      final name = group(p);
+      final cat = m[name] ??= CategorySales(name);
       cat.quantity += it.quantity;
       cat.amount += it.amount;
       final size = _sizeOf(it, p);

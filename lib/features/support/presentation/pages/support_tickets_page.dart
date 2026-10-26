@@ -247,6 +247,7 @@ class _SupportTicketsPageState extends ConsumerState<SupportTicketsPage> {
             // reload() keeps the old list while loading — show the skeleton
             // anyway so a search/filter visibly reloads.
             child: ticketsAsync.when(
+              skipError: true,
               skipLoadingOnRefresh: false,
               skipLoadingOnReload: false,
               loading: () => const SkeletonListView(),

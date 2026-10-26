@@ -155,6 +155,7 @@ class AppDrawer extends ConsumerWidget {
             ),
             Expanded(
               child: modulesAsync.when(
+                skipError: true,
                 loading: () => const SkeletonDrawerMenu(),
                 error: (e, _) => ErrorCard(
                   error: e,

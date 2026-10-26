@@ -64,6 +64,9 @@ class ReportList<T> extends StatefulWidget {
   final String emptyText;
   final bool allTime;
 
+  /// Rows shown at first, and added by each "Show more".
+  final int pageSize;
+
   const ReportList({
     super.key,
     required this.title,
@@ -75,6 +78,7 @@ class ReportList<T> extends StatefulWidget {
     this.sorts = const [],
     this.emptyText = 'Nothing in this period',
     this.allTime = false,
+    this.pageSize = 25,
   });
 
   @override
@@ -84,7 +88,7 @@ class ReportList<T> extends StatefulWidget {
 class _ReportListState<T> extends State<ReportList<T>> {
   final _search = TextEditingController();
   int _sort = 0;
-  int _shown = 25;
+  late int _shown = widget.pageSize;
 
   @override
   void dispose() {
@@ -120,7 +124,8 @@ class _ReportListState<T> extends State<ReportList<T>> {
                       child: SearchField(
                         controller: _search,
                         hintText: widget.searchHint,
-                        onChanged: (_) => setState(() => _shown = 25),
+                        onChanged: (_) =>
+                            setState(() => _shown = widget.pageSize),
                       ),
                     )
                   else
@@ -173,7 +178,7 @@ class _ReportListState<T> extends State<ReportList<T>> {
             for (final (i, it) in items.take(_shown).indexed) widget.row(it, i),
             if (items.length > _shown)
               TextButton(
-                onPressed: () => setState(() => _shown += 25),
+                onPressed: () => setState(() => _shown += widget.pageSize),
                 child: Text('Show more (${items.length - _shown} left)'),
               ),
           ],

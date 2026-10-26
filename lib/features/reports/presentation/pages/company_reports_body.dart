@@ -201,6 +201,7 @@ class _CompanyReportsBodyState extends ConsumerState<CompanyReportsBody> {
     final summaryAsync = ref.watch(reportsSummaryProvider(query));
 
     return summaryAsync.when(
+      skipError: true,
       loading: () => const _ReportsSkeleton(),
       error: (e, _) => ErrorCard(
         error: e,

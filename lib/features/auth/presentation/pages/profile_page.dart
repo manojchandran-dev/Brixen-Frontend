@@ -169,6 +169,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ),
           Expanded(
             child: async.when(
+              skipError: true,
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(
                 child: Text(

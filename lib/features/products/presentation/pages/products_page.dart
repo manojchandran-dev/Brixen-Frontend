@@ -340,6 +340,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
           const SuperAdminCompanyFilterBar(),
           Expanded(
             child: productsAsync.when(
+              skipError: true,
               loading: () => const SkeletonListView(),
               error: (e, _) => ErrorCard(
                 error: e,
@@ -1043,7 +1044,12 @@ void _showProductDetail(
                       working:
                           'Retail ₹${product.retailFor(v).toStringAsFixed(2)} · '
                           'Wholesale ₹${product.wholesaleFor(v).toStringAsFixed(2)}',
-                      total: '${v.stockQuantity} in stock',
+                      total: v.stockQuantity > 0
+                          ? '${v.stockQuantity} in stock'
+                          // Below zero: sold more than was ever stocked.
+                          : v.stockQuantity < 0
+                          ? 'Out · oversold ${-v.stockQuantity}'
+                          : 'Out of stock',
                     ),
                 ],
               ),

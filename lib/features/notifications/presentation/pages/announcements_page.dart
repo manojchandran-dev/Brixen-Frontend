@@ -134,6 +134,7 @@ class _AnnouncementsPageState extends ConsumerState<AnnouncementsPage> {
                 ),
                 Expanded(
                   child: announcementsAsync.when(
+                    skipError: true,
                     loading: () => const SkeletonListView(),
                     error: (e, _) => ErrorCard(
                       error: e,

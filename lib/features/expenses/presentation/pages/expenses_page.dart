@@ -328,6 +328,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
           const SuperAdminCompanyFilterBar(),
           Expanded(
             child: expensesAsync.when(
+              skipError: true,
               loading: () => const SkeletonListView(),
               error: (e, _) => ErrorCard(
                 error: e,

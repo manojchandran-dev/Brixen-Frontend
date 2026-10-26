@@ -7,7 +7,6 @@ import '../../../../../core/services/session_service.dart';
 import '../../../../../core/theme/app_colors.dart';
 import '../../../../../core/utils/date_utils.dart';
 import '../../../../../shared/widgets/exact_amount.dart';
-import '../../../../../shared/widgets/session_icon.dart';
 import '../../../../../shared/widgets/skeleton.dart';
 import '../../../../customers/presentation/providers/customers_provider.dart';
 import '../../../../employees/presentation/providers/employees_provider.dart';
@@ -106,7 +105,7 @@ class CompanyAdminDashboardPage extends ConsumerWidget {
           _InventoryAlert(products: products.valueOrNull),
           const SizedBox(height: 22),
           const _SectionLabel(
-            "Today's status",
+            "This week's status",
             Icons.account_balance_wallet_rounded,
           ),
           const SizedBox(height: 12),
@@ -262,44 +261,127 @@ class _Greeting extends StatelessWidget {
           ),
         ]),
       ),
+      // Greeting small, name large, company as a chip; today's date on the
+      // right.
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${greetingPrefix()}, ${Session.ownerName ?? 'Admin'} 👋',
+                  greetingPrefix(),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  Session.ownerName ?? 'Admin',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: AppColors.white,
-                    fontSize: 21,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
                     letterSpacing: -0.4,
                   ),
                 ),
                 if (Session.companyName != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    Session.companyName!,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.storefront_rounded,
+                          size: 14,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            Session.companyName!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ],
             ),
           ),
-          SizedBox(
-            width: 46,
-            height: 46,
-            child: FittedBox(child: SessionIcon(session: currentSession())),
-          ),
+          const SizedBox(width: 12),
+          _DatePill(DateTime.now()),
         ],
       ),
     );
   }
+}
+
+/// "26 / OCT / Mon" calendar tile for the greeting card.
+class _DatePill extends StatelessWidget {
+  final DateTime day;
+  const _DatePill(this.day);
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 58,
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.18),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+    ),
+    child: Column(
+      children: [
+        Text(
+          DateFormat('MMM').format(day).toUpperCase(),
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.85),
+            fontSize: 10.5,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.8,
+          ),
+        ),
+        Text(
+          '${day.day}',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            height: 1.1,
+          ),
+        ),
+        Text(
+          DateFormat('EEE').format(day),
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.85),
+            fontSize: 10.5,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _LoadIssue extends StatelessWidget {
@@ -387,13 +469,14 @@ class _Summary extends StatelessWidget {
         Row(
           children: [
             Expanded(
+              // The week, with today underneath: a quiet day isn't all zeros.
               child: _MoneyCard(
                 icon: Icons.point_of_sale_rounded,
-                label: "Today's sales",
-                value: today?.sales,
+                label: 'Sales this week',
+                value: today?.weekSales,
                 note: today == null
                     ? null
-                    : '${today!.invoices} invoice${today!.invoices == 1 ? '' : 's'}',
+                    : '${today!.weekInvoices} invoice${today!.weekInvoices == 1 ? '' : 's'} · Today ${rupees(today!.sales)}',
                 // Green: money in.
                 color: AppColors.positive,
               ),
@@ -402,9 +485,9 @@ class _Summary extends StatelessWidget {
             Expanded(
               child: _MoneyCard(
                 icon: Icons.receipt_long_rounded,
-                label: "Today's expenses",
-                value: today?.expenses,
-                note: 'Spent today',
+                label: 'Expenses this week',
+                value: today?.weekExpenses,
+                note: today == null ? null : 'Today ${rupees(today!.expenses)}',
                 // Blue: money out.
                 color: AppColors.brand,
               ),
@@ -626,12 +709,18 @@ class _MoneyCard extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
-                        note!,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
+                      // One line in the fixed-height card: shrinks to fit.
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          note!,
+                          maxLines: 1,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -1083,10 +1172,14 @@ class _BusinessStatus extends StatelessWidget {
       ),
     );
 
-    final share = t == null || t.sales <= 0
+    // The last 7 days, so a quiet day doesn't show all zeros.
+    final sales = t?.weekSales;
+    final spent = t?.weekExpenses;
+    final net = t == null ? null : t.weekSales - t.weekExpenses;
+    final share = t == null || t.weekSales <= 0
         ? 0.0
-        : (t.expenses / t.sales).clamp(0.0, 1.0);
-    final netUp = t == null || t.net >= 0;
+        : (t.weekExpenses / t.weekSales).clamp(0.0, 1.0);
+    final netUp = net == null || net >= 0;
     return Container(
       decoration: _cardDecoration(),
       clipBehavior: Clip.antiAlias,
@@ -1109,8 +1202,8 @@ class _BusinessStatus extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    figure('Sales', t?.sales, AppColors.positive),
-                    figure('Expenses', t?.expenses, AppColors.brand),
+                    figure('Sales', sales, AppColors.positive),
+                    figure('Expenses', spent, AppColors.brand),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -1136,9 +1229,9 @@ class _BusinessStatus extends StatelessWidget {
                             ),
                           ),
                           ExactAmount(
-                            amount: t?.net,
+                            amount: net,
                             child: Text(
-                              t == null ? '…' : rupees(t.net),
+                              net == null ? '…' : rupees(net),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 17,
@@ -1176,11 +1269,11 @@ class _BusinessStatus extends StatelessWidget {
                 Text(
                   t == null
                       ? ' '
-                      : t.sales <= 0 && t.expenses <= 0
-                      ? 'No sales or expenses recorded today'
-                      : t.sales <= 0
-                      ? 'Expenses recorded, no sales yet today'
-                      : 'Expenses are ${(share * 100).round()}% of today\'s sales',
+                      : t.weekSales <= 0 && t.weekExpenses <= 0
+                      ? 'No sales or expenses in the last 7 days'
+                      : t.weekSales <= 0
+                      ? 'Expenses recorded, no sales this week'
+                      : 'Expenses are ${(share * 100).round()}% of this week\'s sales',
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,

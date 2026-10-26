@@ -344,6 +344,7 @@ class _SalesPageState extends ConsumerState<SalesPage> {
           // List
           Expanded(
             child: salesAsync.when(
+              skipError: true,
               loading: () => const SkeletonListView(),
               error: (e, _) => ErrorCard(
                 error: e,

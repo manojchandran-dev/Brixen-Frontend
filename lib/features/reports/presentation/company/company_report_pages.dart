@@ -15,9 +15,11 @@ import '../../../products/presentation/providers/products_provider.dart';
 import '../../../sales/domain/entities/sale.dart';
 import '../../../sales/presentation/providers/sales_provider.dart';
 import '../superadmin/report_kit.dart';
+import '../superadmin/superadmin_reports_data.dart' show TrendBucket;
 import 'category_size_sales.dart';
 import 'company_report_kit.dart';
 import 'company_reports_data.dart';
+import 'customer_report_widgets.dart';
 import 'product_size_sales.dart';
 
 final _day = DateFormat('d MMM yyyy');
@@ -294,6 +296,7 @@ class CompanySalesReport extends ConsumerWidget {
           ),
           ReportList<Sale>(
             title: 'Invoices',
+            pageSize: 5,
             caption: '${list.length} in this period',
             items: list,
             searchText: (s) =>
@@ -424,6 +427,7 @@ class CompanyExpenseReport extends ConsumerWidget {
           ),
           ReportList<Expense>(
             title: 'Expenses',
+            pageSize: 5,
             caption: '${list.length} in this period',
             items: list,
             searchText: (e) =>
@@ -540,35 +544,31 @@ class CompanyCustomerReport extends ConsumerWidget {
                     a.label.toLowerCase().compareTo(b.label.toLowerCase()),
               ),
             ],
-            row: (t, i) => InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () => showCustomerBreakdown(
-                context,
-                customer: t,
-                categories: salesByCategorySize([
-                  for (final s in periodSales)
-                    if ((s.customerId ?? '') == t.key) s,
-                ], prods),
-                periodLabel: period.label,
-              ),
-              child: _RankRow(
+            row: (t, i) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: CustomerBuyRow(
                 rank: i + 1,
-                title: t.label,
-                subtitle: [
-                  if (t.sub.isNotEmpty) t.sub,
-                  '${t.count} invoice${t.count == 1 ? '' : 's'}',
-                  '${t.quantity} units',
-                  if (t.last != null)
-                    'last ${DateFormat('d MMM').format(t.last!)}',
-                ].join(' · '),
-                value: rupees(t.amount),
-                amount: t.amount,
-                valueSub: 'View ›',
+                customer: t,
+                onTap: () {
+                  final theirs = [
+                    for (final s in periodSales)
+                      if ((s.customerId ?? '') == t.key) s,
+                  ];
+                  showCustomerDetails(
+                    context,
+                    summary: t,
+                    customer: all.where((c) => c.id == t.key).firstOrNull,
+                    sales: theirs,
+                    categories: salesByCategorySize(theirs, prods),
+                    periodLabel: period.label,
+                  );
+                },
               ),
             ),
           ),
           ReportList<Customer>(
             title: 'New customers',
+            pageSize: 5,
             caption: '${added.length} added in this period',
             items: added,
             searchText: (c) =>
@@ -620,9 +620,6 @@ class CompanyProductReport extends ConsumerWidget {
       body: (period) {
         final now = DateTime.now();
         final all = products.valueOrNull ?? const <Product>[];
-        final active = all
-            .where((p) => p.status.toLowerCase() == 'active')
-            .length;
         final periodSales = [
           for (final s in sales.valueOrNull ?? const <Sale>[])
             if (s.countsInSales && inPeriod(s.billDate, period, now)) s,
@@ -630,105 +627,57 @@ class CompanyProductReport extends ConsumerWidget {
         final people = ref.watch(customersProvider).valueOrNull ?? const [];
         final sold = salesByProductSize(periodSales, all, people);
         final categorySizes = salesByCategorySize(periodSales, all, people);
-        final byCategory = <String, int>{};
-        for (final p in all) {
-          final c = p.category.isEmpty ? 'Uncategorised' : p.category;
-          byCategory[c] = (byCategory[c] ?? 0) + 1;
-        }
-        final cats = byCategory.entries.toList()
-          ..sort((a, b) => b.value.compareTo(a.value));
+        final bySize = salesBySize(periodSales, all, people);
+        final units = sold.fold<int>(0, (a, p) => a + p.quantity);
+        final value = sold.fold<double>(0, (a, p) => a + p.amount);
+        final best = bySize?.sizes.firstOrNull;
         return [
           ReportSummary([
             ReportStat(
-              Icons.checkroom_rounded,
-              'Total products',
-              '${all.length}',
-              AppColors.brand,
-              allTime: true,
-            ),
-            ReportStat(
-              Icons.check_circle_rounded,
-              'Active',
-              '$active',
-              AppColors.positive,
-              allTime: true,
-            ),
-            ReportStat(
-              Icons.pause_circle_rounded,
-              'Inactive',
-              '${all.length - active}',
-              AppColors.brandBlack,
-              allTime: true,
-            ),
-            ReportStat(
               Icons.shopping_cart_checkout_rounded,
               'Units sold',
-              '${sold.fold<int>(0, (a, t) => a + t.quantity)}',
+              '$units',
+              AppColors.brand,
+            ),
+            ReportStat(
+              Icons.currency_rupee_rounded,
+              'Sales value',
+              rupees(value),
+              AppColors.positive,
+              amount: value,
+            ),
+            ReportStat(
+              Icons.checkroom_rounded,
+              'Products sold · of ${all.length}',
+              '${sold.length}',
               AppColors.brandDeep,
             ),
+            ReportStat(
+              Icons.straighten_rounded,
+              best == null ? 'Best size' : 'Best size · ${best.quantity} sold',
+              best?.label ?? '—',
+              AppColors.brandBlack,
+            ),
           ]),
+          ReportCard(
+            title: 'Units sold by size',
+            caption: 'All products together',
+            child: ReportTrendChart(
+              buckets: [
+                for (final s in bySize?.sizesInOrder ?? const <Tally>[])
+                  TrendBucket(s.label, s.quantity),
+              ],
+            ),
+          ),
+          ReportCard(
+            title: 'Sales by size',
+            caption: 'Tap a size for who bought it & which products',
+            child: CategorySizeList([?bySize], flat: true),
+          ),
           ReportCard(
             title: 'Category & size sales',
             caption: 'Units sold · tap a category for its sizes',
             child: CategorySizeList(categorySizes),
-          ),
-          ReportCard(
-            title: 'Stock summary',
-            caption: 'Right now',
-            allTime: true,
-            child: _StockSummary(all),
-          ),
-          ReportList<Product>(
-            title: 'Low & out of stock',
-            caption:
-                '${all.where((p) => p.isOutOfStock || p.isLowStock).length} need restocking',
-            allTime: true,
-            items: [
-              for (final p in all)
-                if (p.isOutOfStock || p.isLowStock) p,
-            ],
-            emptyText: 'Everything is well stocked',
-            searchText: (p) => '${p.productName} ${p.category}',
-            sorts: [
-              ReportSort(
-                'Lowest first',
-                (a, b) => a.stockQuantity.compareTo(b.stockQuantity),
-              ),
-              ReportSort(
-                'Name',
-                (a, b) => a.productName.toLowerCase().compareTo(
-                  b.productName.toLowerCase(),
-                ),
-              ),
-            ],
-            row: (p, _) => ReportRow(
-              icon: p.isOutOfStock
-                  ? Icons.remove_shopping_cart_rounded
-                  : Icons.warning_amber_rounded,
-              color: p.isOutOfStock
-                  ? AppColors.brandBlack
-                  : AppColors.brandDeep,
-              title: p.productName,
-              subtitle:
-                  '${p.category.isEmpty ? 'Uncategorised' : p.category} · alert at ${p.lowStockThreshold}',
-              trailing: p.isOutOfStock
-                  ? 'Out · ${p.stockQuantity}'
-                  : '${p.stockQuantity} left',
-            ),
-          ),
-          ReportCard(
-            title: 'Products by category',
-            allTime: true,
-            child: ReportBreakdown([
-              for (final (i, e) in cats.take(5).indexed)
-                BreakdownItem(e.key, e.value, _palette[i % _palette.length]),
-              if (cats.length > 5)
-                BreakdownItem(
-                  'Others',
-                  cats.skip(5).fold(0, (a, e) => a + e.value),
-                  AppColors.textHint,
-                ),
-            ]),
           ),
           ReportList<ProductSales>(
             title: 'Product sales',
@@ -1201,95 +1150,6 @@ class _ProfitRowTile extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// In stock / low / out counts, units on hand and their value at cost.
-class _StockSummary extends StatelessWidget {
-  final List<Product> products;
-  const _StockSummary(this.products);
-
-  @override
-  Widget build(BuildContext context) {
-    final out = products.where((p) => p.isOutOfStock).length;
-    final low = products.where((p) => p.isLowStock).length;
-    final units = products.fold<int>(
-      0,
-      (a, p) => a + (p.stockQuantity > 0 ? p.stockQuantity : 0),
-    );
-    final value = products.fold<double>(
-      0,
-      (a, p) => a + (p.stockQuantity > 0 ? p.stockQuantity * p.costPrice : 0),
-    );
-    Widget cell(String label, String v, Color color, {double? amount}) =>
-        Expanded(
-          child: ExactAmount(
-            amount: amount,
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      v,
-                      style: TextStyle(
-                        color: AppColors.ink,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-    return Column(
-      children: [
-        Row(
-          children: [
-            cell(
-              'In stock',
-              '${products.length - out - low}',
-              AppColors.positive,
-            ),
-            const SizedBox(width: 8),
-            cell('Low stock', '$low', AppColors.brandDeep),
-            const SizedBox(width: 8),
-            cell('Out of stock', '$out', AppColors.brandBlack),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            cell('Units on hand', '$units', AppColors.brand),
-            const SizedBox(width: 8),
-            cell(
-              'Stock value at cost',
-              rupees(value),
-              AppColors.brand,
-              amount: value,
-            ),
-          ],
-        ),
-      ],
     );
   }
 }

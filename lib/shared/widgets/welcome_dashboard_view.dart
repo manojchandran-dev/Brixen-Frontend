@@ -46,6 +46,7 @@ class WelcomeDashboardView extends ConsumerWidget {
     final summaryAsync = ref.watch(superadminDashboardProvider);
 
     return summaryAsync.when(
+      skipError: true,
       loading: () => _DashboardSkeleton(showMenuButton: showMenuButton),
       error: (e, _) => ErrorCard(
         error: e,

@@ -35,6 +35,7 @@ import '../../../../shared/widgets/module_title.dart';
 import '../../../../shared/widgets/chip_filter_sheet.dart';
 import '../../../../shared/widgets/search_field.dart';
 import '../../../../shared/widgets/confirm_dialog.dart';
+
 // Attendance module disabled for now — uncomment to re-enable.
 // import '../../../attendance/presentation/pages/attendance_body.dart';
 
@@ -3194,6 +3195,7 @@ class _DashboardBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final companiesAsync = ref.watch(companiesProvider);
     return companiesAsync.when(
+      skipError: true,
       loading: () => const Center(
         child: CircularProgressIndicator(color: AppColors.silver),
       ),

@@ -158,6 +158,7 @@ class _PermissionEditor extends ConsumerWidget {
     final permissionsAsync = ref.watch(permissionsProvider(companyId));
 
     return permissionsAsync.when(
+      skipError: true,
       loading: () => const Padding(
         padding: EdgeInsets.symmetric(vertical: 40),
         child: Center(child: CircularProgressIndicator(color: AppColors.brand)),

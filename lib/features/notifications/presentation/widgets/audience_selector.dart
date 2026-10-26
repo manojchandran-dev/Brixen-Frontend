@@ -26,6 +26,7 @@ class AudienceSelector extends ConsumerWidget {
     final companiesAsync = ref.watch(companiesProvider);
 
     return companiesAsync.when(
+      skipError: true,
       loading: () => const Padding(
         padding: EdgeInsets.symmetric(vertical: 16),
         child: Center(

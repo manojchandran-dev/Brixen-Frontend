@@ -25,12 +25,20 @@ class TodayStats {
   final double sales;
   final int invoices;
   final double expenses;
+
+  /// The last 7 days including today (the reports' Week range).
+  final double weekSales;
+  final int weekInvoices;
+  final double weekExpenses;
   final List<DashActivity> activity;
 
   const TodayStats({
     required this.sales,
     required this.invoices,
     required this.expenses,
+    this.weekSales = 0,
+    this.weekInvoices = 0,
+    this.weekExpenses = 0,
     required this.activity,
   });
 
@@ -48,6 +56,9 @@ class TodayStats {
         t.year == now.year && t.month == now.month && t.day == now.day;
 
     final salesToday = sales.where((s) => today(s.billDate)).toList();
+    final weekStart = DateTime(now.year, now.month, now.day - 6);
+    bool thisWeek(DateTime t) => !t.isBefore(weekStart);
+    final salesWeek = sales.where((s) => thisWeek(s.billDate)).toList();
     final activity = <DashActivity>[
       for (final s in sales.where((s) => today(s.createdAt)))
         DashActivity(
@@ -86,6 +97,13 @@ class TodayStats {
       invoices: salesToday.length,
       expenses: expenses
           .where((e) => today(e.expenseDate))
+          .fold(0, (a, e) => a + e.amount),
+      weekSales: salesWeek
+          .where((s) => s.countsInSales)
+          .fold(0, (a, s) => a + s.totalAmount),
+      weekInvoices: salesWeek.length,
+      weekExpenses: expenses
+          .where((e) => thisWeek(e.expenseDate))
           .fold(0, (a, e) => a + e.amount),
       activity: activity.take(activityLimit).toList(),
     );

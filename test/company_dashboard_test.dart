@@ -153,20 +153,21 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(tester.takeException(), isNull);
     expect(find.text("Business summary"), findsOneWidget);
-    expect(find.text("₹1,500"), findsOneWidget); // today's sales card
-    expect(find.text("2 invoices"), findsOneWidget);
+    // This week: today (1,500) + 1 and 3 days ago (1,000 + 800).
+    expect(find.text("₹3,300"), findsOneWidget); // this week's sales card
+    expect(find.text("4 invoices · Today ₹1,500"), findsOneWidget);
 
     for (final title in [
       "Quick actions",
       "Today's activity",
       "Inventory alert",
-      "Today's status",
+      "This week's status",
     ]) {
       await tester.scrollUntilVisible(find.text(title), 300);
       await tester.pump(const Duration(milliseconds: 100));
       expect(tester.takeException(), isNull, reason: title);
     }
-    expect(find.text("₹1,100"), findsOneWidget); // net
+    expect(find.text("₹2,900"), findsOneWidget); // net this week: 3,300 − 400
     // Report-style sections are gone.
     expect(find.text("Top selling products"), findsNothing);
     expect(find.text("Sales overview"), findsNothing);

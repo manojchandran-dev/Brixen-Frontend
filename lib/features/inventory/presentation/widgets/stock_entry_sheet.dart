@@ -500,6 +500,7 @@ class _StockEntrySheetState extends ConsumerState<StockEntrySheet> {
                   ),
                 )
                 .when(
+                  skipError: true,
                   loading: () => const Padding(
                     padding: EdgeInsets.all(16),
                     child: Center(

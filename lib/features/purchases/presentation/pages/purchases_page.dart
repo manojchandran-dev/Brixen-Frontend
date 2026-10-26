@@ -260,6 +260,7 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
           ),
           Expanded(
             child: purchasesAsync.when(
+              skipError: true,
               loading: () => const SkeletonListView(),
               error: (e, _) => ErrorCard(
                 error: e,

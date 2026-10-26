@@ -328,6 +328,7 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
           const SuperAdminCompanyFilterBar(),
           Expanded(
             child: employeesAsync.when(
+              skipError: true,
               loading: () => const SkeletonListView(),
               error: (e, _) => ErrorCard(
                 error: e,

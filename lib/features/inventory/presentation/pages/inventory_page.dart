@@ -326,6 +326,7 @@ class _OverviewTab extends ConsumerWidget {
           InvCard(
             title: 'Recent movements',
             child: recent.when(
+              skipError: true,
               loading: () => const Padding(
                 padding: EdgeInsets.all(12),
                 child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
@@ -463,6 +464,7 @@ class _MovementsTabState extends ConsumerState<_MovementsTab> {
           ),
           const SizedBox(height: 8),
           async.when(
+            skipError: true,
             loading: () => const Padding(
               padding: EdgeInsets.all(30),
               child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
@@ -688,6 +690,7 @@ class _ReportsTab extends ConsumerWidget {
             title: 'Stock movement',
             caption: 'Last 30 days',
             child: moves.when(
+              skipError: true,
               loading: () => const Padding(
                 padding: EdgeInsets.all(12),
                 child: Center(child: CircularProgressIndicator(strokeWidth: 2)),

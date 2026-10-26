@@ -7,6 +7,7 @@ import '../services/session_service.dart';
 import '../services/token_service.dart';
 import 'api_endpoints.dart';
 import 'api_exception.dart';
+import 'retry_interceptor.dart';
 import 'token_refresh_interceptor.dart';
 
 final dioProvider = Provider<Dio>((ref) {
@@ -24,6 +25,7 @@ final dioProvider = Provider<Dio>((ref) {
   dio.interceptors.add(_AuthInterceptor());
   dio.interceptors.add(TokenRefreshInterceptor());
   dio.interceptors.add(CompanyScopeInterceptor(ref));
+  dio.interceptors.add(RetryInterceptor(dio));
   dio.interceptors.add(
     LogInterceptor(
       requestBody: true,
@@ -107,8 +109,19 @@ ApiException mapDioError(DioException e) {
     return const ApiException('Cannot reach server. Check your network.');
   }
   final status = e.response?.statusCode;
-  final msg = e.response?.data?['message'] ?? e.message ?? 'Unknown error';
-  return ApiException(msg.toString(), statusCode: status);
+  // The body isn't always JSON (a proxy's HTML error page, or nothing).
+  final data = e.response?.data;
+  final serverMsg = data is Map ? data['message']?.toString() : null;
+  if (serverMsg != null && serverMsg.isNotEmpty) {
+    return ApiException(serverMsg, statusCode: status);
+  }
+  final msg = switch (status) {
+    502 || 503 || 504 => 'Server is starting up. Please try again.',
+    final s? when s >= 500 => 'Something went wrong on the server ($s).',
+    final s? => 'Request failed ($s).',
+    _ => 'Network problem. Check your connection and try again.',
+  };
+  return ApiException(msg, statusCode: status);
 }
 
 /// GETs every page of a list endpoint — the API caps a page at 100 rows.

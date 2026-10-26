@@ -189,6 +189,7 @@ class _ChatListState extends ConsumerState<_ChatList> {
           ),
           Expanded(
             child: chatsAsync.when(
+              skipError: true,
               loading: () => const SkeletonListView(),
               error: (e, _) => ErrorCard(
                 error: e,
