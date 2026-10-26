@@ -96,10 +96,16 @@ class VariantDraft {
     );
   }
 
-  void clearPrices() {
-    retail.clear();
-    wholesale.clear();
-    cost.clear();
+  /// "Use defaults for all": copies the default prices into this size's
+  /// boxes (an empty default leaves the box empty).
+  void fillPrices({
+    required String retail,
+    required String wholesale,
+    required String cost,
+  }) {
+    this.retail.text = retail;
+    this.wholesale.text = wholesale;
+    this.cost.text = cost;
   }
 
   void dispose() {
@@ -464,7 +470,7 @@ class VariantPriceList extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          'Empty prices use the defaults above. Change any to price that size differently.',
+          'A size left empty sells at the default price above. Type a price to change one size, or tap "Use defaults for all" to copy the defaults into every size.',
           style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
         ),
         Align(
@@ -472,11 +478,15 @@ class VariantPriceList extends StatelessWidget {
           child: TextButton.icon(
             onPressed: () {
               for (final r in rows) {
-                r.clearPrices();
+                r.fillPrices(
+                  retail: defaultRetail,
+                  wholesale: defaultWholesale,
+                  cost: defaultCost,
+                );
               }
               onChanged();
             },
-            icon: const Icon(Icons.restart_alt_rounded, size: 18),
+            icon: const Icon(Icons.content_copy_rounded, size: 18),
             label: const Text('Use defaults for all'),
           ),
         ),
@@ -533,7 +543,9 @@ class _VariantCard extends StatelessWidget {
         controller: c,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-        decoration: _box(label, hint: hint.isEmpty ? '0' : hint, prefix: '₹ '),
+        // Empty = the default price; it isn't shown here so a changed
+        // default never looks like it changed every size.
+        decoration: _box(label, hint: 'Default', prefix: '₹ '),
         validator: (v) {
           final t = v?.trim() ?? '';
           return t.isEmpty || double.tryParse(t) != null ? null : 'Number';

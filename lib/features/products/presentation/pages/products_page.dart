@@ -415,15 +415,19 @@ class _ProductCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Only the picture placeholder rotates colour; the card itself is one
-    // calm surface so the photo, name and price carry it.
     final accentColors = [
       AppColors.brand,
       AppColors.positive,
       AppColors.brandDeep,
       AppColors.brandLight,
+      AppColors.brandBlack,
     ];
     final accent = accentColors[index % accentColors.length];
+    final bg = Color.lerp(
+      AppColors.surface,
+      accent,
+      AppColors.cardTintBlend(accent),
+    )!;
     final meta = [
       product.category,
       product.gender,
@@ -456,113 +460,109 @@ class _ProductCard extends ConsumerWidget {
             onTap: () => _confirmDelete(context, ref),
           ),
       ],
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.border),
-          boxShadow: AppColors.shadows([
-            BoxShadow(
-              color: AppColors.shadowDark.withValues(alpha: 0.06),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
-            ),
-          ]),
-        ),
+      // Tinted card in the rotating theme colours, like the other lists.
+      child: RichCardShell(
+        accentColor: accent,
+        backgroundColor: bg,
+        backgroundGradient: AppColors.cardTintGradient(accent),
+        edgeColor: accent,
+        showAccentBar: false,
         // Picture · name & status / category · gender / sizes / price and
         // stock. Cost, unit and the rest are in the detail sheet (tap).
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _Thumb(product: product, accent: accent),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          product.productName,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
-                            height: 1.2,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _Thumb(product: product, accent: accent),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            product.productName,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.ink,
+                              height: 1.2,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      _StatusPill(status: product.status),
-                    ],
-                  ),
-                  if (meta.isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      meta,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
+                        const SizedBox(width: 8),
+                        _StatusPill(status: product.status),
+                      ],
                     ),
-                  ],
-                  if (product.hasVariants) ...[
-                    const SizedBox(height: 8),
-                    _SizeChips(product: product),
-                  ],
-                  const SizedBox(height: 10),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // One line: a price range shrinks to fit
-                            // rather than wrapping.
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                _priceText(product, wholesale: false),
-                                maxLines: 1,
-                                style: TextStyle(
-                                  fontSize: 19,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.4,
-                                  color: AppColors.isDark
-                                      ? AppColors.brandLight
-                                      : AppColors.brand,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              'Wholesale ${_priceText(product, wholesale: true)}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
+                    if (meta.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        meta,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
                         ),
                       ),
-                      _StockPill(product: product),
                     ],
-                  ),
-                ],
+                    if (product.hasVariants) ...[
+                      const SizedBox(height: 8),
+                      _SizeChips(product: product),
+                    ],
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // One line: a price range shrinks to fit
+                              // rather than wrapping.
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  _priceText(product, wholesale: false),
+                                  maxLines: 1,
+                                  style: TextStyle(
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.4,
+                                    color: AppColors.isDark
+                                        ? AppColors.brandLight
+                                        : AppColors.brand,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                'Wholesale ${_priceText(product, wholesale: true)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        _StockPill(product: product),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
