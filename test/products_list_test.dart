@@ -41,7 +41,8 @@ void main() {
     expect(find.text('Kids Printed T-Shirt'), findsOneWidget);
     expect(find.text('₹1199'), findsOneWidget);
     expect(find.text('Wholesale ₹900'), findsOneWidget);
-    expect(find.text('Sarees'), findsWidgets); // category chip
+    // Category leads the details line ("Sarees · Women · Checked · Maroon").
+    expect(find.textContaining('Sarees ·'), findsWidgets);
     // Gone from the list: the three price chips, unit and field labels.
     expect(find.text('Cost'), findsNothing);
     expect(find.text('Retail Price'), findsNothing);

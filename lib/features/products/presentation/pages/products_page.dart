@@ -415,22 +415,21 @@ class _ProductCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Only the picture placeholder rotates colour; the card itself is one
+    // calm surface so the photo, name and price carry it.
     final accentColors = [
       AppColors.brand,
       AppColors.positive,
       AppColors.brandDeep,
       AppColors.brandLight,
-      AppColors.brandBlack,
     ];
     final accent = accentColors[index % accentColors.length];
-    final bg = Color.lerp(
-      AppColors.surface,
-      accent,
-      AppColors.cardTintBlend(accent),
-    )!;
-
-    final fg = AppColors.ink;
-    final fgMuted = AppColors.ink.withValues(alpha: 0.55);
+    final meta = [
+      product.category,
+      product.gender,
+      product.designPattern,
+      if (!product.hasVariants) product.color,
+    ].where((s) => s != null && s.isNotEmpty).join(' · ');
 
     return SwipeActions(
       onTap: () => _showProductDetail(context, ref, product, accent),
@@ -457,142 +456,113 @@ class _ProductCard extends ConsumerWidget {
             onTap: () => _confirmDelete(context, ref),
           ),
       ],
-      child: RichCardShell(
-        accentColor: accent,
-        backgroundColor: bg,
-        backgroundGradient: AppColors.cardTintGradient(accent),
-        edgeColor: accent,
-        showAccentBar: false,
-        child: Padding(
-          // List card: just what you scan for — picture, name, attributes,
-          // category, retail price (wholesale under it). Cost, unit and the
-          // rest are in the detail sheet (tap).
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              _Thumb(product: product, accent: accent),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.border),
+          boxShadow: AppColors.shadows([
+            BoxShadow(
+              color: AppColors.shadowDark.withValues(alpha: 0.06),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ]),
+        ),
+        // Picture · name & status / category · gender / sizes / price and
+        // stock. Cost, unit and the rest are in the detail sheet (tap).
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _Thumb(product: product, accent: accent),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          product.productName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.ink,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _StatusPill(status: product.status),
+                    ],
+                  ),
+                  if (meta.isNotEmpty) ...[
+                    const SizedBox(height: 3),
                     Text(
-                      product.productName,
+                      meta,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: fg,
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      [
-                        product.gender,
-                        product.designPattern,
-                        product.color,
-                      ].where((s) => s != null && s.isNotEmpty).join(' · '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: fgMuted),
-                    ),
-                    if (product.hasVariants) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        _sizesSummary(product),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: fg,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
+                  ],
+                  if (product.hasVariants) ...[
                     const SizedBox(height: 8),
-                    // Wraps to a second line when the name column is narrow.
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        if (product.category.isNotEmpty) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
+                    _SizeChips(product: product),
+                  ],
+                  const SizedBox(height: 10),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // One line: a price range shrinks to fit
+                            // rather than wrapping.
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                _priceText(product, wholesale: false),
+                                maxLines: 1,
+                                style: TextStyle(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.4,
+                                  color: AppColors.isDark
+                                      ? AppColors.brandLight
+                                      : AppColors.brand,
+                                ),
+                              ),
                             ),
-                            decoration: BoxDecoration(
-                              color: accent.withValues(alpha: 0.14),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              product.category,
+                            Text(
+                              'Wholesale ${_priceText(product, wholesale: true)}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: fg,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
                               ),
                             ),
-                          ),
-                        ],
-                        _StatusPill(status: product.status),
-                        _StockPill(product: product),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // The price is what you look for — a solid pill.
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [AppColors.brand, AppColors.brandDeep],
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: AppColors.shadows([
-                        BoxShadow(
-                          color: AppColors.brand.withValues(alpha: 0.35),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                          ],
                         ),
-                      ]),
-                    ),
-                    child: Text(
-                      '₹${product.retailPrice.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3,
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Wholesale ₹${product.wholesalePrice.toStringAsFixed(0)}',
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
-                      color: fgMuted,
-                    ),
+                      _StockPill(product: product),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -776,7 +746,7 @@ class _StockPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (text, color) = product.isOutOfStock
-        ? ('Out of stock', AppColors.brandBlack)
+        ? ('Out of stock', AppColors.error)
         : product.isLowStock
         ? ('Low · ${product.stockQuantity}', AppColors.brandDeep)
         : ('${product.stockQuantity} in stock', AppColors.brand);
@@ -1177,19 +1147,88 @@ class _ProductGallerySectionState
   }
 }
 
-/// "Sizes: S, M, L, XL · 2 colours" for a product card.
-String _sizesSummary(Product p) {
-  final sizes = <String>[];
-  final colours = <String>{};
-  for (final v in p.variants) {
-    final s = v.size?.trim();
-    if (s != null && s.isNotEmpty && !sizes.contains(s)) sizes.add(s);
-    final c = v.color?.trim();
-    if (c != null && c.isNotEmpty) colours.add(c);
+/// "₹150", or "₹150–₹180" when sizes are priced differently.
+String _priceText(Product p, {required bool wholesale}) {
+  final prices = p.hasVariants
+      ? [
+          for (final v in p.variants)
+            wholesale ? p.wholesaleFor(v) : p.retailFor(v),
+        ]
+      : [wholesale ? p.wholesalePrice : p.retailPrice];
+  String rs(double v) => '₹${v.toStringAsFixed(v % 1 == 0 ? 0 : 2)}';
+  final lo = prices.reduce((a, b) => a < b ? a : b);
+  final hi = prices.reduce((a, b) => a > b ? a : b);
+  return lo == hi ? rs(lo) : '${rs(lo)}–${rs(hi)}';
+}
+
+/// A product's sizes as small chips (first few, then "+n"), plus how many
+/// colours.
+class _SizeChips extends StatelessWidget {
+  final Product product;
+  const _SizeChips({required this.product});
+
+  static const _shown = 5;
+
+  @override
+  Widget build(BuildContext context) {
+    final sizes = <String>[];
+    final colours = <String>{};
+    for (final v in product.variants) {
+      final s = v.size?.trim();
+      if (s != null && s.isNotEmpty && !sizes.contains(s)) sizes.add(s);
+      final c = v.color?.trim();
+      if (c != null && c.isNotEmpty) colours.add(c);
+    }
+    Widget chip(String text, {bool muted = false}) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: muted ? Colors.transparent : AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w800,
+          color: muted ? AppColors.textSecondary : AppColors.ink,
+        ),
+      ),
+    );
+    return Wrap(
+      spacing: 5,
+      runSpacing: 5,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        for (final s in sizes.take(_shown)) chip(s),
+        if (sizes.length > _shown)
+          chip('+${sizes.length - _shown}', muted: true),
+        if (colours.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.palette_outlined,
+                  size: 13,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: 3),
+                Text(
+                  colours.length == 1
+                      ? colours.first
+                      : '${colours.length} colours',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
   }
-  return [
-    if (sizes.isNotEmpty) 'Sizes: ${sizes.join(', ')}',
-    if (colours.isNotEmpty)
-      colours.length == 1 ? colours.first : '${colours.length} colours',
-  ].join(' · ');
 }
