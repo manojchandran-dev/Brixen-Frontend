@@ -316,12 +316,18 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
                       count: filtered.length,
                     ),
                     Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) =>
-                            _PurchaseCard(purchase: filtered[i], index: i),
+                      child: RefreshIndicator(
+                        // Pull down to reload.
+                        onRefresh: () => ref.refresh(purchasesProvider.future),
+                        child: ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (_, i) =>
+                              _PurchaseCard(purchase: filtered[i], index: i),
+                        ),
                       ),
                     ),
                   ],

@@ -399,13 +399,18 @@ class _SalesPageState extends ConsumerState<SalesPage> {
                       count: filtered.length,
                     ),
                     Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                        itemCount: filtered.length,
-                        separatorBuilder: (context, i) =>
-                            const SizedBox(height: 10),
-                        itemBuilder: (_, i) =>
-                            _SaleCard(sale: filtered[i], index: i),
+                      child: RefreshIndicator(
+                        // Pull down to reload.
+                        onRefresh: () => ref.refresh(salesProvider.future),
+                        child: ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                          itemCount: filtered.length,
+                          separatorBuilder: (context, i) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (_, i) =>
+                              _SaleCard(sale: filtered[i], index: i),
+                        ),
                       ),
                     ),
                   ],

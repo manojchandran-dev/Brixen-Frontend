@@ -377,12 +377,18 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
                       count: filtered.length,
                     ),
                     Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) =>
-                            _EmployeeCard(employee: filtered[i], index: i),
+                      child: RefreshIndicator(
+                        // Pull down to reload.
+                        onRefresh: () => ref.refresh(employeesProvider.future),
+                        child: ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (_, i) =>
+                              _EmployeeCard(employee: filtered[i], index: i),
+                        ),
                       ),
                     ),
                   ],

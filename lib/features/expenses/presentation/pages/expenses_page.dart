@@ -375,13 +375,19 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
                       count: filtered.length,
                     ),
                     Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 18),
-                        itemBuilder: (_, i) => _ExpenseCard(
-                          expense: filtered[i],
-                          categoryColor: _cardColors[i % _cardColors.length],
+                      child: RefreshIndicator(
+                        // Pull down to reload.
+                        onRefresh: () => ref.refresh(expensesProvider.future),
+                        child: ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 18),
+                          itemBuilder: (_, i) => _ExpenseCard(
+                            expense: filtered[i],
+                            categoryColor: _cardColors[i % _cardColors.length],
+                          ),
                         ),
                       ),
                     ),

@@ -86,6 +86,10 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
   int _currentStep = 0;
   bool _submitting = false;
 
+  /// Editing: the sale's lines are still loading (saving now would drop
+  /// them, and with them the GST change).
+  bool _loadingLines = false;
+
   // Step 1 — Bill Info
   /// GST bill or secondary bill; fixed once the sale is saved.
   late String _billType = widget.editSale?.billType ?? widget.billType;
@@ -157,21 +161,38 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
         );
       }
       _notesCtrl.text = s.notes ?? '';
-      // Pre-select customer, and rebuild the line-item rows from the saved
-      // sale_items, once the Customers/Products providers have data.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Pre-select the customer and rebuild the line-item rows from the
+      // saved sale_items. The list response doesn't carry the lines, so
+      // they're fetched; customers/products are awaited, not read as they
+      // happen to be — without the lines a save would drop the GST change.
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
+        _loadingLines = true;
+        final scope = Session.isSuperAdmin ? s.companyId : null;
+        final itemsF = s.items.isNotEmpty
+            ? Future.value(s.items)
+            : ref
+                  .read(salesRepositoryProvider)
+                  .getSaleItems(s.id, companyId: scope)
+                  .catchError((_) => <SaleItem>[]);
+        final customers = await ref
+            .read(customersProvider.future)
+            .catchError((_) => <Customer>[]);
+        final products = await ref
+            .read(productsProvider.future)
+            .catchError((_) => <Product>[]);
+        final items = await itemsF;
+        if (!mounted) return;
+        setState(() => _loadingLines = false);
         if (s.customerId != null) {
-          final customers = ref.read(customersProvider).valueOrNull ?? [];
           final matches = customers.where((c) => c.id == s.customerId);
           if (matches.isNotEmpty) {
             setState(() => _selectedCustomer = matches.first);
           }
         }
-        if (s.items.isNotEmpty) {
-          final products = ref.read(productsProvider).valueOrNull ?? [];
+        if (items.isNotEmpty) {
           final byId = {for (final p in products) p.id: p};
-          final restored = s.items
+          final restored = items
               .map((item) {
                 final product = byId[item.productId];
                 if (product == null) return null;
@@ -257,7 +278,7 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
             product: product,
             variant: variant,
             quantity: 1,
-            priceType: 'Retail',
+            priceType: 'Wholesale',
           ),
         );
       }
@@ -387,15 +408,29 @@ class _CreateSalePageState extends ConsumerState<CreateSalePage> {
     setState(() => _submitting = true);
     // Header fields only — subtotal/tax/total are no longer sent here, the
     // server derives them from the line items posted in the step2 call below.
+    if (_loadingLines) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Loading the sale\'s items — try again')),
+      );
+      return;
+    }
+    // Without product lines the amounts typed here are the sale's amounts,
+    // so they go with the header (with lines the server works them out).
+    final manual = _lineItems.isEmpty;
     final headerSale = Sale(
       id: _isEditing ? widget.editSale!.id : '',
       customerId: _selectedCustomer?.id,
       billDate: _billDate,
       billType: _billType,
       invoiceType: _invoiceType,
-      subtotal: 0,
-      taxAmount: 0,
-      totalAmount: 0,
+      subtotal: manual ? double.tryParse(_subtotalCtrl.text) ?? 0 : 0,
+      taxPercentage: manual && _isGst
+          ? double.tryParse(_taxPercentCtrl.text) ?? 0
+          : 0,
+      taxAmount: manual && _isGst
+          ? double.tryParse(_taxAmountCtrl.text) ?? 0
+          : 0,
+      totalAmount: manual ? double.tryParse(_totalAmountCtrl.text) ?? 0 : 0,
       paymentType: _paymentType,
       paymentStatus: _paymentStatus ?? 'Pending',
       amountPaid: _paymentStatus == 'Partial'
@@ -1382,6 +1417,7 @@ class _QtyStepperState extends State<_QtyStepper> {
   void initState() {
     super.initState();
     _focus.addListener(() {
+      setState(() {}); // focused border
       if (_focus.hasFocus) {
         // Tap to type over the old number.
         _ctrl.selection = TextSelection(
@@ -1424,56 +1460,58 @@ class _QtyStepperState extends State<_QtyStepper> {
     final cs = Theme.of(context).colorScheme;
     final value = widget.value;
     final onChanged = widget.onChanged;
-    return Container(
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _QtyButton(
-            icon: Icons.remove_rounded,
-            onTap: value > 1 ? () => onChanged(value - 1) : null,
-          ),
-          SizedBox(
-            width: 48,
-            child: TextField(
-              controller: _ctrl,
-              focusNode: _focus,
-              textAlign: TextAlign.center,
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(5),
-              ],
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface,
-              ),
-              decoration: const InputDecoration(
-                isDense: true,
-                filled: false,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 8),
-              ),
-              onChanged: (t) {
-                final n = int.tryParse(t);
-                if (n != null && n >= 1) onChanged(n);
-              },
-              onSubmitted: (_) => _commit(),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _QtyButton(
+          icon: Icons.remove_rounded,
+          onTap: value > 1 ? () => onChanged(value - 1) : null,
+        ),
+        const SizedBox(width: 8),
+        Container(
+          width: 72,
+          height: 42,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _focus.hasFocus ? AppColors.brand : AppColors.border,
+              width: _focus.hasFocus ? 1.6 : 1,
             ),
           ),
-          _QtyButton(
-            icon: Icons.add_rounded,
-            onTap: () => onChanged(value + 1),
+          child: TextField(
+            controller: _ctrl,
+            focusNode: _focus,
+            textAlign: TextAlign.center,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(5),
+            ],
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: cs.onSurface,
+            ),
+            decoration: const InputDecoration(
+              isDense: true,
+              filled: false,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+            ),
+            onChanged: (t) {
+              final n = int.tryParse(t);
+              if (n != null && n >= 1) onChanged(n);
+            },
+            onSubmitted: (_) => _commit(),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 8),
+        _QtyButton(icon: Icons.add_rounded, onTap: () => onChanged(value + 1)),
+      ],
     );
   }
 }
@@ -1485,18 +1523,23 @@ class _QtyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.all(9),
-        child: Icon(
-          icon,
-          size: 16,
-          color: onTap == null
-              ? cs.onSurfaceVariant.withValues(alpha: 0.3)
-              : cs.onSurfaceVariant,
+    final enabled = onTap != null;
+    return Material(
+      color: AppColors.brand.withValues(alpha: enabled ? 0.12 : 0.05),
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: 38,
+          height: 38,
+          child: Icon(
+            icon,
+            size: 20,
+            color: enabled
+                ? AppColors.brand
+                : AppColors.brand.withValues(alpha: 0.3),
+          ),
         ),
       ),
     );
@@ -1664,7 +1707,11 @@ class _ProductMultiSelectSheetState
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final async = ref.watch(productsProvider);
-    final products = async.valueOrNull ?? const <Product>[];
+    // Inactive products can't be sold.
+    final products = [
+      for (final p in async.valueOrNull ?? const <Product>[])
+        if (p.status.toLowerCase() != 'inactive') p,
+    ];
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
       minChildSize: 0.35,
@@ -1766,7 +1813,20 @@ class _ProductMultiSelectSheetState
                       },
                     ),
             ),
-            SizedBox(height: MediaQuery.of(context).padding.bottom + 12),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                10,
+                16,
+                MediaQuery.of(context).padding.bottom + 12,
+              ),
+              child: BrixenButton(
+                label: _selected.isEmpty
+                    ? 'Done'
+                    : 'Apply · ${_selected.length} selected',
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
           ],
         ),
       ),
@@ -1864,7 +1924,8 @@ class _VariantPickTile extends StatelessWidget {
                 _SizeChip(
                   label: v.label,
                   stock: v.stockQuantity,
-                  price: product.retailFor(v),
+                  retail: product.retailFor(v),
+                  wholesale: product.wholesaleFor(v),
                   selected: selected.contains(_lineKey(product, v)),
                   onTap: () => onToggle(v),
                 ),
@@ -1879,13 +1940,14 @@ class _VariantPickTile extends StatelessWidget {
 class _SizeChip extends StatelessWidget {
   final String label;
   final int stock;
-  final double price;
+  final double retail, wholesale;
   final bool selected;
   final VoidCallback onTap;
   const _SizeChip({
     required this.label,
     required this.stock,
-    required this.price,
+    required this.retail,
+    required this.wholesale,
     required this.selected,
     required this.onTap,
   });
@@ -1924,7 +1986,8 @@ class _SizeChip extends StatelessWidget {
                 ],
               ),
               Text(
-                '₹${price.toStringAsFixed(0)} · ${stock <= 0 ? 'out' : '$stock left'}',
+                'R ₹${retail.toStringAsFixed(0)} · W ₹${wholesale.toStringAsFixed(0)}\n${stock <= 0 ? 'Out of stock' : '$stock in stock'}',
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   color: fg.withValues(alpha: 0.75),
                   fontSize: 10.5,
@@ -1990,27 +2053,31 @@ class _LineItemRow extends StatelessWidget {
                 value: item.priceType,
                 onChanged: onPriceTypeChanged,
               ),
-              const Spacer(),
-              _QtyStepper(value: item.quantity, onChanged: onQtyChanged),
-              const SizedBox(width: 12),
-              SizedBox(
-                width: 60,
+              const SizedBox(width: 10),
+              Expanded(
                 child: Text(
-                  '₹${item.amount.toStringAsFixed(0)}',
-                  textAlign: TextAlign.right,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color: cs.onSurface,
-                  ),
+                  '₹${item.unitPrice.toStringAsFixed(0)} each',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 2),
-          Text(
-            '₹${item.unitPrice.toStringAsFixed(0)} each (${item.priceType})',
-            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _QtyStepper(value: item.quantity, onChanged: onQtyChanged),
+              const Spacer(),
+              Text(
+                '₹${item.amount.toStringAsFixed(item.amount % 1 == 0 ? 0 : 2)}',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: cs.onSurface,
+                ),
+              ),
+            ],
           ),
         ],
       ),

@@ -76,6 +76,14 @@ class SaleModel extends Sale {
     if (s.customerId != null && s.customerId!.isNotEmpty)
       'customer_id': s.customerId,
     'bill_date': s.billDate.toIso8601String(),
+    // A sale without product lines: its typed amounts are the sale's (with
+    // lines the form sends 0 here and step2 sets them from the lines).
+    if (s.subtotal > 0) ...{
+      'subtotal': s.subtotal,
+      'tax_percentage': s.taxPercentage ?? 0,
+      'tax_amount': s.taxAmount,
+      'total_amount': s.totalAmount,
+    },
     // Only used on create; the server keeps a sale's bill type fixed.
     'bill_type': s.billType,
     if (s.invoiceType != null && s.invoiceType!.isNotEmpty)

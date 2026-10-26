@@ -63,6 +63,9 @@ List<ProviderOrFamily> _dataFor(String path) {
       permissionsProvider,
     ],
     RouteNames.sales => [salesProvider],
+    // The sale form picks from these: always current prices, sizes and
+    // active/inactive status.
+    RouteNames.createSale => [productsProvider, customersProvider],
     RouteNames.customers => [customersProvider],
     RouteNames.expenses => [expensesProvider],
     RouteNames.employees => [employeesProvider],

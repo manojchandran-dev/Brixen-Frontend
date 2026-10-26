@@ -389,12 +389,18 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                       count: filtered.length,
                     ),
                     Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) =>
-                            _ProductCard(product: filtered[i], index: i),
+                      child: RefreshIndicator(
+                        // Pull down to reload.
+                        onRefresh: () => ref.refresh(productsProvider.future),
+                        child: ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (_, i) =>
+                              _ProductCard(product: filtered[i], index: i),
+                        ),
                       ),
                     ),
                   ],
@@ -838,220 +844,233 @@ void _openProductStatusPicker(
 void _showProductDetail(
   BuildContext context,
   WidgetRef ref,
-  Product product,
+  Product initial,
   Color accent,
 ) {
   showDetailSheet(
     context,
-    (ctx) => DetailSheetScaffold(
-      avatarIcon: Icons.checkroom_rounded,
-      avatarGradient: AppColors.accentGradient(accent),
-      title: product.productName,
-      subtitle: product.productCode,
-      onEdit: !ref.read(moduleAccessProvider('Products')).edit
-          ? null
-          : () {
-              Navigator.of(ctx).pop();
-              ctx.push(AppRouter.createProduct, extra: product);
-            },
-      onDelete: !ref.read(moduleAccessProvider('Products')).delete
-          ? null
-          : () async {
-              final confirmed = await showDialog<bool>(
-                context: ctx,
-                builder: (dCtx) => AlertDialog(
-                  backgroundColor: Theme.of(dCtx).scaffoldBackgroundColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  title: Text(
-                    'Delete Product',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.ink,
-                    ),
-                  ),
-                  content: Text(
-                    'Delete "${product.productName}"? This cannot be undone.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(dCtx).pop(false),
-                      child: Text(
-                        'Cancel',
-                        style: TextStyle(color: AppColors.textSecondary),
+    // Follows the live list, so a status/price/stock change made from the
+    // sheet (or anywhere) shows here at once instead of after a refresh.
+    (ctx) => Consumer(
+      builder: (ctx, liveRef, _) {
+        final product =
+            liveRef
+                .watch(productsProvider)
+                .valueOrNull
+                ?.where((p) => p.id == initial.id)
+                .firstOrNull ??
+            initial;
+        return DetailSheetScaffold(
+          avatarIcon: Icons.checkroom_rounded,
+          avatarGradient: AppColors.accentGradient(accent),
+          title: product.productName,
+          subtitle: product.productCode,
+          onEdit: !ref.read(moduleAccessProvider('Products')).edit
+              ? null
+              : () {
+                  Navigator.of(ctx).pop();
+                  ctx.push(AppRouter.createProduct, extra: product);
+                },
+          onDelete: !ref.read(moduleAccessProvider('Products')).delete
+              ? null
+              : () async {
+                  final confirmed = await showDialog<bool>(
+                    context: ctx,
+                    builder: (dCtx) => AlertDialog(
+                      backgroundColor: Theme.of(dCtx).scaffoldBackgroundColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.of(dCtx).pop(true),
-                      child: Text(
-                        'Delete',
+                      title: Text(
+                        'Delete Product',
                         style: TextStyle(
-                          color: AppColors.ink,
+                          fontSize: 16,
                           fontWeight: FontWeight.w700,
+                          color: AppColors.ink,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              );
-              if (confirmed != true) return;
-              try {
-                await ref
-                    .read(productsProvider.notifier)
-                    .deleteProduct(
-                      product.id,
-                      companyId: Session.isSuperAdmin
-                          ? product.companyId
-                          : null,
-                    );
-                if (ctx.mounted) Navigator.of(ctx).pop();
-              } catch (e) {
-                if (ctx.mounted) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(
-                      content: Text(e.toString()),
-                      backgroundColor: AppColors.dangerFill,
+                      content: Text(
+                        'Delete "${product.productName}"? This cannot be undone.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(dCtx).pop(false),
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(dCtx).pop(true),
+                          child: Text(
+                            'Delete',
+                            style: TextStyle(
+                              color: AppColors.ink,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   );
-                }
-              }
-            },
-      statusRow: GestureDetector(
-        onTap: !ref.read(moduleAccessProvider('Products')).edit
-            ? null
-            : () => _openProductStatusPicker(ctx, ref, product),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-          decoration: BoxDecoration(
-            color: product.status == 'Active'
-                ? AppColors.accentEmerald
-                : AppColors.accentRose,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.checkroom_rounded,
-                color: AppColors.white,
-                size: 18,
+                  if (confirmed != true) return;
+                  try {
+                    await ref
+                        .read(productsProvider.notifier)
+                        .deleteProduct(
+                          product.id,
+                          companyId: Session.isSuperAdmin
+                              ? product.companyId
+                              : null,
+                        );
+                    if (ctx.mounted) Navigator.of(ctx).pop();
+                  } catch (e) {
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(
+                          content: Text(e.toString()),
+                          backgroundColor: AppColors.dangerFill,
+                        ),
+                      );
+                    }
+                  }
+                },
+          statusRow: GestureDetector(
+            onTap: !ref.read(moduleAccessProvider('Products')).edit
+                ? null
+                : () => _openProductStatusPicker(ctx, ref, product),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+              decoration: BoxDecoration(
+                color: product.status == 'Active'
+                    ? AppColors.accentEmerald
+                    : AppColors.accentRose,
+                borderRadius: BorderRadius.circular(16),
               ),
-              const SizedBox(width: 8),
-              Text(
-                product.status,
-                style: const TextStyle(
-                  color: AppColors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.checkroom_rounded,
+                    color: AppColors.white,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    product.status,
+                    style: const TextStyle(
+                      color: AppColors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  const Text(
+                    'Tap to change',
+                    style: TextStyle(
+                      color: AppColors.white,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.sync_alt_rounded,
+                    color: AppColors.white,
+                    size: 15,
+                  ),
+                ],
               ),
-              const Spacer(),
-              const Text(
-                'Tap to change',
-                style: TextStyle(
-                  color: AppColors.white,
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.sync_alt_rounded,
-                color: AppColors.white,
-                size: 15,
-              ),
-            ],
-          ),
-        ),
-      ),
-      sections: [
-        _ProductGallerySection(product: product),
-        DetailSection(
-          title: 'Details',
-          items: [
-            DetailRow(
-              icon: Icons.category_outlined,
-              label: 'Category',
-              value: product.category,
             ),
-            DetailRow(
-              icon: Icons.wc_rounded,
-              label: 'Gender',
-              value: product.gender,
-              iconColor: AppColors.positive,
+          ),
+          sections: [
+            _ProductGallerySection(product: product),
+            DetailSection(
+              title: 'Details',
+              items: [
+                DetailRow(
+                  icon: Icons.category_outlined,
+                  label: 'Category',
+                  value: product.category,
+                ),
+                DetailRow(
+                  icon: Icons.wc_rounded,
+                  label: 'Gender',
+                  value: product.gender,
+                  iconColor: AppColors.positive,
+                ),
+                if (product.designPattern != null &&
+                    product.designPattern!.isNotEmpty)
+                  DetailRow(
+                    icon: Icons.texture_rounded,
+                    label: 'Design / Pattern',
+                    value: product.designPattern!,
+                  ),
+                if (product.unit != null)
+                  DetailRow(
+                    icon: Icons.straighten_rounded,
+                    label: 'Unit',
+                    value: product.unit!,
+                    iconColor: AppColors.positive,
+                  ),
+                if (product.color != null && product.color!.isNotEmpty)
+                  DetailRow(
+                    icon: Icons.palette_outlined,
+                    label: 'Color',
+                    value: product.color!,
+                  ),
+                if (product.size != null && product.size!.isNotEmpty)
+                  DetailRow(
+                    icon: Icons.straighten_outlined,
+                    label: 'Size',
+                    value: product.size!,
+                    iconColor: AppColors.positive,
+                  ),
+              ],
             ),
-            if (product.designPattern != null &&
-                product.designPattern!.isNotEmpty)
-              DetailRow(
-                icon: Icons.texture_rounded,
-                label: 'Design / Pattern',
-                value: product.designPattern!,
+            if (product.hasVariants)
+              DetailSection(
+                title: 'Sizes & stock',
+                items: [
+                  for (final v in product.variants)
+                    DetailLineItem(
+                      icon: Icons.straighten_rounded,
+                      name: v.label,
+                      tag: v.sku,
+                      working:
+                          'Retail ₹${product.retailFor(v).toStringAsFixed(2)} · '
+                          'Wholesale ₹${product.wholesaleFor(v).toStringAsFixed(2)}',
+                      total: '${v.stockQuantity} in stock',
+                    ),
+                ],
               ),
-            if (product.unit != null)
-              DetailRow(
-                icon: Icons.straighten_rounded,
-                label: 'Unit',
-                value: product.unit!,
-                iconColor: AppColors.positive,
-              ),
-            if (product.color != null && product.color!.isNotEmpty)
-              DetailRow(
-                icon: Icons.palette_outlined,
-                label: 'Color',
-                value: product.color!,
-              ),
-            if (product.size != null && product.size!.isNotEmpty)
-              DetailRow(
-                icon: Icons.straighten_outlined,
-                label: 'Size',
-                value: product.size!,
-                iconColor: AppColors.positive,
-              ),
+            DetailSection(
+              title: product.hasVariants ? 'Default pricing' : 'Pricing',
+              items: [
+                DetailRow(
+                  icon: Icons.sell_outlined,
+                  label: 'Cost Price',
+                  value: '₹${product.costPrice.toStringAsFixed(2)}',
+                ),
+                DetailRow(
+                  icon: Icons.storefront_outlined,
+                  label: 'Retail Price',
+                  value: '₹${product.retailPrice.toStringAsFixed(2)}',
+                  iconColor: AppColors.positive,
+                ),
+                DetailRow(
+                  icon: Icons.local_shipping_outlined,
+                  label: 'Wholesale Price',
+                  value: '₹${product.wholesalePrice.toStringAsFixed(2)}',
+                ),
+              ],
+            ),
           ],
-        ),
-        if (product.hasVariants)
-          DetailSection(
-            title: 'Sizes & stock',
-            items: [
-              for (final v in product.variants)
-                DetailLineItem(
-                  icon: Icons.straighten_rounded,
-                  name: v.label,
-                  tag: v.sku,
-                  working:
-                      'Retail ₹${product.retailFor(v).toStringAsFixed(2)} · '
-                      'Wholesale ₹${product.wholesaleFor(v).toStringAsFixed(2)}',
-                  total: '${v.stockQuantity} in stock',
-                ),
-            ],
-          ),
-        DetailSection(
-          title: product.hasVariants ? 'Default pricing' : 'Pricing',
-          items: [
-            DetailRow(
-              icon: Icons.sell_outlined,
-              label: 'Cost Price',
-              value: '₹${product.costPrice.toStringAsFixed(2)}',
-            ),
-            DetailRow(
-              icon: Icons.storefront_outlined,
-              label: 'Retail Price',
-              value: '₹${product.retailPrice.toStringAsFixed(2)}',
-              iconColor: AppColors.positive,
-            ),
-            DetailRow(
-              icon: Icons.local_shipping_outlined,
-              label: 'Wholesale Price',
-              value: '₹${product.wholesalePrice.toStringAsFixed(2)}',
-            ),
-          ],
-        ),
-      ],
+        );
+      },
     ),
   );
 }

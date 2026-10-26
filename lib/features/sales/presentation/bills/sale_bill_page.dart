@@ -16,8 +16,8 @@ import '../../data/repositories/sales_repository_impl.dart';
 import '../../domain/entities/sale.dart';
 import 'sale_bill_pdf.dart';
 
-/// A sale's bill: the PDF's pages as images you can pinch or double-tap to
-/// zoom, with Download, Share and Print below.
+/// A sale's bill: the PDF's pages as images — tap anywhere to zoom into that
+/// spot, pinch for more — with Download, Share and Print below.
 class SaleBillPage extends ConsumerStatefulWidget {
   final Sale sale;
   const SaleBillPage({super.key, required this.sale});
@@ -39,30 +39,13 @@ class _Bill {
 
 class _SaleBillPageState extends ConsumerState<SaleBillPage> {
   late Future<_Bill> _bill = _build();
-  final _zoom = TransformationController();
-  TapDownDetails? _doubleTapAt;
 
-  /// Zoomed in: a one-finger drag moves around the page. Not zoomed: it
-  /// scrolls the pages (the two would otherwise fight over the drag).
-  bool _zoomed = false;
+  /// How many pages are zoomed in: while any is, the page list stops
+  /// scrolling so a drag moves around the zoomed page instead.
+  int _zoomedPages = 0;
 
   /// Which action is running ('download' | 'share' | 'print').
   String? _busy;
-
-  @override
-  void initState() {
-    super.initState();
-    _zoom.addListener(() {
-      final zoomed = _zoom.value.getMaxScaleOnAxis() > 1.01;
-      if (zoomed != _zoomed) setState(() => _zoomed = zoomed);
-    });
-  }
-
-  @override
-  void dispose() {
-    _zoom.dispose();
-    super.dispose();
-  }
 
   Future<SaleBillData> _load() async {
     final sale = widget.sale;
@@ -96,7 +79,7 @@ class _SaleBillPageState extends ConsumerState<SaleBillPage> {
     final pdf = await buildSaleBillPdf(await _load());
     // Sharp enough to zoom into the small print.
     final pages = <Uint8List>[
-      await for (final page in Printing.raster(pdf, dpi: 200))
+      await for (final page in Printing.raster(pdf, dpi: 220))
         await page.toPng(),
     ];
     return _Bill(pdf, pages);
@@ -145,19 +128,6 @@ class _SaleBillPageState extends ConsumerState<SaleBillPage> {
     'print',
     () => Printing.layoutPdf(onLayout: (_) async => b.pdf, name: _fileName),
   );
-
-  /// Double tap: zoom 2.5× into the tapped spot, or back out.
-  void _toggleZoom() {
-    if (_zoom.value.getMaxScaleOnAxis() > 1.01) {
-      _zoom.value = Matrix4.identity();
-      return;
-    }
-    final at = _doubleTapAt?.localPosition ?? Offset.zero;
-    const scale = 2.5;
-    _zoom.value = Matrix4.identity()
-      ..translateByDouble(-at.dx * (scale - 1), -at.dy * (scale - 1), 0, 1)
-      ..scaleByDouble(scale, scale, 1, 1);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -211,72 +181,44 @@ class _SaleBillPageState extends ConsumerState<SaleBillPage> {
           }
           return Column(
             children: [
-              Expanded(
-                child: Stack(
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                child: Row(
                   children: [
-                    GestureDetector(
-                      onDoubleTapDown: (d) => _doubleTapAt = d,
-                      onDoubleTap: _toggleZoom,
-                      child: InteractiveViewer(
-                        transformationController: _zoom,
-                        minScale: 1,
-                        maxScale: 5,
-                        panEnabled: _zoomed,
-                        boundaryMargin: const EdgeInsets.all(40),
-                        child: ListView(
-                          physics: _zoomed
-                              ? const NeverScrollableScrollPhysics()
-                              : null,
-                          padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
-                          children: [
-                            for (final page in bill.pages)
-                              Container(
-                                margin: const EdgeInsets.only(bottom: 14),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(6),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.14,
-                                      ),
-                                      blurRadius: 16,
-                                      offset: const Offset(0, 6),
-                                    ),
-                                  ],
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: Image.memory(
-                                    page,
-                                    fit: BoxFit.fitWidth,
-                                    filterQuality: FilterQuality.medium,
-                                  ),
-                                ),
-                              ),
-                          ],
+                    Icon(
+                      Icons.touch_app_outlined,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _zoomedPages > 0
+                            ? 'Drag to move around · tap to zoom out'
+                            : 'Tap anywhere to zoom in · pinch for more',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                    // How to zoom, until the bill is zoomed.
-                    Positioned(
-                      top: 10,
-                      right: 10,
-                      child: ValueListenableBuilder<Matrix4>(
-                        valueListenable: _zoom,
-                        builder: (context, m, _) => m.getMaxScaleOnAxis() > 1.01
-                            ? _ZoomChip(
-                                icon: Icons.zoom_out_map_rounded,
-                                label: 'Reset zoom',
-                                onTap: () => _zoom.value = Matrix4.identity(),
-                              )
-                            : const _ZoomChip(
-                                icon: Icons.pinch_rounded,
-                                label: 'Pinch or double-tap to zoom',
-                              ),
-                      ),
-                    ),
                   ],
+                ),
+              ),
+              Expanded(
+                child: ListView.separated(
+                  physics: _zoomedPages > 0
+                      ? const NeverScrollableScrollPhysics()
+                      : null,
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 20),
+                  itemCount: bill.pages.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 14),
+                  itemBuilder: (_, i) => _ZoomablePage(
+                    image: bill.pages[i],
+                    onZoomChanged: (zoomed) =>
+                        setState(() => _zoomedPages += zoomed ? 1 : -1),
+                  ),
                 ),
               ),
               _ActionBar(
@@ -293,42 +235,110 @@ class _SaleBillPageState extends ConsumerState<SaleBillPage> {
   }
 }
 
-class _ZoomChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-  const _ZoomChip({required this.icon, required this.label, this.onTap});
+/// One bill page that fits the width. Tap a spot to zoom 2.5× into it (tap
+/// again to zoom out), pinch for up to 5×; while zoomed, drag to move.
+class _ZoomablePage extends StatefulWidget {
+  final Uint8List image;
+  final ValueChanged<bool> onZoomChanged;
+  const _ZoomablePage({required this.image, required this.onZoomChanged});
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.black.withValues(alpha: 0.65),
-    borderRadius: BorderRadius.circular(20),
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 15, color: Colors.white),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
+  State<_ZoomablePage> createState() => _ZoomablePageState();
 }
 
-/// Download (main action), Share and Print.
+class _ZoomablePageState extends State<_ZoomablePage>
+    with SingleTickerProviderStateMixin {
+  final _zoom = TransformationController();
+  late final _anim = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 220),
+  );
+  Animation<Matrix4>? _tween;
+  bool _zoomed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _anim.addListener(() {
+      if (_tween != null) _zoom.value = _tween!.value;
+    });
+    _zoom.addListener(() {
+      final zoomed = _zoom.value.getMaxScaleOnAxis() > 1.01;
+      if (zoomed != _zoomed) {
+        setState(() => _zoomed = zoomed);
+        widget.onZoomChanged(zoomed);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _anim.dispose();
+    _zoom.dispose();
+    super.dispose();
+  }
+
+  void _animateTo(Matrix4 target) {
+    _tween = Matrix4Tween(
+      begin: _zoom.value,
+      end: target,
+    ).animate(CurvedAnimation(parent: _anim, curve: Curves.easeOutCubic));
+    _anim.forward(from: 0);
+  }
+
+  /// Tap: zoom into the tapped spot, or back out.
+  void _onTap(TapUpDetails d) {
+    if (_zoomed) {
+      _animateTo(Matrix4.identity());
+      return;
+    }
+    const scale = 2.5;
+    final at = d.localPosition;
+    _animateTo(
+      Matrix4.identity()
+        ..translateByDouble(-at.dx * (scale - 1), -at.dy * (scale - 1), 0, 1)
+        ..scaleByDouble(scale, scale, 1, 1),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: GestureDetector(
+          onTapUp: _onTap,
+          child: InteractiveViewer(
+            transformationController: _zoom,
+            minScale: 1,
+            maxScale: 5,
+            // Only pans while zoomed; otherwise the drag scrolls the list.
+            panEnabled: _zoomed,
+            child: Image.memory(
+              widget.image,
+              width: double.infinity,
+              fit: BoxFit.fitWidth,
+              filterQuality: FilterQuality.medium,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Download PDF (main), Share and Print — one row, all the same height.
 class _ActionBar extends StatelessWidget {
   final String? busy;
   final VoidCallback onDownload, onShare, onPrint;
@@ -339,43 +349,52 @@ class _ActionBar extends StatelessWidget {
     required this.onPrint,
   });
 
+  static const _height = 52.0;
+
   @override
   Widget build(BuildContext context) {
     final isDark = AppColors.isDark;
-    final fg = isDark ? AppColors.black : AppColors.white;
-    Widget spinner(Color c) => SizedBox(
-      width: 18,
-      height: 18,
-      child: CircularProgressIndicator(strokeWidth: 2, color: c),
+    final onBrand = isDark ? AppColors.black : AppColors.white;
+    final tint = isDark ? AppColors.brandLight : AppColors.brand;
+
+    Widget content(String id, IconData icon, String label, Color color) => Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        busy == id
+            ? SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: color),
+              )
+            : Icon(icon, size: 20, color: color),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
     );
 
-    Widget side(String id, IconData icon, String label, VoidCallback onTap) =>
+    Widget secondary(String id, IconData icon, String label, VoidCallback f) =>
         Expanded(
-          child: OutlinedButton(
-            onPressed: busy == null ? onTap : null,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.ink,
-              side: BorderSide(color: AppColors.border),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+          child: SizedBox(
+            height: _height,
+            child: Material(
+              color: tint.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: busy == null ? f : null,
+                child: content(id, icon, label, tint),
               ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                busy == id
-                    ? spinner(AppColors.brand)
-                    : Icon(icon, size: 20, color: AppColors.brand),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
             ),
           ),
         );
@@ -389,11 +408,11 @@ class _ActionBar extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.border)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
         boxShadow: AppColors.shadows([
           BoxShadow(
             color: AppColors.shadowDark.withValues(alpha: 0.08),
-            blurRadius: 16,
+            blurRadius: 18,
             offset: const Offset(0, -4),
           ),
         ]),
@@ -402,38 +421,27 @@ class _ActionBar extends StatelessWidget {
         children: [
           Expanded(
             flex: 2,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: isDark
-                    ? AppColors.silverGradient
-                    : const LinearGradient(
-                        colors: [AppColors.brand, AppColors.brandDeep],
-                      ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Material(
-                type: MaterialType.transparency,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: busy == null ? onDownload : null,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        busy == 'download'
-                            ? spinner(fg)
-                            : Icon(Icons.download_rounded, color: fg),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Download PDF',
-                          style: TextStyle(
-                            color: fg,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                          ),
+            child: SizedBox(
+              height: _height,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: isDark
+                      ? AppColors.silverGradient
+                      : const LinearGradient(
+                          colors: [AppColors.brand, AppColors.brandDeep],
                         ),
-                      ],
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: busy == null ? onDownload : null,
+                    child: content(
+                      'download',
+                      Icons.download_rounded,
+                      'Download PDF',
+                      onBrand,
                     ),
                   ),
                 ),
@@ -441,9 +449,9 @@ class _ActionBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          side('share', Icons.share_rounded, 'Share', onShare),
+          secondary('share', Icons.share_rounded, 'Share', onShare),
           const SizedBox(width: 10),
-          side('print', Icons.print_rounded, 'Print', onPrint),
+          secondary('print', Icons.print_rounded, 'Print', onPrint),
         ],
       ),
     );

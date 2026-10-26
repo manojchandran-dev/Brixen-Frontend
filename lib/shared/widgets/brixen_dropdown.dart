@@ -38,6 +38,13 @@ class _BrixenDropdownState<T> extends State<BrixenDropdown<T>>
   late final Animation<double> _anim;
   bool _isOpen = false;
 
+  /// Opened above the field (not enough room below it).
+  bool _openUp = false;
+
+  /// Height the list may take where it opens.
+  double _maxListHeight = _listHeight;
+  static const _listHeight = 224.0;
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +68,22 @@ class _BrixenDropdownState<T> extends State<BrixenDropdown<T>>
     final width = rb.size.width;
     final height = rb.size.height;
 
+    // Room below and above the field (minus the keyboard and system bars);
+    // open upwards when the list doesn't fit below and there's more above.
+    final mq = MediaQuery.of(context);
+    final top = rb.localToGlobal(Offset.zero).dy;
+    const gap = 12.0;
+    final below =
+        mq.size.height -
+        mq.viewInsets.bottom -
+        mq.padding.bottom -
+        (top + height) -
+        gap;
+    final above = top - mq.padding.top - gap;
+    final wanted = _listHeight.clamp(0.0, widget.items.length * 49.0 + 2);
+    _openUp = below < wanted && above > below;
+    _maxListHeight = (_openUp ? above : below).clamp(96.0, _listHeight);
+
     _entry = OverlayEntry(
       builder: (ctx) {
         return GestureDetector(
@@ -71,9 +94,13 @@ class _BrixenDropdownState<T> extends State<BrixenDropdown<T>>
               CompositedTransformFollower(
                 link: _link,
                 showWhenUnlinked: false,
-                targetAnchor: Alignment.bottomLeft,
-                followerAnchor: Alignment.topLeft,
-                offset: Offset(0, height > 0 ? 0 : 56),
+                targetAnchor: _openUp
+                    ? Alignment.topLeft
+                    : Alignment.bottomLeft,
+                followerAnchor: _openUp
+                    ? Alignment.bottomLeft
+                    : Alignment.topLeft,
+                offset: Offset(0, height > 0 || _openUp ? 0 : 56),
                 child: SizedBox(
                   width: width,
                   child: AnimatedBuilder(
@@ -81,12 +108,17 @@ class _BrixenDropdownState<T> extends State<BrixenDropdown<T>>
                     builder: (context, _) => Opacity(
                       opacity: _anim.value,
                       child: Transform.translate(
-                        offset: Offset(0, (1 - _anim.value) * -6),
+                        offset: Offset(
+                          0,
+                          (1 - _anim.value) * (_openUp ? 6 : -6),
+                        ),
                         child: _BrixenDropdownPanel<T>(
                           items: widget.items,
                           value: widget.value,
                           labelOf: widget.labelOf,
                           subtitleOf: widget.subtitleOf,
+                          openUp: _openUp,
+                          maxHeight: _maxListHeight,
                           onSelect: (v) {
                             widget.onChanged(v);
                             _hide();
@@ -139,7 +171,9 @@ class _BrixenDropdownState<T> extends State<BrixenDropdown<T>>
           decoration: BoxDecoration(
             color: isDark ? cs.surfaceContainerHighest : AppColors.surface,
             borderRadius: _isOpen
-                ? const BorderRadius.vertical(top: Radius.circular(16))
+                ? (_openUp
+                      ? const BorderRadius.vertical(bottom: Radius.circular(16))
+                      : const BorderRadius.vertical(top: Radius.circular(16)))
                 : BorderRadius.circular(16),
             border: isDark
                 ? Border.all(
@@ -247,13 +281,23 @@ class _BrixenDropdownPanel<T> extends StatelessWidget {
   final String? Function(T)? subtitleOf;
   final void Function(T) onSelect;
 
+  /// Opens above the field: round the top corners instead.
+  final bool openUp;
+  final double maxHeight;
+
   const _BrixenDropdownPanel({
     required this.items,
     required this.value,
     required this.labelOf,
     this.subtitleOf,
     required this.onSelect,
+    this.openUp = false,
+    this.maxHeight = 224,
   });
+
+  BorderRadius get _radius => openUp
+      ? const BorderRadius.vertical(top: Radius.circular(12))
+      : const BorderRadius.vertical(bottom: Radius.circular(12));
 
   @override
   Widget build(BuildContext context) {
@@ -265,7 +309,7 @@ class _BrixenDropdownPanel<T> extends StatelessWidget {
       return Material(
         elevation: 10,
         shadowColor: Colors.black.withValues(alpha: 0.15),
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+        borderRadius: _radius,
         color: bg,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -288,22 +332,18 @@ class _BrixenDropdownPanel<T> extends StatelessWidget {
     return Material(
       elevation: isDark ? 0 : 10,
       shadowColor: Colors.black.withValues(alpha: 0.15),
-      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+      borderRadius: _radius,
       color: bg,
       child: Container(
-        constraints: const BoxConstraints(maxHeight: 224),
+        constraints: BoxConstraints(maxHeight: maxHeight),
         decoration: BoxDecoration(
-          borderRadius: const BorderRadius.vertical(
-            bottom: Radius.circular(12),
-          ),
+          borderRadius: _radius,
           border: Border.all(
             color: AppColors.silver.withValues(alpha: isDark ? 0.3 : 0.2),
           ),
         ),
         child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(
-            bottom: Radius.circular(12),
-          ),
+          borderRadius: _radius,
           child: ListView.separated(
             padding: EdgeInsets.zero,
             shrinkWrap: true,
