@@ -8,6 +8,7 @@ import '../../../../shared/widgets/brixen_button.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
 import '../cubit/auth_cubit.dart';
 import '../cubit/auth_state.dart';
+import 'set_first_password_page.dart';
 
 class SignInPage extends StatelessWidget {
   /// Prefills the email, e.g. when an account's session ended and it has to
@@ -63,6 +64,14 @@ class _SignInViewState extends State<_SignInView> {
           if (state is AuthAuthenticated) {
             context.go(
               state.hasPin ? AppRouter.lockScreen : AppRouter.pinSetup,
+            );
+          }
+          // Temporary password (first sign-in): choose a new one first.
+          if (state is AuthPasswordChangeRequired) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => SetFirstPasswordPage(email: state.email),
+              ),
             );
           }
         },

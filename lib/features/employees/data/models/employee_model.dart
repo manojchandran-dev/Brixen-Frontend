@@ -33,6 +33,9 @@ class EmployeeModel extends Employee {
     super.onboardingStatus,
     super.loginEmail,
     super.loginActive,
+    super.loginPending,
+    super.setupEmailSentAt,
+    super.setupEmailError,
     required super.createdAt,
   });
 
@@ -79,6 +82,16 @@ class EmployeeModel extends Employee {
           ? json['users']['email']?.toString()
           : null,
       loginActive: json['users'] is Map && json['users']['deleted_at'] == null,
+      loginPending:
+          json['users'] is Map && json['users']['must_change_password'] == true,
+      setupEmailSentAt: json['users'] is Map
+          ? DateTime.tryParse(
+              json['users']['setup_email_sent_at']?.toString() ?? '',
+            )
+          : null,
+      setupEmailError: json['users'] is Map
+          ? json['users']['setup_email_error']?.toString()
+          : null,
       onboardingStatus: json['onboarding_status'] ?? json['onboardingStatus'],
       createdAt: (json['created_at'] ?? json['createdAt']) != null
           ? DateTime.tryParse(

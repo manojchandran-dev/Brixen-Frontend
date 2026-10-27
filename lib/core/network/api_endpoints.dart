@@ -40,6 +40,11 @@ class ApiEndpoints {
   // An employee login's own data.
   static const String myEmployee = '/api/v1/me/employee';
   static const String myAttendance = '/api/v1/me/attendance';
+  static const String myPermissions = '/api/v1/me/permissions';
+  static String employeePermissions(String employeeId) =>
+      '/api/v1/employee-permissions/$employeeId';
+  static String employeeLoginActivate(String id) =>
+      '/api/v1/employees/$id/login/activate';
   static const String units = '/api/v1/units';
   static const String expenses = '/api/v1/expenses';
   static const String customers = '/api/v1/customers';

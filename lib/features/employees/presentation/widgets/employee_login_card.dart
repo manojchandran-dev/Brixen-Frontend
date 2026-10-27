@@ -1,38 +1,162 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/services/session_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/brixen_button.dart';
-import '../../../../shared/widgets/brixen_text_field.dart';
+import '../../../auth/domain/entities/user_role.dart';
 import '../../../permissions/presentation/providers/module_access_provider.dart';
 import '../../domain/entities/employee.dart';
 import '../providers/employees_provider.dart';
 
-/// The employee's own app login, in their detail sheet: whether they have
-/// one, its email, and (for an admin who may edit employees) buttons to set
-/// it up, change it or remove it. Watches the list, so it updates in place.
-class EmployeeLoginCard extends ConsumerWidget {
+/// The employee's own app login, in their detail sheet. Activating emails a
+/// temporary password to the employee's saved email (plain text); they set
+/// their own at first sign-in. Shows whether the setup email went out (or
+/// why not), with Resend and Remove. Company admins only; watches the list,
+/// so it updates in place.
+class EmployeeLoginCard extends ConsumerStatefulWidget {
   final String employeeId;
   const EmployeeLoginCard({super.key, required this.employeeId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<EmployeeLoginCard> createState() => _EmployeeLoginCardState();
+}
+
+class _EmployeeLoginCardState extends ConsumerState<EmployeeLoginCard> {
+  bool _busy = false;
+
+  void _snack(String text, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text),
+        backgroundColor: error ? AppColors.dangerFill : null,
+      ),
+    );
+  }
+
+  Future<bool> _confirm(String title, String body, String action) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (d) => AlertDialog(
+          title: Text(title),
+          content: Text(body),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(d).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(d).pop(true),
+              child: Text(action),
+            ),
+          ],
+        ),
+      ) ==
+      true;
+
+  Future<void> _activate(Employee e, {required bool resend}) async {
+    final ok = await _confirm(
+      resend ? 'Send a new setup email?' : 'Activate login?',
+      'A new temporary password will be emailed to ${e.email}. '
+      '${resend ? 'Any earlier one stops working. ' : ''}'
+      '${e.fullName} sets their own password at first sign-in.',
+      resend ? 'Send' : 'Activate',
+    );
+    if (!ok) return;
+    setState(() => _busy = true);
+    try {
+      await ref
+          .read(employeesProvider.notifier)
+          .activateLogin(
+            e.id,
+            companyId: Session.isSuperAdmin ? e.companyId : null,
+          );
+      _snack('Setup email sent to ${e.email}');
+    } catch (err) {
+      _snack(err.toString(), error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _remove(Employee e) async {
+    final ok = await _confirm(
+      'Remove login?',
+      '${e.fullName} will be signed out and can\'t sign in until you activate '
+          'their login again.',
+      'Remove',
+    );
+    if (!ok) return;
+    setState(() => _busy = true);
+    try {
+      await ref
+          .read(employeesProvider.notifier)
+          .removeLogin(
+            e.id,
+            companyId: Session.isSuperAdmin ? e.companyId : null,
+          );
+    } catch (err) {
+      _snack(err.toString(), error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final e = ref
         .watch(employeesProvider)
         .valueOrNull
-        ?.where((x) => x.id == employeeId)
+        ?.where((x) => x.id == widget.employeeId)
         .firstOrNull;
     if (e == null) return const SizedBox.shrink();
-    final canEdit = ref.watch(moduleAccessProvider('Employees')).edit;
-    final active = e.loginActive;
-    final color = active ? AppColors.positive : AppColors.textHint;
+    // Logins are managed by admins, never by an employee login.
+    final canEdit =
+        Session.role != UserRole.employee &&
+        ref.watch(moduleAccessProvider('Employees')).edit;
+    final hasEmail = (e.email ?? '').trim().isNotEmpty;
+    final failed = e.loginActive && e.setupEmailError != null;
+    final (IconData icon, Color color, String status) = !e.loginActive
+        ? (
+            Icons.no_accounts,
+            AppColors.textHint,
+            e.loginEmail != null
+                ? 'Access removed (${e.loginEmail})'
+                : 'No login yet',
+          )
+        : failed
+        ? (
+            Icons.error_outline_rounded,
+            AppColors.dangerFill,
+            'Setup email to ${e.loginEmail} failed: ${e.setupEmailError}',
+          )
+        : e.loginPending
+        ? (
+            Icons.mark_email_read_outlined,
+            AppColors.brandDeep,
+            'Setup email sent to ${e.loginEmail}'
+                '${e.setupEmailSentAt == null ? '' : ' on ${DateFormat('d MMM, h:mm a').format(e.setupEmailSentAt!.toLocal())}'}'
+                ' · waiting for first sign-in',
+          )
+        : (
+            Icons.verified_user_rounded,
+            AppColors.positive,
+            'Signs in as ${e.loginEmail} with their own password',
+          );
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(
+          color: failed
+              ? AppColors.dangerFill.withValues(alpha: 0.5)
+              : AppColors.border,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -46,11 +170,7 @@ class EmployeeLoginCard extends ConsumerWidget {
                   color: color.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(11),
                 ),
-                child: Icon(
-                  active ? Icons.verified_user_rounded : Icons.no_accounts,
-                  size: 19,
-                  color: color,
-                ),
+                child: Icon(icon, size: 19, color: color),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -66,13 +186,11 @@ class EmployeeLoginCard extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      active
-                          ? 'Signs in as ${e.loginEmail} · sees only their own profile and attendance'
-                          : e.loginEmail != null
-                          ? 'Access removed (${e.loginEmail})'
-                          : 'No login yet',
+                      status,
                       style: TextStyle(
-                        color: AppColors.textSecondary,
+                        color: failed
+                            ? AppColors.dangerFill
+                            : AppColors.textSecondary,
                         fontSize: 12,
                       ),
                     ),
@@ -84,30 +202,49 @@ class EmployeeLoginCard extends ConsumerWidget {
           if (canEdit) ...[
             const SizedBox(height: 12),
             if (e.status != 'Active')
-              Text(
-                'Only Active employees can sign in.',
-                style: TextStyle(color: AppColors.textHint, fontSize: 11.5),
+              _hint('Only Active employees can sign in.')
+            else if (!hasEmail)
+              _hint(
+                "Add the employee's email (Edit → Personal) — the setup email "
+                'with their temporary password goes there.',
               )
             else
               Row(
                 children: [
                   Expanded(
                     child: BrixenButton(
-                      label: active ? 'Change login' : 'Set up login',
-                      onPressed: () => _openLoginSheet(context, ref, e),
+                      label: !e.loginActive
+                          ? 'Activate login'
+                          : failed
+                          ? 'Resend setup email'
+                          : 'Send new password',
+                      isLoading: _busy,
+                      onPressed: _busy
+                          ? null
+                          : () => _activate(e, resend: e.loginActive),
                     ),
                   ),
-                  if (active) ...[
+                  if (e.loginActive) ...[
                     const SizedBox(width: 10),
                     Expanded(
                       child: BrixenButton(
                         label: 'Remove',
                         isOutlined: true,
-                        onPressed: () => _remove(context, ref, e),
+                        onPressed: _busy ? null : () => _remove(e),
                       ),
                     ),
                   ],
                 ],
+              ),
+            if (Session.role == UserRole.companyAdmin)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () =>
+                      context.push(AppRouter.employeeAccess, extra: e.id),
+                  icon: const Icon(Icons.admin_panel_settings_outlined),
+                  label: const Text('Module access'),
+                ),
               ),
           ],
         ],
@@ -115,206 +252,6 @@ class EmployeeLoginCard extends ConsumerWidget {
     );
   }
 
-  Future<void> _remove(BuildContext context, WidgetRef ref, Employee e) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (d) => AlertDialog(
-        title: const Text('Remove login?'),
-        content: Text(
-          '${e.fullName} will be signed out and can\'t sign in until you set '
-          'a login again.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(d).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(d).pop(true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    try {
-      await ref
-          .read(employeesProvider.notifier)
-          .removeLogin(
-            e.id,
-            companyId: Session.isSuperAdmin ? e.companyId : null,
-          );
-    } catch (err) {
-      if (context.mounted) _snack(context, err.toString());
-    }
-  }
-}
-
-void _snack(BuildContext context, String text, {bool error = true}) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(text),
-      backgroundColor: error ? AppColors.dangerFill : null,
-    ),
-  );
-}
-
-Future<void> _openLoginSheet(BuildContext context, WidgetRef ref, Employee e) =>
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _LoginSheet(employee: e),
-    );
-
-class _LoginSheet extends ConsumerStatefulWidget {
-  final Employee employee;
-  const _LoginSheet({required this.employee});
-
-  @override
-  ConsumerState<_LoginSheet> createState() => _LoginSheetState();
-}
-
-class _LoginSheetState extends ConsumerState<_LoginSheet> {
-  final _form = GlobalKey<FormState>();
-  late final _email = TextEditingController(
-    text: widget.employee.loginEmail ?? widget.employee.email ?? '',
-  );
-  final _password = TextEditingController();
-  bool _saving = false;
-
-  /// A password is needed to create a login; changing one may keep it.
-  bool get _hasLogin => widget.employee.loginActive;
-
-  @override
-  void dispose() {
-    _email.dispose();
-    _password.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    if (!_form.currentState!.validate()) return;
-    setState(() => _saving = true);
-    try {
-      await ref
-          .read(employeesProvider.notifier)
-          .setLogin(
-            widget.employee.id,
-            email: _email.text.trim(),
-            password: _password.text,
-            companyId: Session.isSuperAdmin ? widget.employee.companyId : null,
-          );
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      _snack(
-        context,
-        '${widget.employee.fullName} can now sign in with ${_email.text.trim()}',
-        error: false,
-      );
-    } catch (e) {
-      if (mounted) _snack(context, e.toString());
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
-        child: Form(
-          key: _form,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                _hasLogin ? 'Change login' : 'Set up login',
-                style: TextStyle(
-                  color: AppColors.ink,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${widget.employee.fullName} signs in to the app with this '
-                'email and password, and sees only their own profile and '
-                'attendance.',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12.5,
-                ),
-              ),
-              const SizedBox(height: 18),
-              BrixenTextField(
-                label: 'Login email *',
-                hint: 'name@example.com',
-                controller: _email,
-                keyboardType: TextInputType.emailAddress,
-                prefixIcon: const Icon(Icons.alternate_email_rounded),
-                validator: (v) {
-                  final s = v?.trim() ?? '';
-                  if (s.isEmpty) return 'Enter an email';
-                  if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(s)) {
-                    return 'Enter a valid email';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              BrixenTextField(
-                label: _hasLogin ? 'New password' : 'Password *',
-                hint: _hasLogin
-                    ? 'Leave empty to keep the current one'
-                    : 'At least 8 characters',
-                controller: _password,
-                isPassword: true,
-                prefixIcon: const Icon(Icons.lock_outline_rounded),
-                validator: (v) {
-                  final s = v ?? '';
-                  if (s.isEmpty) return _hasLogin ? null : 'Set a password';
-                  if (s.length < 8) return 'At least 8 characters';
-                  return null;
-                },
-              ),
-              if (_hasLogin) ...[
-                const SizedBox(height: 6),
-                Text(
-                  'A new password signs them out on every device.',
-                  style: TextStyle(color: AppColors.textHint, fontSize: 11.5),
-                ),
-              ],
-              const SizedBox(height: 20),
-              BrixenButton(
-                label: 'Save login',
-                isLoading: _saving,
-                onPressed: _saving ? null : _save,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  Widget _hint(String text) =>
+      Text(text, style: TextStyle(color: AppColors.textHint, fontSize: 11.5));
 }

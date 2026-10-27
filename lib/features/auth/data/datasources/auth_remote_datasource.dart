@@ -22,7 +22,9 @@ final _dio =
       )
       ..interceptors.add(
         LogInterceptor(
-          requestBody: true,
+          // Request bodies carry passwords (including temporary ones): never
+          // logged.
+          requestBody: false,
           responseBody: true,
           logPrint: (o) => debugPrint(o.toString()),
         ),
@@ -98,6 +100,8 @@ class AuthRemoteDatasource {
         'email': userEmail,
         'id': (user['id'] ?? '').toString(),
         'hasPin': hasPin,
+        // Signed in with an emailed temporary password: a new one first.
+        'mustChangePassword': user['must_change_password'] == true,
         if (userType != null && userType.isNotEmpty) 'userType': userType,
         if (employeeId != null && employeeId.isNotEmpty)
           'employeeId': employeeId,
@@ -155,6 +159,36 @@ class AuthRemoteDatasource {
   /// again" instead of silently landing on a dashboard where every request
   /// then fails with a confusing 401. Throws [ApiException] (statusCode
   /// 401) when the session is dead.
+  /// First sign-in with a temporary password: sets the user's own password
+  /// with the access token from that sign-in (not yet saved anywhere).
+  Future<void> setFirstPassword({
+    required String token,
+    required String temporaryPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await _dio.post(
+        ApiEndpoints.changePassword,
+        data: {
+          'currentPassword': temporaryPassword,
+          'newPassword': newPassword,
+          'confirmPassword': newPassword,
+        },
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      final msg = data is Map ? data['message']?.toString() : null;
+      final errors = data is Map && data['errors'] is List
+          ? (data['errors'] as List).join('\n')
+          : null;
+      throw ApiException(
+        msg ?? errors ?? 'Could not set the password. Please try again.',
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
   Future<void> validateSession() async {
     try {
       await _dio.get(

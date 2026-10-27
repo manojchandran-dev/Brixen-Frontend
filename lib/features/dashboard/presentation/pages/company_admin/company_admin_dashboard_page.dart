@@ -10,6 +10,7 @@ import '../../../../../shared/widgets/exact_amount.dart';
 import '../../../../../shared/widgets/skeleton.dart';
 import '../../../../customers/presentation/providers/customers_provider.dart';
 import '../../../../employees/presentation/providers/employees_provider.dart';
+import '../../../../employees/domain/entities/employee.dart';
 import '../../../../expenses/presentation/providers/expenses_provider.dart';
 import '../../../../notifications/presentation/widgets/inbox_bell.dart';
 import '../../../../permissions/presentation/providers/module_access_provider.dart';
@@ -35,7 +36,15 @@ class CompanyAdminDashboardPage extends ConsumerWidget {
     final sales = ref.watch(salesProvider);
     final expenses = ref.watch(expensesProvider);
     final customers = ref.watch(customersProvider);
-    final employees = ref.watch(employeesProvider);
+    // The staff list needs the Employees module (the server refuses it
+    // otherwise): without it the dashboard just leaves staff out.
+    final staffReady = ref.watch(moduleAccessReadyProvider);
+    final canSeeStaff = ref.watch(moduleAccessProvider('Employees')).view;
+    final employees = !staffReady
+        ? const AsyncLoading<List<Employee>>()
+        : canSeeStaff
+        ? ref.watch(employeesProvider)
+        : const AsyncData<List<Employee>>([]);
     final products = ref.watch(productsProvider);
 
     final parts = [sales, expenses, customers, employees];

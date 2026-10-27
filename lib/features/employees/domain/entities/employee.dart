@@ -78,6 +78,13 @@ class Employee {
   /// The employee's own login, if one was ever set up.
   final String? loginEmail;
   final bool loginActive;
+
+  /// Still on the emailed temporary password (hasn't signed in yet).
+  final bool loginPending;
+
+  /// When the setup email last went out, or why it failed.
+  final DateTime? setupEmailSentAt;
+  final String? setupEmailError;
   final DateTime createdAt;
 
   const Employee({
@@ -112,6 +119,9 @@ class Employee {
     this.onboardingStatus,
     this.loginEmail,
     this.loginActive = false,
+    this.loginPending = false,
+    this.setupEmailSentAt,
+    this.setupEmailError,
     required this.createdAt,
   });
 
@@ -202,6 +212,9 @@ class Employee {
       createdAt: createdAt ?? this.createdAt,
       loginEmail: loginEmail ?? this.loginEmail,
       loginActive: loginActive ?? this.loginActive,
+      loginPending: loginPending,
+      setupEmailSentAt: setupEmailSentAt,
+      setupEmailError: setupEmailError,
     );
   }
 }

@@ -1,5 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/network/api_client.dart';
+import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/services/session_service.dart';
+import '../../../auth/domain/entities/user_role.dart';
 import '../../../navigation/domain/entities/nav_module.dart';
 import '../../../navigation/presentation/providers/nav_modules_provider.dart';
 import '../../data/models/permission_model.dart';
@@ -30,21 +33,47 @@ class ModuleAccess {
   );
 }
 
-/// The signed-in company's saved grants, keyed by module id. Employees
-/// inherit their company's grants. Empty for superadmin (no restrictions).
+/// The signed-in user's grants, keyed by module id: a company admin's are
+/// the company's (set by the superadmin); an employee's are their own grant
+/// combined with the company's (set by the company admin, from
+/// `/me/permissions`). Empty for superadmin (no restrictions).
 final _myGrantsProvider = FutureProvider<Map<String, PermissionModel>>((
   ref,
 ) async {
   ref.watch(authStateProvider);
   final companyId = Session.companyId;
   if (Session.isSuperAdmin || companyId == null) return const {};
+  if (Session.role == UserRole.employee) {
+    final resp = await ref.read(dioProvider).get(ApiEndpoints.myPermissions);
+    final data = resp.data is Map ? (resp.data['data'] ?? resp.data) : resp.data;
+    final items = (data is Map ? data['items'] : data) as List? ?? const [];
+    final rows = [
+      for (final r in items)
+        PermissionModel.fromJson({
+          'id': '',
+          'company_id': companyId,
+          ...(r as Map).cast<String, dynamic>(),
+        }),
+    ];
+    return {for (final p in rows) p.moduleId: p};
+  }
   final rows = await ref
       .read(permissionsRepositoryProvider)
       .getPermissions(companyId: companyId);
   return {for (final p in rows) p.moduleId: p};
 });
 
-/// Modules a company may use without a saved permission row.
+/// Whether [moduleAccessProvider] has what it needs to answer — until then
+/// it answers "no access", so a screen can wait instead of showing that.
+final moduleAccessReadyProvider = Provider<bool>((ref) {
+  ref.watch(authStateProvider);
+  if (Session.isSuperAdmin) return true;
+  return ref.watch(_myGrantsProvider).hasValue &&
+      ref.watch(grantableModulesProvider).hasValue;
+});
+
+/// Modules a company may use without a saved permission row. Employees
+/// only ever get what's granted to them.
 const _allowedWithoutRow = {'support ticket', 'chatbot'};
 
 /// Access for a module by its name as the modules API spells it, e.g.
@@ -71,7 +100,8 @@ final moduleAccessProvider = Provider.family<ModuleAccess, String>((
   final id = _findId(tree, name);
   final g = id == null ? null : grants[id];
   if (g == null) {
-    return _allowedWithoutRow.contains(name)
+    return _allowedWithoutRow.contains(name) &&
+            Session.role != UserRole.employee
         ? ModuleAccess.full
         : ModuleAccess.none;
   }

@@ -40,6 +40,18 @@ class AuthCubit extends Cubit<AuthState> {
         email: email,
         password: password,
       );
+      // A temporary password: set a new one first. Nothing is saved, so
+      // closing the app here just means signing in with it again.
+      if (result['mustChangePassword'] == true) {
+        emit(
+          AuthPasswordChangeRequired(
+            email: (result['email'] as String?) ?? email,
+            token: result['token'] as String,
+            temporaryPassword: password,
+          ),
+        );
+        return;
+      }
       // Clear first — a fresh sign-in is always a new identity, not a
       // token refresh, so nothing from whatever account was active before
       // (e.g. mid "Add account") should merge onto this one.
@@ -74,6 +86,20 @@ class AuthCubit extends Cubit<AuthState> {
   /// Signs the active account out: revokes its refresh token on the server
   /// and forgets it in the account switcher (other saved accounts stay, and
   /// the sign-in page offers them).
+  /// After [AuthPasswordChangeRequired]: sets the user's own password, then
+  /// signs in with it (the normal path from there: PIN, then the app).
+  /// Throws (with the server's reason) if the password isn't accepted.
+  Future<void> setFirstPassword(String newPassword) async {
+    final s = state;
+    if (s is! AuthPasswordChangeRequired) return;
+    await authRemoteDatasource.setFirstPassword(
+      token: s.token,
+      temporaryPassword: s.temporaryPassword,
+      newPassword: newPassword,
+    );
+    await signIn(email: s.email, password: newPassword);
+  }
+
   Future<void> signOut() async {
     await PushTokenService.unregister();
     final email = TokenService.email;

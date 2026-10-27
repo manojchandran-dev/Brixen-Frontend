@@ -115,22 +115,13 @@ class EmployeesRemoteDatasource {
     }
   }
 
-  /// Sets up or changes the employee's own login (`PUT /employees/:id/login`).
-  /// [password] is needed when there's no login yet; null keeps the current
-  /// one.
-  Future<void> setLogin(
-    String id, {
-    required String email,
-    String? password,
-    String? companyId,
-  }) async {
+  /// Activates the employee's login, or resends it: the server emails a new
+  /// temporary password to their saved email. Throws with the server's
+  /// reason if the email couldn't be sent (the admin can try again).
+  Future<void> activateLogin(String id, {String? companyId}) async {
     try {
-      await _dio.put(
-        ApiEndpoints.employeeLogin(id),
-        data: {
-          'email': email,
-          if (password != null && password.isNotEmpty) 'password': password,
-        },
+      await _dio.post(
+        ApiEndpoints.employeeLoginActivate(id),
         queryParameters: _companyIdParam(companyId),
       );
     } on DioException catch (e) {

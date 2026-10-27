@@ -113,17 +113,23 @@ class EmployeesNotifier extends AsyncNotifier<List<Employee>> {
     return fetched;
   }
 
-  /// Sets up or changes [id]'s own login, then refreshes the employee so
-  /// its login status shows.
-  Future<Employee> setLogin(
-    String id, {
-    required String email,
-    String? password,
-    String? companyId,
-  }) async {
-    await ref
-        .read(employeesRepositoryProvider)
-        .setLogin(id, email: email, password: password, companyId: companyId);
+  /// Activates (or resends) [id]'s login — a temporary password emailed to
+  /// them — then refreshes the employee so its login status shows. If the
+  /// email failed, the status (with the reason) still refreshes, then the
+  /// error is rethrown for the admin to see.
+  Future<Employee> activateLogin(String id, {String? companyId}) async {
+    try {
+      await ref
+          .read(employeesRepositoryProvider)
+          .activateLogin(id, companyId: companyId);
+    } catch (_) {
+      try {
+        await fetchEmployeeDetail(id);
+      } catch (_) {
+        // The send error below is the one worth showing.
+      }
+      rethrow;
+    }
     return fetchEmployeeDetail(id);
   }
 

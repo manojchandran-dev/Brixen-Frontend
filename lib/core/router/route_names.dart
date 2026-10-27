@@ -33,6 +33,7 @@ class RouteNames {
   static const String products = '/dashboard/products';
   static const String inventory = '/dashboard/inventory';
   static const String attendance = '/dashboard/attendance';
+  static const String employeeAccess = '/dashboard/employee-access';
   static const String createProduct = '/dashboard/products/create';
   static const String permissions = '/dashboard/permissions';
   static const String createPermission = '/dashboard/permissions/create';

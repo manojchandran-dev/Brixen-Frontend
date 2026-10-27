@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/services/session_service.dart';
+import '../../features/auth/domain/entities/user_role.dart';
+import '../../features/permissions/presentation/providers/module_access_provider.dart';
 import '../../features/chat/presentation/pages/chat_room_page.dart';
 import '../../features/navigation/presentation/providers/nav_modules_provider.dart';
 import 'app_drawer.dart' show isChatModule;
@@ -20,6 +22,7 @@ class AppBottomNav extends ConsumerWidget {
   const AppBottomNav({super.key, required this.activeIndex, this.onTap});
 
   static String _target(int index) => switch (index) {
+    1 => AppRouter.attendance,
     2 => AppRouter.report,
     3 => AppRouter.more,
     4 => AppRouter.chat,
@@ -47,6 +50,7 @@ class AppBottomNav extends ConsumerWidget {
     final path = _path(context);
     if (path == null) return activeIndex;
     if (path == AppRouter.more) return 3;
+    if (path == AppRouter.attendance) return 1;
     if (path == AppRouter.chat || path.startsWith('${AppRouter.chat}/')) {
       return 4;
     }
@@ -79,6 +83,9 @@ class AppBottomNav extends ConsumerWidget {
     // Chat tab only for users whose menu (GET /modules) includes Chat.
     final hasChat =
         ref.watch(navModulesProvider).valueOrNull?.any(isChatModule) ?? false;
+    final showAttendance =
+        Session.role == UserRole.companyAdmin &&
+        ref.watch(moduleAccessProvider('Attendance')).view;
     // Reads AppColors' own dark-mode flag rather than Theme.of(context) —
     // this widget is passed as `bottomNavigationBar: const AppBottomNav(...)`
     // on every page, and as a const instance it doesn't reliably rebuild
@@ -113,8 +120,15 @@ class AppBottomNav extends ConsumerWidget {
             isActive: active == 0,
             onTap: () => _onTap(context, 0),
           ),
-          // Attendance module disabled for now — uncomment to re-enable.
-          // _NavBtn(icon: Icons.access_time_outlined,  activeIcon: Icons.access_time_filled_rounded,  label: 'Attendance', isActive: activeIndex == 1, onTap: () => _onTap(context, 1)),
+          // Company admins who have the Attendance module.
+          if (showAttendance)
+            _NavBtn(
+              icon: Icons.access_time_outlined,
+              activeIcon: Icons.access_time_filled_rounded,
+              label: 'Attendance',
+              isActive: active == 1,
+              onTap: () => _onTap(context, 1),
+            ),
           _NavBtn(
             icon: Icons.bar_chart_outlined,
             activeIcon: Icons.bar_chart_rounded,

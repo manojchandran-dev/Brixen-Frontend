@@ -136,6 +136,7 @@ void main() {
           productsProvider.overrideWith(_Products.new),
           employeesProvider.overrideWith(_Employees.new),
           inboxProvider.overrideWith((ref) async => const Inbox([], 0)),
+          moduleAccessReadyProvider.overrideWithValue(true),
           moduleAccessProvider.overrideWith(
             (ref, _) => const ModuleAccess(
               view: true,

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/router/app_router.dart';
 import '../../core/services/session_service.dart';
+import '../../features/auth/domain/entities/user_role.dart';
 import '../../features/navigation/domain/entities/nav_module.dart';
 import '../../features/navigation/presentation/module_visuals.dart';
 import '../../features/navigation/presentation/providers/nav_modules_provider.dart';
@@ -48,6 +49,14 @@ Iterable<NavModule> _withInventory(Iterable<NavModule> modules) sync* {
         id: 'inventory',
         name: 'Inventory',
         description: 'Stock levels and movements',
+      );
+    }
+    // Company admins grant their employees modules, right after Employees.
+    if (key(m) == 'employees' && Session.role == UserRole.companyAdmin) {
+      yield const NavModule(
+        id: 'employeeaccess',
+        name: 'Employee Access',
+        description: 'What each employee can use',
       );
     }
   }
@@ -260,6 +269,8 @@ void Function(BuildContext context) _destinationFor(NavModule module) {
       return (context) => context.go(AppRouter.masterWorkTypes);
     case 'attendance':
       return (context) => context.go(AppRouter.attendance);
+    case 'employeeaccess':
+      return (context) => context.go(AppRouter.employeeAccess);
     // No backend module row exists for these yet — the module only reaches
     // superAdmin today via the Dashboard's Quick Actions tiles
     // (welcome_dashboard_view.dart). These cases are additive/forward-

@@ -24,12 +24,7 @@ abstract class EmployeesRepository {
   });
   Future<void> deleteEmployee(String id, {String? companyId});
 
-  /// The employee's own login (see EmployeesRemoteDatasource.setLogin).
-  Future<void> setLogin(
-    String id, {
-    required String email,
-    String? password,
-    String? companyId,
-  });
+  /// The employee's own login (see EmployeesRemoteDatasource.activateLogin).
+  Future<void> activateLogin(String id, {String? companyId});
   Future<void> removeLogin(String id, {String? companyId});
 }

@@ -1,6 +1,11 @@
-import 'package:flutter/widgets.dart' show PopScope;
+import 'package:flutter/widgets.dart' show PopScope, SizedBox;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../shared/widgets/module_guard.dart';
+import '../../features/masters/domain/entities/master_type.dart'
+    show masterModuleName;
+import '../../features/auth/domain/entities/user_role.dart';
+import '../../features/employees/presentation/pages/employee_access_page.dart';
 import 'route_names.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
 import '../../features/auth/presentation/pages/sign_in_page.dart';
@@ -101,6 +106,7 @@ class AppRouter {
   static const String products = RouteNames.products;
   static const String inventory = RouteNames.inventory;
   static const String attendance = RouteNames.attendance;
+  static const String employeeAccess = RouteNames.employeeAccess;
   static const String createProduct = RouteNames.createProduct;
   static const String permissions = RouteNames.permissions;
   static const String createPermission = RouteNames.createPermission;
@@ -137,6 +143,15 @@ class AppRouter {
     assert(child.startsWith('$parent/'), '$child is not under $parent');
     return child.substring(parent.length + 1);
   }
+
+  /// [builder]'s page, shown only to a user who may view [module] — so an
+  /// address typed or saved can't open a screen the menu hides.
+  static GoRouterWidgetBuilder _guard(
+    String module,
+    GoRouterWidgetBuilder builder,
+  ) =>
+      (context, state) =>
+          ModuleGuard(module: module, child: builder(context, state));
 
   static final GoRouter router = GoRouter(
     initialLocation: splash,
@@ -189,12 +204,15 @@ class AppRouter {
           ),
           GoRoute(
             path: _sub(sales, dashboard),
-            builder: (context, state) =>
-                SalesPage(fromMasters: state.extra == 'masters'),
+            builder: _guard(
+              'Sales',
+              (context, state) =>
+                  SalesPage(fromMasters: state.extra == 'masters'),
+            ),
             routes: [
               GoRoute(
                 path: _sub(createSale, sales),
-                builder: (context, state) {
+                builder: _guard('Sales', (context, state) {
                   final extra = state.extra;
                   if (extra is Map) {
                     return CreateSalePage(
@@ -208,35 +226,41 @@ class AppRouter {
                     fromMenu: extra == 'menu',
                     fromMasters: extra == 'masters',
                   );
-                },
+                }),
               ),
             ],
           ),
           GoRoute(
             path: _sub(customers, dashboard),
-            builder: (context, state) =>
-                CustomersPage(fromMasters: state.extra == 'masters'),
+            builder: _guard(
+              'Customers',
+              (context, state) =>
+                  CustomersPage(fromMasters: state.extra == 'masters'),
+            ),
             routes: [
               GoRoute(
                 path: _sub(createCustomer, customers),
-                builder: (context, state) {
+                builder: _guard('Customers', (context, state) {
                   final extra = state.extra;
                   if (extra is Customer) {
                     return CreateCustomerPage(editCustomer: extra);
                   }
                   return CreateCustomerPage(fromMasters: extra == 'masters');
-                },
+                }),
               ),
             ],
           ),
           GoRoute(
             path: _sub(purchases, dashboard),
-            builder: (context, state) =>
-                PurchasesPage(fromMasters: state.extra == 'masters'),
+            builder: _guard(
+              'Purchases',
+              (context, state) =>
+                  PurchasesPage(fromMasters: state.extra == 'masters'),
+            ),
             routes: [
               GoRoute(
                 path: _sub(createPurchase, purchases),
-                builder: (context, state) {
+                builder: _guard('Purchases', (context, state) {
                   final extra = state.extra;
                   if (extra is Map) {
                     return CreatePurchasePage(
@@ -245,66 +269,94 @@ class AppRouter {
                     );
                   }
                   return CreatePurchasePage(fromMasters: extra == 'masters');
-                },
+                }),
               ),
             ],
           ),
           GoRoute(
             path: _sub(expenses, dashboard),
-            builder: (context, state) =>
-                ExpensesPage(fromMasters: state.extra == 'masters'),
+            builder: _guard(
+              'Expenses',
+              (context, state) =>
+                  ExpensesPage(fromMasters: state.extra == 'masters'),
+            ),
             routes: [
               GoRoute(
                 path: _sub(createExpense, expenses),
-                builder: (context, state) {
+                builder: _guard('Expenses', (context, state) {
                   final extra = state.extra;
                   if (extra is Expense) {
                     return CreateExpensePage(editExpense: extra);
                   }
                   return CreateExpensePage(fromMasters: extra == 'masters');
-                },
+                }),
               ),
             ],
           ),
           GoRoute(
             path: _sub(employees, dashboard),
-            builder: (context, state) =>
-                EmployeesPage(fromMasters: state.extra == 'masters'),
+            builder: _guard(
+              'Employees',
+              (context, state) =>
+                  EmployeesPage(fromMasters: state.extra == 'masters'),
+            ),
             routes: [
               GoRoute(
                 path: _sub(createEmployee, employees),
-                builder: (context, state) {
+                builder: _guard('Employees', (context, state) {
                   final extra = state.extra;
                   if (extra is Employee) {
                     return CreateEmployeePage(editEmployee: extra);
                   }
                   return CreateEmployeePage(fromMasters: extra == 'masters');
-                },
+                }),
               ),
             ],
           ),
           GoRoute(
+            path: _sub(employeeAccess, dashboard),
+            // Company admins only: employee logins never manage access.
+            builder: _guard(
+              'Employees',
+              (context, state) => Session.role == UserRole.employee
+                  ? const SizedBox.shrink()
+                  : EmployeeAccessPage(
+                      initialEmployeeId: state.extra as String?,
+                    ),
+            ),
+          ),
+          GoRoute(
             path: _sub(inventory, dashboard),
-            builder: (context, state) => const InventoryPage(),
+            // Stock is part of a product: the Products permission.
+            builder: _guard(
+              'Products',
+              (context, state) => const InventoryPage(),
+            ),
           ),
           GoRoute(
             path: _sub(attendance, dashboard),
-            builder: (context, state) => const AttendancePage(),
+            builder: _guard(
+              'Attendance',
+              (context, state) => const AttendancePage(),
+            ),
           ),
           GoRoute(
             path: _sub(products, dashboard),
-            builder: (context, state) =>
-                ProductsPage(fromMasters: state.extra == 'masters'),
+            builder: _guard(
+              'Products',
+              (context, state) =>
+                  ProductsPage(fromMasters: state.extra == 'masters'),
+            ),
             routes: [
               GoRoute(
                 path: _sub(createProduct, products),
-                builder: (context, state) {
+                builder: _guard('Products', (context, state) {
                   final extra = state.extra;
                   if (extra is Product) {
                     return CreateProductPage(editProduct: extra);
                   }
                   return CreateProductPage(fromMasters: extra == 'masters');
-                },
+                }),
               ),
             ],
           ),
@@ -390,38 +442,52 @@ class AppRouter {
           ),
           GoRoute(
             path: _sub(masterCompanyCategories, dashboard),
-            builder: (context, state) =>
-                const MasterCategoryPage(typeKey: 'companyCategory'),
+            builder: (context, state) => ModuleGuard(
+              module: masterModuleName('companyCategory'),
+              child: const MasterCategoryPage(typeKey: 'companyCategory'),
+            ),
           ),
           GoRoute(
             path: _sub(masterExpenseCategories, dashboard),
-            builder: (context, state) =>
-                const MasterCategoryPage(typeKey: 'expenseCategory'),
+            builder: (context, state) => ModuleGuard(
+              module: masterModuleName('expenseCategory'),
+              child: const MasterCategoryPage(typeKey: 'expenseCategory'),
+            ),
           ),
           GoRoute(
             path: _sub(masterProductCategories, dashboard),
-            builder: (context, state) =>
-                const MasterCategoryPage(typeKey: 'productCategory'),
+            builder: (context, state) => ModuleGuard(
+              module: masterModuleName('productCategory'),
+              child: const MasterCategoryPage(typeKey: 'productCategory'),
+            ),
           ),
           GoRoute(
             path: _sub(masterPurchaseCategories, dashboard),
-            builder: (context, state) =>
-                const MasterCategoryPage(typeKey: 'purchaseCategory'),
+            builder: (context, state) => ModuleGuard(
+              module: masterModuleName('purchaseCategory'),
+              child: const MasterCategoryPage(typeKey: 'purchaseCategory'),
+            ),
           ),
           GoRoute(
             path: _sub(masterUnits, dashboard),
-            builder: (context, state) =>
-                const MasterCategoryPage(typeKey: 'unit'),
+            builder: (context, state) => ModuleGuard(
+              module: masterModuleName('unit'),
+              child: const MasterCategoryPage(typeKey: 'unit'),
+            ),
           ),
           GoRoute(
             path: _sub(masterDepartments, dashboard),
-            builder: (context, state) =>
-                const MasterCategoryPage(typeKey: 'department'),
+            builder: (context, state) => ModuleGuard(
+              module: masterModuleName('department'),
+              child: const MasterCategoryPage(typeKey: 'department'),
+            ),
           ),
           GoRoute(
             path: _sub(masterWorkTypes, dashboard),
-            builder: (context, state) =>
-                const MasterCategoryPage(typeKey: 'workType'),
+            builder: (context, state) => ModuleGuard(
+              module: masterModuleName('workType'),
+              child: const MasterCategoryPage(typeKey: 'workType'),
+            ),
           ),
           GoRoute(
             path: _sub(profile, dashboard),
