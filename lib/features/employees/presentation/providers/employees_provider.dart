@@ -113,6 +113,27 @@ class EmployeesNotifier extends AsyncNotifier<List<Employee>> {
     return fetched;
   }
 
+  /// Sets up or changes [id]'s own login, then refreshes the employee so
+  /// its login status shows.
+  Future<Employee> setLogin(
+    String id, {
+    required String email,
+    String? password,
+    String? companyId,
+  }) async {
+    await ref
+        .read(employeesRepositoryProvider)
+        .setLogin(id, email: email, password: password, companyId: companyId);
+    return fetchEmployeeDetail(id);
+  }
+
+  Future<Employee> removeLogin(String id, {String? companyId}) async {
+    await ref
+        .read(employeesRepositoryProvider)
+        .removeLogin(id, companyId: companyId);
+    return fetchEmployeeDetail(id);
+  }
+
   Future<void> deleteEmployee(String id, {String? companyId}) async {
     await ref
         .read(employeesRepositoryProvider)

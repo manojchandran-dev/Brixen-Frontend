@@ -94,6 +94,7 @@ class PurchaseCategoriesRemoteDatasource implements RemoteMasterDatasource {
     required String name,
     String? description,
     String? fullForm,
+    double? rate,
     bool isActive = true,
     String? companyId,
   }) async {
@@ -121,6 +122,7 @@ class PurchaseCategoriesRemoteDatasource implements RemoteMasterDatasource {
     String? name,
     String? description,
     String? fullForm,
+    double? rate,
     bool? isActive,
   }) async {
     try {

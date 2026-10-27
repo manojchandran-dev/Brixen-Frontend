@@ -26,6 +26,7 @@ import '../../features/purchases/domain/entities/purchase.dart';
 import '../../features/expenses/presentation/pages/expenses_page.dart';
 import '../../features/expenses/presentation/pages/create_expense_page.dart';
 import '../../features/expenses/domain/entities/expense.dart';
+import '../../features/attendance/presentation/pages/attendance_page.dart';
 import '../../features/employees/presentation/pages/employees_page.dart';
 import '../../features/employees/presentation/pages/create_employee_page.dart';
 import '../../features/employees/domain/entities/employee.dart';
@@ -99,6 +100,7 @@ class AppRouter {
   static const String createEmployee = RouteNames.createEmployee;
   static const String products = RouteNames.products;
   static const String inventory = RouteNames.inventory;
+  static const String attendance = RouteNames.attendance;
   static const String createProduct = RouteNames.createProduct;
   static const String permissions = RouteNames.permissions;
   static const String createPermission = RouteNames.createPermission;
@@ -122,6 +124,8 @@ class AppRouter {
   static const String masterPurchaseCategories =
       RouteNames.masterPurchaseCategories;
   static const String masterUnits = RouteNames.masterUnits;
+  static const String masterDepartments = RouteNames.masterDepartments;
+  static const String masterWorkTypes = RouteNames.masterWorkTypes;
   static const String lockScreen = RouteNames.lockScreen;
   static const String security = RouteNames.security;
   static const String setPin = RouteNames.setPin;
@@ -284,6 +288,10 @@ class AppRouter {
             builder: (context, state) => const InventoryPage(),
           ),
           GoRoute(
+            path: _sub(attendance, dashboard),
+            builder: (context, state) => const AttendancePage(),
+          ),
+          GoRoute(
             path: _sub(products, dashboard),
             builder: (context, state) =>
                 ProductsPage(fromMasters: state.extra == 'masters'),
@@ -404,6 +412,16 @@ class AppRouter {
             path: _sub(masterUnits, dashboard),
             builder: (context, state) =>
                 const MasterCategoryPage(typeKey: 'unit'),
+          ),
+          GoRoute(
+            path: _sub(masterDepartments, dashboard),
+            builder: (context, state) =>
+                const MasterCategoryPage(typeKey: 'department'),
+          ),
+          GoRoute(
+            path: _sub(masterWorkTypes, dashboard),
+            builder: (context, state) =>
+                const MasterCategoryPage(typeKey: 'workType'),
           ),
           GoRoute(
             path: _sub(profile, dashboard),

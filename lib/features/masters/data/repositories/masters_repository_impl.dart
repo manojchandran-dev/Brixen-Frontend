@@ -41,6 +41,7 @@ class MastersRepositoryImpl implements MastersRepository {
     required String name,
     String? description,
     String? fullForm,
+    double? rate,
     bool isActive = true,
     String? companyId,
   }) {
@@ -52,6 +53,7 @@ class MastersRepositoryImpl implements MastersRepository {
       name: name,
       description: description,
       fullForm: fullForm,
+      rate: rate,
       isActive: isActive,
       companyId: companyId,
     );
@@ -64,6 +66,7 @@ class MastersRepositoryImpl implements MastersRepository {
     String? name,
     String? description,
     String? fullForm,
+    double? rate,
     bool? isActive,
   }) {
     final remote = _remoteFor(typeKey);
@@ -75,6 +78,7 @@ class MastersRepositoryImpl implements MastersRepository {
       name: name,
       description: description,
       fullForm: fullForm,
+      rate: rate,
       isActive: isActive,
     );
   }

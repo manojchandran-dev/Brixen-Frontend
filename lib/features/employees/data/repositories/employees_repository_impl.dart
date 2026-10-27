@@ -48,4 +48,17 @@ class EmployeesRepositoryImpl implements EmployeesRepository {
   @override
   Future<void> deleteEmployee(String id, {String? companyId}) =>
       _ds.deleteEmployee(id, companyId: companyId);
+
+  @override
+  Future<void> setLogin(
+    String id, {
+    required String email,
+    String? password,
+    String? companyId,
+  }) =>
+      _ds.setLogin(id, email: email, password: password, companyId: companyId);
+
+  @override
+  Future<void> removeLogin(String id, {String? companyId}) =>
+      _ds.removeLogin(id, companyId: companyId);
 }

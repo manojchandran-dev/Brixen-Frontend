@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/session_service.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/money.dart';
 import '../../../../shared/widgets/brixen_button.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
@@ -432,6 +433,8 @@ class MasterDetailSheet extends StatelessWidget {
     final details = <MapEntry<String, String>>[
       if (item.fullForm != null && item.fullForm!.isNotEmpty)
         MapEntry('Full Form', item.fullForm!),
+      if (item.rate != null)
+        MapEntry('Rate per piece', rupeesExact(item.rate!)),
       if (item.assignedCategoryName != null)
         MapEntry('Category', item.assignedCategoryName!),
       if (item.description != null && item.description!.isNotEmpty)
@@ -641,6 +644,15 @@ class MasterCard extends StatelessWidget {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
+                      if (item.rate != null)
+                        Text(
+                          '${rupeesExact(item.rate!)} per piece',
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       if (item.assignedCategoryName != null)
                         Row(
                           children: [
@@ -716,6 +728,7 @@ class _MasterFormBodyState extends State<MasterFormBody> {
   final _nameCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _fullFormCtrl = TextEditingController(); // Unit type only
+  final _rateCtrl = TextEditingController(); // Work Type only
   bool _isActive = true;
   bool _saving = false;
   bool _loadingItem = false;
@@ -734,6 +747,8 @@ class _MasterFormBodyState extends State<MasterFormBody> {
       masterTypeFor(widget.typeKey)?.hasParentAssignment ?? false;
   bool get _isRemote => masterCubit.isRemote(widget.typeKey);
   bool get _isUnit => widget.typeKey == 'unit';
+  bool get _hasRate => widget.typeKey == 'workType';
+  double? get _rate => double.tryParse(_rateCtrl.text.trim());
 
   @override
   void initState() {
@@ -766,6 +781,11 @@ class _MasterFormBodyState extends State<MasterFormBody> {
     _nameCtrl.text = item.name;
     _descCtrl.text = item.description ?? '';
     _fullFormCtrl.text = item.fullForm ?? '';
+    if (item.rate != null) {
+      _rateCtrl.text = item.rate! % 1 == 0
+          ? item.rate!.toStringAsFixed(0)
+          : item.rate!.toStringAsFixed(2);
+    }
     _isActive = item.isActive;
     _selectedCategoryId = item.assignedCategoryId;
     _selectedCategoryName = item.assignedCategoryName;
@@ -792,6 +812,7 @@ class _MasterFormBodyState extends State<MasterFormBody> {
     _nameCtrl.dispose();
     _descCtrl.dispose();
     _fullFormCtrl.dispose();
+    _rateCtrl.dispose();
     super.dispose();
   }
 
@@ -832,6 +853,7 @@ class _MasterFormBodyState extends State<MasterFormBody> {
             fullForm: _isUnit && _fullFormCtrl.text.trim().isNotEmpty
                 ? _fullFormCtrl.text.trim()
                 : null,
+            rate: _hasRate ? _rate : null,
           ),
         );
       } else {
@@ -848,6 +870,7 @@ class _MasterFormBodyState extends State<MasterFormBody> {
             fullForm: _isUnit && _fullFormCtrl.text.trim().isNotEmpty
                 ? _fullFormCtrl.text.trim()
                 : null,
+            rate: _hasRate ? _rate : null,
             assignedCategoryId: _selectedCategoryId,
             assignedCategoryName: _selectedCategoryName,
           ),
@@ -939,6 +962,24 @@ class _MasterFormBodyState extends State<MasterFormBody> {
                         (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
                   const SizedBox(height: 18),
+                  if (_hasRate) ...[
+                    BrixenTextField(
+                      label: 'Rate per piece *',
+                      hint: 'e.g. 200',
+                      controller: _rateCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      prefixIcon: const Icon(Icons.currency_rupee_rounded),
+                      validator: (v) {
+                        final n = double.tryParse(v?.trim() ?? '');
+                        if (n == null) return 'Enter the rate per piece';
+                        if (n <= 0) return 'Rate must be more than 0';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 18),
+                  ],
                   if (_needsCategory) ...[
                     MasterCategoryDropdown(
                       categories: categories,

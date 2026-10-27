@@ -91,6 +91,7 @@ class CompanyCategoriesRemoteDatasource implements RemoteMasterDatasource {
     required String name,
     String? description,
     String? fullForm,
+    double? rate,
     bool isActive = true,
     String? companyId, // unused: company categories are global
   }) async {
@@ -117,6 +118,7 @@ class CompanyCategoriesRemoteDatasource implements RemoteMasterDatasource {
     String? name,
     String? description,
     String? fullForm,
+    double? rate,
     bool? isActive,
   }) async {
     try {

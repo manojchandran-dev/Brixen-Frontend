@@ -18,6 +18,8 @@ String? _deletedListPath(String typeKey) => switch (typeKey) {
   'productCategory' => ApiEndpoints.productCategories,
   'purchaseCategory' => ApiEndpoints.purchaseCategories,
   'unit' => ApiEndpoints.units,
+  'department' => ApiEndpoints.departments,
+  'workType' => ApiEndpoints.workTypes,
   _ => null,
 };
 

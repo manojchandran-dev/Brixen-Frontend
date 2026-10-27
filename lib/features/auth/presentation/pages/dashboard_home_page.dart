@@ -4,7 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/theme_cubit.dart';
 import '../../../../shared/widgets/app_shell.dart';
 import '../../../dashboard/presentation/pages/company_admin/company_admin_dashboard_page.dart';
-import '../../../dashboard/presentation/pages/employee/employee_dashboard_page.dart';
+import '../../../attendance/presentation/pages/my_work_page.dart';
 import '../../../dashboard/presentation/pages/superadmin/superadmin_dashboard_page.dart';
 import '../../domain/entities/user_role.dart';
 import '../../../../core/services/session_service.dart';
@@ -49,7 +49,10 @@ class _DashboardHomePageState extends State<DashboardHomePage> {
 
   void _comingSoon(BuildContext context, String label) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$label — coming soon'), backgroundColor: AppColors.dangerFill),
+      SnackBar(
+        content: Text('$label — coming soon'),
+        backgroundColor: AppColors.dangerFill,
+      ),
     );
   }
 
@@ -59,8 +62,11 @@ class _DashboardHomePageState extends State<DashboardHomePage> {
       activeIndex: 0,
       body: switch (Session.role) {
         UserRole.superAdmin => const SuperadminDashboardPage(),
-        UserRole.companyAdmin => CompanyAdminDashboardPage(onIconTap: (l) => _comingSoon(context, l)),
-        UserRole.employee => EmployeeDashboardPage(onIconTap: (l) => _comingSoon(context, l)),
+        UserRole.companyAdmin => CompanyAdminDashboardPage(
+          onIconTap: (l) => _comingSoon(context, l),
+        ),
+        // An employee's own profile and attendance.
+        UserRole.employee => const MyWorkPage(),
       },
     );
   }

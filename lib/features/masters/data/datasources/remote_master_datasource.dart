@@ -20,6 +20,7 @@ abstract class RemoteMasterDatasource {
     required String name,
     String? description,
     String? fullForm,
+    double? rate,
     bool isActive = true,
     String? companyId,
   });
@@ -29,6 +30,7 @@ abstract class RemoteMasterDatasource {
     String? name,
     String? description,
     String? fullForm,
+    double? rate,
     bool? isActive,
   });
 

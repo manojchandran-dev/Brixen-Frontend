@@ -18,6 +18,7 @@ abstract class MastersRepository {
     required String name,
     String? description,
     String? fullForm,
+    double? rate,
     bool isActive = true,
     String? companyId,
   });
@@ -27,6 +28,7 @@ abstract class MastersRepository {
     String? name,
     String? description,
     String? fullForm,
+    double? rate,
     bool? isActive,
   });
   Future<void> delete(String typeKey, String id);

@@ -32,6 +32,7 @@ class RouteNames {
   static const String createEmployee = '/dashboard/employees/create';
   static const String products = '/dashboard/products';
   static const String inventory = '/dashboard/inventory';
+  static const String attendance = '/dashboard/attendance';
   static const String createProduct = '/dashboard/products/create';
   static const String permissions = '/dashboard/permissions';
   static const String createPermission = '/dashboard/permissions/create';
@@ -56,6 +57,8 @@ class RouteNames {
   static const String masterPurchaseCategories =
       '/dashboard/masters/purchase-categories';
   static const String masterUnits = '/dashboard/masters/units';
+  static const String masterDepartments = '/dashboard/masters/departments';
+  static const String masterWorkTypes = '/dashboard/masters/work-types';
   static const String lockScreen = '/lock';
   static const String security = '/dashboard/security';
   static const String setPin = '/dashboard/security/set-pin';

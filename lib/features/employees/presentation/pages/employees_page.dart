@@ -22,6 +22,7 @@ import '../../domain/entities/employee.dart';
 import '../../../../shared/widgets/chip_filter_sheet.dart';
 import '../../../../shared/widgets/search_field.dart';
 import '../providers/employees_provider.dart';
+import '../widgets/employee_login_card.dart';
 import '../../../../shared/widgets/list_count_bar.dart';
 import '../../../../shared/widgets/module_title.dart';
 
@@ -933,6 +934,13 @@ void _showEmployeeDetail(
                 label: 'Employment Type',
                 value: employee.employmentType!,
               ),
+            if (employee.salaryType != null || employee.salary != null)
+              DetailRow(
+                icon: Icons.payments_outlined,
+                label: 'Salary',
+                value: employee.salarySummary,
+                iconColor: AppColors.positive,
+              ),
             if (employee.joiningDate != null)
               DetailRow(
                 icon: Icons.calendar_today_rounded,
@@ -942,6 +950,7 @@ void _showEmployeeDetail(
               ),
           ],
         ),
+        EmployeeLoginCard(employeeId: employee.id),
         DetailSection(
           title: 'Contact',
           items: [

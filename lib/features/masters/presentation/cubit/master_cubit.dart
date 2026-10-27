@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/datasources/company_categories_remote_datasource.dart';
+import '../../data/datasources/company_masters_remote_datasource.dart';
 import '../../data/datasources/expense_categories_remote_datasource.dart';
 import '../../data/datasources/product_categories_remote_datasource.dart';
 import '../../data/datasources/purchase_categories_remote_datasource.dart';
@@ -20,6 +21,8 @@ final Map<String, RemoteMasterDatasource> _remoteDatasources = {
   'productCategory': productCategoriesRemoteDatasource,
   'purchaseCategory': purchaseCategoriesRemoteDatasource,
   'unit': unitsRemoteDatasource,
+  'department': departmentsRemoteDatasource,
+  'workType': workTypesRemoteDatasource,
 };
 
 final masterCubit = MasterCubit(MastersRepositoryImpl(_remoteDatasources));
@@ -92,6 +95,7 @@ class MasterCubit extends Cubit<MasterState> {
         name: item.name,
         description: item.description,
         fullForm: item.fullForm,
+        rate: item.rate,
         isActive: item.isActive,
         companyId: companyId,
       );
@@ -112,6 +116,7 @@ class MasterCubit extends Cubit<MasterState> {
         name: updated.name,
         description: updated.description,
         fullForm: updated.fullForm,
+        rate: updated.rate,
         isActive: updated.isActive,
       );
       final list = _store[updated.typeKey];

@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../network/api_client.dart' show mapDioError, CompanyScopeInterceptor;
 import '../network/api_endpoints.dart';
+import 'session_service.dart';
+import '../../features/auth/domain/entities/user_role.dart';
 import '../network/token_refresh_interceptor.dart';
 import '../router/app_router.dart';
 import '../router/route_names.dart';
@@ -188,6 +190,8 @@ class PushTokenService {
 
   /// Call after every successful sign-in, account switch, and auto-login.
   static Future<void> register() async {
+    // Company pushes go to admins; an employee login has no inbox.
+    if (Session.role == UserRole.employee) return;
     try {
       final settings = await FirebaseMessaging.instance.requestPermission();
       debugPrint(

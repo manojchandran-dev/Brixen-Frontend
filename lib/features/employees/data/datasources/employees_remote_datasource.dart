@@ -115,6 +115,41 @@ class EmployeesRemoteDatasource {
     }
   }
 
+  /// Sets up or changes the employee's own login (`PUT /employees/:id/login`).
+  /// [password] is needed when there's no login yet; null keeps the current
+  /// one.
+  Future<void> setLogin(
+    String id, {
+    required String email,
+    String? password,
+    String? companyId,
+  }) async {
+    try {
+      await _dio.put(
+        ApiEndpoints.employeeLogin(id),
+        data: {
+          'email': email,
+          if (password != null && password.isNotEmpty) 'password': password,
+        },
+        queryParameters: _companyIdParam(companyId),
+      );
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
+  /// Removes the employee's login; they're signed out everywhere.
+  Future<void> removeLogin(String id, {String? companyId}) async {
+    try {
+      await _dio.delete(
+        ApiEndpoints.employeeLogin(id),
+        queryParameters: _companyIdParam(companyId),
+      );
+    } on DioException catch (e) {
+      throw mapDioError(e);
+    }
+  }
+
   Map<String, dynamic>? _companyIdParam(String? companyId) =>
       companyId != null ? {'company_id': companyId} : null;
 }

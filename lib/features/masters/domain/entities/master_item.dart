@@ -12,6 +12,8 @@ class MasterItem extends Equatable {
   final String? assignedCategoryName;
   // Unit type only: e.g. name="pcs", fullForm="Pieces", description="Number of garments"
   final String? fullForm;
+  // Work Type only: the rate paid per piece.
+  final double? rate;
 
   const MasterItem({
     required this.id,
@@ -23,6 +25,7 @@ class MasterItem extends Equatable {
     this.assignedCategoryId,
     this.assignedCategoryName,
     this.fullForm,
+    this.rate,
   });
 
   MasterItem copyWith({
@@ -32,6 +35,7 @@ class MasterItem extends Equatable {
     String? assignedCategoryId,
     String? assignedCategoryName,
     String? fullForm,
+    double? rate,
   }) => MasterItem(
     id: id,
     typeKey: typeKey,
@@ -42,6 +46,7 @@ class MasterItem extends Equatable {
     assignedCategoryId: assignedCategoryId ?? this.assignedCategoryId,
     assignedCategoryName: assignedCategoryName ?? this.assignedCategoryName,
     fullForm: fullForm ?? this.fullForm,
+    rate: rate ?? this.rate,
   );
 
   @override
@@ -52,6 +57,7 @@ class MasterItem extends Equatable {
     isActive,
     createdAt,
     assignedCategoryId,
+    rate,
   ];
 
   /// Human-readable reference code shown in the UI.
@@ -71,6 +77,10 @@ class MasterItem extends Equatable {
         return id;
       case 'purchaseCategory':
         // Backend id is already the formatted code, e.g. "PUCAT65618502479".
+        return id;
+      case 'department':
+      case 'workType':
+        // Server-made code, e.g. "DEPT123456789012", "WTYP123456789012".
         return id;
       case 'unit':
         // Backend id is already the formatted code, e.g. "UNIT533111998460".

@@ -39,6 +39,8 @@ const kMasterTypes = <MasterTypeConfig>[
     Icons.shopping_basket_outlined,
   ),
   MasterTypeConfig('unit', 'Unit', Icons.straighten_outlined),
+  MasterTypeConfig('department', 'Department', Icons.apartment_outlined),
+  MasterTypeConfig('workType', 'Work Type', Icons.content_cut_rounded),
 ];
 
 /// This type's module name in the modules API, for access checks — only

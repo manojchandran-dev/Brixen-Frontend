@@ -29,6 +29,17 @@ class ApiEndpoints {
   static const String productCategories = '/api/v1/product-categories';
   static const String purchaseCategories = '/api/v1/purchase-categories';
   static const String employees = '/api/v1/employees';
+  static String employeeLogin(String id) => '/api/v1/employees/$id/login';
+  static const String departments = '/api/v1/departments';
+  static String departmentById(String id) => '/api/v1/departments/$id';
+  static const String workTypes = '/api/v1/work-types';
+  static String workTypeById(String id) => '/api/v1/work-types/$id';
+  static const String attendance = '/api/v1/attendance';
+  static const String attendanceMeta = '/api/v1/attendance/meta';
+  static String attendanceById(String id) => '/api/v1/attendance/$id';
+  // An employee login's own data.
+  static const String myEmployee = '/api/v1/me/employee';
+  static const String myAttendance = '/api/v1/me/attendance';
   static const String units = '/api/v1/units';
   static const String expenses = '/api/v1/expenses';
   static const String customers = '/api/v1/customers';

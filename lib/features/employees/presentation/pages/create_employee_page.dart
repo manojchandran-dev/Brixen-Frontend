@@ -11,6 +11,8 @@ import '../../../../shared/widgets/brixen_dropdown.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
 import '../../../../shared/widgets/company_selector_field.dart';
 import '../../../companies/domain/entities/company.dart';
+import '../../../masters/domain/entities/master_item.dart';
+import '../../../masters/presentation/cubit/master_cubit.dart';
 import '../../domain/entities/employee.dart';
 import '../providers/employees_provider.dart';
 
@@ -51,7 +53,9 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
   DateTime? _dateOfBirth;
 
   // Step 2 — Employment Info
-  final _departmentCtrl = TextEditingController();
+  String? _departmentId; // from the Department master
+  String? _salaryType; // SalaryType.shift / SalaryType.piece
+  String? _salaryPeriod;
   final _designationCtrl = TextEditingController();
   final _salaryCtrl = TextEditingController();
   DateTime? _joiningDate;
@@ -94,6 +98,10 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
   @override
   void initState() {
     super.initState();
+    // Departments for step 2's picker.
+    masterCubit.ensureLoaded('department').then((_) {
+      if (mounted) setState(() {});
+    }, onError: (_) {});
     final e = widget.editEmployee;
     if (e != null) {
       _employeeId = e.id;
@@ -104,7 +112,9 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
       _addressCtrl.text = e.address ?? '';
       _gender = e.gender;
       _dateOfBirth = e.dateOfBirth;
-      _departmentCtrl.text = e.department ?? '';
+      _departmentId = e.departmentId;
+      _salaryType = e.salaryType;
+      _salaryPeriod = e.salaryPeriod;
       _designationCtrl.text = e.designation ?? '';
       _salaryCtrl.text = e.salary?.toStringAsFixed(2) ?? '';
       _joiningDate = e.joiningDate;
@@ -134,7 +144,6 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
     _addressCtrl.dispose();
-    _departmentCtrl.dispose();
     _designationCtrl.dispose();
     _salaryCtrl.dispose();
     _panCtrl.dispose();
@@ -156,6 +165,26 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
   void _back() {
     if (_currentStep > 0) setState(() => _currentStep--);
   }
+
+  /// What step 2 still needs before it can be saved (pickers, which a form
+  /// validator can't cover), or null.
+  String? _employmentProblem() {
+    if (_departmentId == null) return 'Pick a department';
+    if (_salaryType == null) {
+      return 'Pick a salary type: Shift Rate or Piece Rate';
+    }
+    if (_salaryType == SalaryType.shift &&
+        !SalaryType.periodsFor(SalaryType.shift).contains(_salaryPeriod)) {
+      return 'Pick how the shift rate is paid: Monthly, Weekly, Daily or Hourly';
+    }
+    return null;
+  }
+
+  /// Active departments, plus this employee's own even if made inactive.
+  List<MasterItem> get _departments => [
+    for (final d in masterCubit.allItemsOfType('department'))
+      if (d.isActive || d.id == _departmentId) d,
+  ];
 
   Future<void> _handleNext() async {
     if (_currentFormKey != null && !_currentFormKey!.currentState!.validate())
@@ -243,13 +272,25 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
           }
           setState(() => _currentStep = 1);
         case 1:
+          final problem = _employmentProblem();
+          if (problem != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(problem),
+                backgroundColor: AppColors.dangerFill,
+              ),
+            );
+            return;
+          }
           final employment = Employee(
             id: _employeeId!,
             employeeCode: '',
             firstName: '',
-            department: _departmentCtrl.text.trim().isEmpty
-                ? null
-                : _departmentCtrl.text.trim(),
+            departmentId: _departmentId,
+            salaryType: _salaryType,
+            salaryPeriod: _salaryType == SalaryType.piece
+                ? 'PER_PIECE'
+                : _salaryPeriod,
             designation: _designationCtrl.text.trim().isEmpty
                 ? null
                 : _designationCtrl.text.trim(),
@@ -518,7 +559,19 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
       case 1:
         return _Step2(
           formKey: _step2Key,
-          departmentCtrl: _departmentCtrl,
+          departments: _departments,
+          departmentId: _departmentId,
+          onDepartmentChanged: (d) => setState(() => _departmentId = d?.id),
+          salaryType: _salaryType,
+          onSalaryTypeChanged: (t) => setState(() {
+            _salaryType = t;
+            // Keep the period only if it fits the new type.
+            if (!SalaryType.periodsFor(t).contains(_salaryPeriod)) {
+              _salaryPeriod = t == SalaryType.piece ? 'PER_PIECE' : null;
+            }
+          }),
+          salaryPeriod: _salaryPeriod,
+          onSalaryPeriodChanged: (p) => setState(() => _salaryPeriod = p),
           designationCtrl: _designationCtrl,
           salaryCtrl: _salaryCtrl,
           joiningDate: _joiningDate,
@@ -559,9 +612,7 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
             'Designation': r?.designation ?? '—',
             'Employment Type': r?.employmentType ?? '—',
             'Manager': r?.managerName ?? '—',
-            'Salary': r?.salary == null
-                ? '—'
-                : '₹${r!.salary!.toStringAsFixed(2)}',
+            'Salary': r?.salarySummary ?? '—',
             'Status': r?.status ?? '—',
             'Bank': r?.bankName ?? '—',
             'Account No.': r?.accountNumber ?? '—',
@@ -865,7 +916,14 @@ class _Step1 extends StatelessWidget {
 
 class _Step2 extends StatelessWidget {
   final GlobalKey<FormState> formKey;
-  final TextEditingController departmentCtrl, designationCtrl, salaryCtrl;
+  final List<MasterItem> departments;
+  final String? departmentId;
+  final void Function(MasterItem?) onDepartmentChanged;
+  final String? salaryType;
+  final void Function(String) onSalaryTypeChanged;
+  final String? salaryPeriod;
+  final void Function(String?) onSalaryPeriodChanged;
+  final TextEditingController designationCtrl, salaryCtrl;
   final DateTime? joiningDate;
   final void Function(DateTime?) onJoiningDateChanged;
   final String? employmentType;
@@ -880,7 +938,13 @@ class _Step2 extends StatelessWidget {
 
   const _Step2({
     required this.formKey,
-    required this.departmentCtrl,
+    required this.departments,
+    required this.departmentId,
+    required this.onDepartmentChanged,
+    required this.salaryType,
+    required this.onSalaryTypeChanged,
+    required this.salaryPeriod,
+    required this.onSalaryPeriodChanged,
     required this.designationCtrl,
     required this.salaryCtrl,
     required this.joiningDate,
@@ -898,22 +962,43 @@ class _Step2 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final label = TextStyle(
+      color: cs.onSurfaceVariant,
+      fontSize: 12,
+      fontWeight: FontWeight.w500,
+    );
+    final hint = TextStyle(
+      color: cs.onSurfaceVariant.withValues(alpha: 0.75),
+      fontSize: 11.5,
+    );
+    final isShift = salaryType == SalaryType.shift;
+    final isPiece = salaryType == SalaryType.piece;
     return Form(
       key: formKey,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
         children: [
-          BrixenTextField(
-            label: 'Department',
-            hint: 'e.g. Engineering',
-            controller: departmentCtrl,
-            textInputAction: TextInputAction.next,
-            prefixIcon: const Icon(Icons.apartment_outlined),
+          BrixenDropdown<MasterItem>(
+            hint: 'Department *',
+            value: departments.where((d) => d.id == departmentId).firstOrNull,
+            items: departments,
+            labelOf: (d) => d.isActive ? d.name : '${d.name} (inactive)',
+            subtitleOf: (d) => d.id,
+            icon: Icons.apartment_outlined,
+            onChanged: onDepartmentChanged,
           ),
+          if (departments.isEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              'No departments yet — add them in Masters → Department.',
+              style: hint,
+            ),
+          ],
           const SizedBox(height: 22),
           BrixenTextField(
             label: 'Designation',
-            hint: 'e.g. Software Engineer',
+            hint: 'e.g. Tailor',
             controller: designationCtrl,
             textInputAction: TextInputAction.next,
             prefixIcon: const Icon(Icons.badge_outlined),
@@ -947,23 +1032,91 @@ class _Step2 extends StatelessWidget {
             ),
             const SizedBox(height: 22),
           ],
-          BrixenTextField(
-            label: 'Salary',
-            hint: '0.00',
-            controller: salaryCtrl,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textInputAction: TextInputAction.next,
-            prefixIcon: const Icon(Icons.currency_rupee_rounded),
+          Text('Salary type *', style: label),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _SalaryTypeCard(
+                  title: 'Shift Rate',
+                  subtitle: 'Paid per shift worked',
+                  icon: Icons.schedule_rounded,
+                  selected: isShift,
+                  onTap: () => onSalaryTypeChanged(SalaryType.shift),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _SalaryTypeCard(
+                  title: 'Piece Rate',
+                  subtitle: 'Paid per piece made',
+                  icon: Icons.content_cut_rounded,
+                  selected: isPiece,
+                  onTap: () => onSalaryTypeChanged(SalaryType.piece),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 22),
-          Text(
-            'Status',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+          if (isShift) ...[
+            BrixenDropdown<String>(
+              hint: 'Salary period *',
+              value: SalaryType.periodsFor(
+                SalaryType.shift,
+              ).where((p) => p == salaryPeriod).firstOrNull,
+              items: SalaryType.periodsFor(SalaryType.shift),
+              labelOf: SalaryType.periodLabel,
+              icon: Icons.event_repeat_rounded,
+              onChanged: onSalaryPeriodChanged,
             ),
-          ),
+            const SizedBox(height: 22),
+            BrixenTextField(
+              label: salaryPeriod == null
+                  ? 'Salary amount *'
+                  : 'Salary amount ${SalaryType.perLabel(salaryPeriod)} *',
+              hint: '0.00',
+              controller: salaryCtrl,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              textInputAction: TextInputAction.next,
+              prefixIcon: const Icon(Icons.currency_rupee_rounded),
+              validator: (v) {
+                final n = double.tryParse(v?.trim() ?? '');
+                if (n == null) return 'Enter the salary amount';
+                if (n <= 0) return 'Must be more than 0';
+                return null;
+              },
+            ),
+            const SizedBox(height: 6),
+            Text(
+              salaryPeriod == 'DAILY'
+                  ? 'One full shift = one day. Attendance shows each day\'s pay.'
+                  : 'Attendance records shifts (1/4 to 3 a shift, up to 3 a day).',
+              style: hint,
+            ),
+            const SizedBox(height: 22),
+          ],
+          if (isPiece) ...[
+            InputDecorator(
+              decoration: InputDecoration(
+                labelText: 'Salary period',
+                prefixIcon: const Icon(Icons.event_repeat_rounded),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: const Text('Per Piece'),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Paid by each work type\'s rate (Masters → Work Type) × pieces '
+              'done. No separate amount.',
+              style: hint,
+            ),
+            const SizedBox(height: 22),
+          ],
+          Text('Status', style: label),
           const SizedBox(height: 8),
           Row(
             children: statuses.map((s) {
@@ -982,6 +1135,75 @@ class _Step2 extends StatelessWidget {
           ),
           const SizedBox(height: 22),
         ],
+      ),
+    );
+  }
+}
+
+/// One salary type to pick: icon, name, one line on how it's paid.
+class _SalaryTypeCard extends StatelessWidget {
+  final String title, subtitle;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+  const _SalaryTypeCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected
+          ? AppColors.brand.withValues(alpha: 0.12)
+          : AppColors.surface,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? AppColors.brand : AppColors.border,
+              width: selected ? 1.6 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                selected ? Icons.check_circle_rounded : icon,
+                size: 22,
+                color: selected ? AppColors.brand : AppColors.textHint,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(color: AppColors.textHint, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

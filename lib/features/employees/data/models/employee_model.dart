@@ -14,10 +14,13 @@ class EmployeeModel extends Employee {
     super.address,
     super.joiningDate,
     super.department,
+    super.departmentId,
     super.designation,
     super.managerId,
     super.managerName,
     super.employmentType,
+    super.salaryType,
+    super.salaryPeriod,
     super.salary,
     super.panNumber,
     super.aadhaarNumber,
@@ -28,6 +31,8 @@ class EmployeeModel extends Employee {
     super.emergencyContactPhone,
     super.status = 'Active',
     super.onboardingStatus,
+    super.loginEmail,
+    super.loginActive,
     required super.createdAt,
   });
 
@@ -45,11 +50,17 @@ class EmployeeModel extends Employee {
       phone: json['phone'],
       address: json['address'],
       joiningDate: _parseDate(json['joining_date'] ?? json['joiningDate']),
-      department: json['department'],
+      // The Department master's name when set, else older free text.
+      department:
+          (json['departments'] is Map ? json['departments']['name'] : null) ??
+          json['department'],
+      departmentId: json['department_id']?.toString(),
       designation: json['designation'],
       managerId: (json['manager_id'] ?? json['managerId'])?.toString(),
       managerName: json['manager_name'] ?? json['managerName'],
       employmentType: json['employment_type'] ?? json['employmentType'],
+      salaryType: json['salary_type']?.toString(),
+      salaryPeriod: json['salary_period']?.toString(),
       salary: json['salary'] != null
           ? double.tryParse(json['salary'].toString())
           : null,
@@ -63,6 +74,11 @@ class EmployeeModel extends Employee {
       emergencyContactPhone:
           json['emergency_contact_phone'] ?? json['emergencyContactPhone'],
       status: (json['status'] ?? 'Active').toString(),
+      // users = the employee's login row; deleted_at set = access removed.
+      loginEmail: json['users'] is Map
+          ? json['users']['email']?.toString()
+          : null,
+      loginActive: json['users'] is Map && json['users']['deleted_at'] == null,
       onboardingStatus: json['onboarding_status'] ?? json['onboardingStatus'],
       createdAt: (json['created_at'] ?? json['createdAt']) != null
           ? DateTime.tryParse(
@@ -97,14 +113,16 @@ class EmployeeModel extends Employee {
 
   /// Step 2 (Employment) — PUT /employees/:id/step2.
   static Map<String, dynamic> toStep2Body(Employee e) => {
-    if (e.department != null && e.department!.isNotEmpty)
-      'department': e.department,
+    'department_id': e.departmentId,
+    'salary_type': e.salaryType,
+    'salary_period': e.salaryPeriod,
+    // Piece rate has no amount of its own: null clears an old one.
+    'salary': e.salaryType == SalaryType.piece ? null : e.salary,
     if (e.designation != null && e.designation!.isNotEmpty)
       'designation': e.designation,
     if (e.joiningDate != null) 'joining_date': e.joiningDate!.toIso8601String(),
     if (e.managerId != null) 'manager_id': e.managerId,
     if (e.employmentType != null) 'employment_type': e.employmentType,
-    if (e.salary != null) 'salary': e.salary,
     'status': e.status,
   };
 
