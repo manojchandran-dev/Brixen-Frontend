@@ -20,9 +20,13 @@ import '../attendance_providers.dart';
 import '../widgets/attendance_card.dart';
 import 'attendance_form_page.dart';
 
-/// Company admins record and review attendance, one day at a time (the
-/// company's own date, in its time zone). Search by name or code, filter
-/// shift or piece workers, and see the day's totals.
+final _ymd = DateFormat('yyyy-MM-dd');
+final _ym = DateFormat('yyyy-MM');
+
+/// Company admins record and review attendance on a month calendar: every
+/// day with records is marked (shift, piece, how many); tap a day for its
+/// records, totals and to record more. Dates are the company's own, in its
+/// time zone; search by name or code and filter shift or piece workers.
 class AttendancePage extends ConsumerStatefulWidget {
   const AttendancePage({super.key});
 
@@ -31,14 +35,17 @@ class AttendancePage extends ConsumerStatefulWidget {
 }
 
 class _AttendancePageState extends ConsumerState<AttendancePage> {
-  /// null = today in the company's zone (the server decides).
-  String? _date;
+  late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+
+  /// "YYYY-MM-DD"; null = today in the company's zone, once known.
+  String? _selected;
   String _search = '';
   String? _kind;
   final _searchCtrl = TextEditingController();
   Timer? _debounce;
 
-  AttendanceQuery get _query => (date: _date, search: _search, kind: _kind);
+  AttendanceQuery get _query =>
+      (month: _ym.format(_month), search: _search, kind: _kind);
 
   @override
   void dispose() {
@@ -47,36 +54,31 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
     super.dispose();
   }
 
-  static final _fmt = DateFormat('yyyy-MM-dd');
-
-  void _shiftDay(String current, String today, int days) {
-    final next = DateTime.parse(current).add(Duration(days: days));
-    if (_fmt.format(next).compareTo(today) > 0) return;
-    setState(() => _date = _fmt.format(next));
-  }
-
-  Future<void> _pickDay(String current, String today) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.parse(current),
-      firstDate: DateTime(2000),
-      lastDate: DateTime.parse(today),
-    );
-    if (picked != null) setState(() => _date = _fmt.format(picked));
+  void _shiftMonth(int by, String today) {
+    final next = DateTime(_month.year, _month.month + by);
+    // No months after the company's current one.
+    if (_ym.format(next).compareTo(today.substring(0, 7)) > 0) return;
+    setState(() {
+      _month = next;
+      _selected = null;
+    });
   }
 
   Future<void> _openForm(
-    AttendanceList day,
-    String current, {
+    AttendanceList month,
+    String day, {
     AttendanceRecord? edit,
   }) async {
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => AttendanceFormPage(
-          date: current,
-          today: day.today,
+          date: day,
+          today: month.today,
           edit: edit,
-          recordedEmployeeIds: {for (final r in day.items) r.employeeId},
+          recordedEmployeeIds: {
+            for (final r in month.items)
+              if (r.workDate == day) r.employeeId,
+          },
         ),
       ),
     );
@@ -94,9 +96,19 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
   @override
   Widget build(BuildContext context) {
     final access = ref.watch(moduleAccessProvider('Attendance'));
-    final async = ref.watch(attendanceDayProvider(_query));
-    final day = async.valueOrNull;
-    final current = _date ?? day?.today;
+    final async = ref.watch(attendanceMonthProvider(_query));
+    final month = async.valueOrNull;
+    final today = month?.today;
+    // Default: today when this is the current month, else the 1st.
+    final selected =
+        _selected ??
+        (today != null && today.startsWith(_ym.format(_month))
+            ? today
+            : '${_ym.format(_month)}-01');
+    final dayItems = [
+      for (final r in month?.items ?? const <AttendanceRecord>[])
+        if (r.workDate == selected) r,
+    ];
 
     return Scaffold(
       drawer: const AppDrawer(),
@@ -109,40 +121,48 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
         ),
         title: ModuleTitle(
           title: 'Attendance',
-          subtitle: day == null
+          subtitle: month == null
               ? 'Shifts & pieces per day'
-              : 'Times in ${day.timezone}',
+              : 'Times in ${month.timezone}',
         ),
         actions: [
           IconButton(
             tooltip: 'Company time zone',
-            onPressed: day == null ? null : () => _changeTimezone(day.timezone),
+            onPressed: month == null
+                ? null
+                : () => _changeTimezone(month.timezone),
             icon: const Icon(Icons.public_rounded),
           ),
-          if (access.create && day != null && current != null)
+          if (access.create &&
+              month != null &&
+              selected.compareTo(month.today) <= 0)
             IconButton(
               tooltip: 'Record attendance',
-              onPressed: () => _openForm(day, current),
+              onPressed: () => _openForm(month, selected),
               icon: const Icon(Icons.add_circle_rounded, size: 28),
               color: AppColors.brand,
             ),
         ],
       ),
-      body: Column(
-        children: [
-          if (current != null && day != null)
-            _DayBar(
-              date: current,
-              isToday: current == day.today,
-              onPrev: () => _shiftDay(current, day.today, -1),
-              onNext: current == day.today
-                  ? null
-                  : () => _shiftDay(current, day.today, 1),
-              onPick: () => _pickDay(current, day.today),
+      body: RefreshIndicator(
+        onRefresh: () => ref.refresh(attendanceMonthProvider(_query).future),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
+          children: [
+            _CalendarCard(
+              month: _month,
+              selected: selected,
+              today: today,
+              items: month?.items ?? const [],
+              loading: month == null,
+              onPrev: () =>
+                  _shiftMonth(-1, today ?? _ymd.format(DateTime.now())),
+              onNext: () =>
+                  _shiftMonth(1, today ?? _ymd.format(DateTime.now())),
+              onPick: (d) => setState(() => _selected = d),
             ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-            child: SearchField(
+            const SizedBox(height: 14),
+            SearchField(
               controller: _searchCtrl,
               hintText: 'Search name or employee ID',
               onChanged: (v) {
@@ -153,10 +173,8 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
                 );
               },
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: PillSegmentedControl<String>(
+            const SizedBox(height: 8),
+            PillSegmentedControl<String>(
               value: _kind ?? 'ALL',
               onChanged: (v) => setState(() => _kind = v == 'ALL' ? null : v),
               segments: const [
@@ -173,50 +191,79 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
                 ),
               ],
             ),
-          ),
-          Expanded(
-            child: async.when(
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    DateFormat(
+                      'EEEE, d MMM yyyy',
+                    ).format(DateTime.parse(selected)),
+                    style: TextStyle(
+                      color: AppColors.ink,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                if (selected == today)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.positive.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text(
+                      'Today',
+                      style: TextStyle(
+                        color: AppColors.positive,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            async.when(
               skipError: true,
-              loading: () => const SkeletonListView(),
+              loading: () => const Shimmer(
+                child: SkeletonBox(width: double.infinity, height: 160),
+              ),
               error: (e, _) => ErrorCard(
                 error: e,
-                onRetry: () => ref.invalidate(attendanceDayProvider(_query)),
+                onRetry: () => ref.invalidate(attendanceMonthProvider(_query)),
               ),
-              data: (list) => RefreshIndicator(
-                onRefresh: () =>
-                    ref.refresh(attendanceDayProvider(_query).future),
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
-                  children: [
-                    _DaySummary(list.items),
-                    const SizedBox(height: 12),
-                    if (list.items.isEmpty)
-                      _Empty(
-                        searching: _search.isNotEmpty || _kind != null,
-                        canCreate: access.create,
-                        onCreate: () => _openForm(list, current ?? list.today),
-                      )
-                    else
-                      for (final r in list.items)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: AttendanceCard(
-                            record: r,
-                            onTap: access.edit || access.delete
-                                ? () => _openForm(
-                                    list,
-                                    current ?? list.today,
-                                    edit: r,
-                                  )
-                                : null,
-                          ),
+              data: (list) => Column(
+                children: [
+                  _DaySummary(dayItems),
+                  const SizedBox(height: 12),
+                  if (dayItems.isEmpty)
+                    _Empty(
+                      searching: _search.isNotEmpty || _kind != null,
+                      canCreate:
+                          access.create && selected.compareTo(list.today) <= 0,
+                      onCreate: () => _openForm(list, selected),
+                    )
+                  else
+                    for (final r in dayItems)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: AttendanceCard(
+                          record: r,
+                          onTap: access.edit || access.delete
+                              ? () => _openForm(list, selected, edit: r)
+                              : null,
                         ),
-                  ],
-                ),
+                      ),
+                ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -268,8 +315,8 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
       await ref
           .read(dioProvider)
           .put(ApiEndpoints.me, data: {'timezone': picked});
-      _date = null; // "today" may be a different date in the new zone
-      ref.invalidate(attendanceDayProvider);
+      _selected = null; // "today" may be a different date in the new zone
+      ref.invalidate(attendanceMonthProvider);
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -288,86 +335,326 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
   }
 }
 
-/// ‹  Tue, 27 Oct 2026 · Today  ›
-class _DayBar extends StatelessWidget {
-  final String date;
-  final bool isToday;
-  final VoidCallback onPrev, onPick;
-  final VoidCallback? onNext;
-  const _DayBar({
-    required this.date,
-    required this.isToday,
+// ── Month calendar ────────────────────────────────────────────────────────
+
+/// The month as a grid (Monday first): each day with records shows how
+/// many and whether shift (blue) or piece (green); today ringed, the picked
+/// day filled, days after today dimmed and not tappable.
+class _CalendarCard extends StatelessWidget {
+  final DateTime month;
+  final String selected;
+  final String? today;
+  final List<AttendanceRecord> items;
+  final bool loading;
+  final VoidCallback onPrev, onNext;
+  final ValueChanged<String> onPick;
+  const _CalendarCard({
+    required this.month,
+    required this.selected,
+    required this.today,
+    required this.items,
+    required this.loading,
     required this.onPrev,
     required this.onNext,
     required this.onPick,
   });
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-    child: Row(
-      children: [
-        IconButton(
-          tooltip: 'Previous day',
-          onPressed: onPrev,
-          icon: const Icon(Icons.chevron_left_rounded),
-        ),
-        Expanded(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: onPick,
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.event_rounded, size: 18, color: AppColors.brand),
-                  const SizedBox(width: 8),
-                  Text(
-                    DateFormat('EEE, d MMM yyyy').format(DateTime.parse(date)),
+  Widget build(BuildContext context) {
+    final byDay = <String, List<AttendanceRecord>>{};
+    for (final r in items) {
+      byDay.putIfAbsent(r.workDate, () => []).add(r);
+    }
+    final first = DateTime(month.year, month.month);
+    final days = DateTime(month.year, month.month + 1, 0).day;
+    final pad = first.weekday - 1;
+    final cells = ((pad + days) / 7).ceil() * 7;
+    final isLatest =
+        today != null && _ym.format(month) == today!.substring(0, 7);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppColors.shadows([
+          BoxShadow(
+            color: AppColors.shadowDark.withValues(alpha: 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ]),
+      ),
+      child: Column(
+        children: [
+          // Accent strip, like the rest of the app's cards.
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(17)),
+            child: Row(
+              children: [
+                for (final c in [
+                  AppColors.brand,
+                  AppColors.positive,
+                  AppColors.brandDeep,
+                  AppColors.brandLight,
+                ])
+                  Expanded(child: Container(height: 3, color: c)),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+            child: Row(
+              children: [
+                _Arrow(Icons.chevron_left_rounded, onPrev),
+                Expanded(
+                  child: Text(
+                    DateFormat('MMMM yyyy').format(month),
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppColors.ink,
+                      fontSize: 16,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  if (isToday) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.positive.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        'Today',
-                        style: TextStyle(
-                          color: AppColors.positive,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+                ),
+                _Arrow(Icons.chevron_right_rounded, isLatest ? null : onNext),
+              ],
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: [
+                for (final (i, d) in const [
+                  'M',
+                  'T',
+                  'W',
+                  'T',
+                  'F',
+                  'S',
+                  'S',
+                ].indexed)
+                  Expanded(
+                    child: Text(
+                      d,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: i >= 5
+                            ? AppColors.brandDeep.withValues(alpha: 0.6)
+                            : AppColors.textHint,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7,
+                childAspectRatio: 0.9,
+              ),
+              itemCount: cells,
+              itemBuilder: (_, i) {
+                if (i < pad || i >= pad + days) return const SizedBox();
+                final date = DateTime(month.year, month.month, i - pad + 1);
+                final key = _ymd.format(date);
+                final future = today != null && key.compareTo(today!) > 0;
+                return _DayCell(
+                  day: date.day,
+                  records: byDay[key] ?? const [],
+                  isToday: key == today,
+                  isSelected: key == selected,
+                  isWeekend: date.weekday >= 6,
+                  disabled: future,
+                  loading: loading,
+                  onTap: future ? null : () => onPick(key),
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Row(
+              children: [
+                _Legend(AppColors.brand, 'Shift'),
+                const SizedBox(width: 14),
+                _Legend(AppColors.positive, 'Piece'),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '${items.length} record${items.length == 1 ? '' : 's'} this month',
+                    textAlign: TextAlign.end,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: AppColors.textHint, fontSize: 11),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Arrow extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  const _Arrow(this.icon, this.onTap);
+
+  @override
+  Widget build(BuildContext context) => Opacity(
+    opacity: onTap == null ? 0.35 : 1,
+    child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: AppColors.accentGradient(AppColors.brand),
+          ),
+          borderRadius: BorderRadius.circular(10),
         ),
-        IconButton(
-          tooltip: 'Next day',
-          onPressed: onNext,
-          icon: const Icon(Icons.chevron_right_rounded),
-        ),
-      ],
+        child: Icon(icon, size: 20, color: Colors.white),
+      ),
     ),
+  );
+}
+
+class _DayCell extends StatelessWidget {
+  final int day;
+  final List<AttendanceRecord> records;
+  final bool isToday, isSelected, isWeekend, disabled, loading;
+  final VoidCallback? onTap;
+  const _DayCell({
+    required this.day,
+    required this.records,
+    required this.isToday,
+    required this.isSelected,
+    required this.isWeekend,
+    required this.disabled,
+    required this.loading,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final shifts = records.where((r) => r.isShift).length;
+    final pieces = records.length - shifts;
+    final has = records.isNotEmpty;
+    final Color? bg = isSelected
+        ? AppColors.brand
+        : has
+        ? (pieces > shifts ? AppColors.positive : AppColors.brand).withValues(
+            alpha: 0.10,
+          )
+        : null;
+    final fg = isSelected
+        ? Colors.white
+        : disabled
+        ? AppColors.textHint.withValues(alpha: 0.5)
+        : isWeekend
+        ? AppColors.ink.withValues(alpha: 0.55)
+        : AppColors.ink;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.all(2.5),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(10),
+          border: isToday && !isSelected
+              ? Border.all(color: AppColors.brand, width: 1.6)
+              : null,
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.brand.withValues(alpha: 0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '$day',
+              style: TextStyle(
+                color: fg,
+                fontSize: 13.5,
+                fontWeight: isToday || isSelected
+                    ? FontWeight.w900
+                    : FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 3),
+            if (has)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (shifts > 0)
+                    _Dot(isSelected ? Colors.white : AppColors.brand),
+                  if (pieces > 0)
+                    _Dot(isSelected ? Colors.white : AppColors.positive),
+                  const SizedBox(width: 2),
+                  Text(
+                    '${records.length}',
+                    style: TextStyle(
+                      color: isSelected
+                          ? Colors.white
+                          : AppColors.textSecondary,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              )
+            else
+              const SizedBox(height: 11),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Dot extends StatelessWidget {
+  final Color color;
+  const _Dot(this.color);
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 5,
+    height: 5,
+    margin: const EdgeInsets.symmetric(horizontal: 1),
+    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+  );
+}
+
+class _Legend extends StatelessWidget {
+  final Color color;
+  final String label;
+  const _Legend(this.color, this.label);
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      _Dot(color),
+      const SizedBox(width: 4),
+      Text(label, style: TextStyle(color: AppColors.textHint, fontSize: 11)),
+    ],
   );
 }
 
@@ -444,11 +731,11 @@ class _Empty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 40),
+    padding: const EdgeInsets.symmetric(vertical: 24),
     child: Column(
       children: [
-        Icon(Icons.event_busy_rounded, size: 46, color: AppColors.textHint),
-        const SizedBox(height: 10),
+        Icon(Icons.event_busy_rounded, size: 42, color: AppColors.textHint),
+        const SizedBox(height: 8),
         Text(
           searching
               ? 'No attendance matches'

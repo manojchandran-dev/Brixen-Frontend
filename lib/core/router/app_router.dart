@@ -5,7 +5,7 @@ import '../../shared/widgets/module_guard.dart';
 import '../../features/masters/domain/entities/master_type.dart'
     show masterModuleName;
 import '../../features/auth/domain/entities/user_role.dart';
-import '../../features/employees/presentation/pages/employee_access_page.dart';
+import '../../features/employees/presentation/pages/staff_permissions_pages.dart';
 import 'route_names.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
 import '../../features/auth/presentation/pages/sign_in_page.dart';
@@ -106,7 +106,7 @@ class AppRouter {
   static const String products = RouteNames.products;
   static const String inventory = RouteNames.inventory;
   static const String attendance = RouteNames.attendance;
-  static const String employeeAccess = RouteNames.employeeAccess;
+  static const String staffPermissions = RouteNames.staffPermissions;
   static const String createProduct = RouteNames.createProduct;
   static const String permissions = RouteNames.permissions;
   static const String createPermission = RouteNames.createPermission;
@@ -314,13 +314,13 @@ class AppRouter {
             ],
           ),
           GoRoute(
-            path: _sub(employeeAccess, dashboard),
+            path: _sub(staffPermissions, dashboard),
             // Company admins only: employee logins never manage access.
             builder: _guard(
               'Employees',
               (context, state) => Session.role == UserRole.employee
                   ? const SizedBox.shrink()
-                  : EmployeeAccessPage(
+                  : StaffPermissionsPage(
                       initialEmployeeId: state.extra as String?,
                     ),
             ),

@@ -24,6 +24,12 @@ bool isChatModule(NavModule m) => const {
   'chatbot',
 }.contains(m.name.toLowerCase().replaceAll(RegExp(r'\s+'), ''));
 
+/// Company admins have Attendance as a bottom-nav tab (see AppBottomNav), so
+/// it's left out of their menu. Employees granted it keep it here.
+bool _attendanceInBottomNav(NavModule m) =>
+    Session.role == UserRole.companyAdmin &&
+    m.name.toLowerCase().replaceAll(RegExp(r'\s+'), '') == 'attendance';
+
 /// Company users read notifications from the dashboard bell (their inbox),
 /// so the Notifications/Announcements modules — superadmin sending tools —
 /// are left out of their menu.
@@ -54,8 +60,8 @@ Iterable<NavModule> _withInventory(Iterable<NavModule> modules) sync* {
     // Company admins grant their employees modules, right after Employees.
     if (key(m) == 'employees' && Session.role == UserRole.companyAdmin) {
       yield const NavModule(
-        id: 'employeeaccess',
-        name: 'Employee Access',
+        id: 'staffpermissions',
+        name: 'Staff Permissions',
         description: 'What each employee can use',
       );
     }
@@ -181,7 +187,8 @@ class AppDrawer extends ConsumerWidget {
                               m.children.isEmpty &&
                               !_supportInMore(m) &&
                               !_notificationsInBell(m) &&
-                              !isChatModule(m),
+                              !isChatModule(m) &&
+                              !_attendanceInBottomNav(m),
                         ),
                       ),
                       ...modules.where((m) => m.children.isNotEmpty),
@@ -269,8 +276,8 @@ void Function(BuildContext context) _destinationFor(NavModule module) {
       return (context) => context.go(AppRouter.masterWorkTypes);
     case 'attendance':
       return (context) => context.go(AppRouter.attendance);
-    case 'employeeaccess':
-      return (context) => context.go(AppRouter.employeeAccess);
+    case 'staffpermissions':
+      return (context) => context.go(AppRouter.staffPermissions);
     // No backend module row exists for these yet — the module only reaches
     // superAdmin today via the Dashboard's Quick Actions tiles
     // (welcome_dashboard_view.dart). These cases are additive/forward-

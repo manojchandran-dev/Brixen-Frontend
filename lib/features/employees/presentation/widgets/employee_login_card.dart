@@ -241,9 +241,9 @@ class _EmployeeLoginCardState extends ConsumerState<EmployeeLoginCard> {
                 alignment: Alignment.centerLeft,
                 child: TextButton.icon(
                   onPressed: () =>
-                      context.push(AppRouter.employeeAccess, extra: e.id),
+                      context.push(AppRouter.staffPermissions, extra: e.id),
                   icon: const Icon(Icons.admin_panel_settings_outlined),
-                  label: const Text('Module access'),
+                  label: const Text('Staff permissions'),
                 ),
               ),
           ],

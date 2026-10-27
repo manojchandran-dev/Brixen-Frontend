@@ -68,6 +68,18 @@ class MasterCubit extends Cubit<MasterState> {
         });
   }
 
+  /// Fetches [typeKey]'s items fresh even when cached — for a form whose
+  /// picker must show items added since (e.g. work types made a minute ago
+  /// in Masters, maybe on another device). Keeps the cache on failure.
+  Future<void> refresh(String typeKey) async {
+    if (!_repository.isRemote(typeKey)) return;
+    try {
+      _store[typeKey] = await _repository.getAll(typeKey);
+    } catch (_) {
+      await ensureLoaded(typeKey);
+    }
+  }
+
   Future<void> load(String typeKey) async {
     _activeType = typeKey;
     _query = '';

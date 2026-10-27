@@ -24,6 +24,8 @@ class AttendanceRemoteDatasource {
   /// zone), optionally narrowed by [search] (name or code) and [kind].
   Future<AttendanceList> list({
     String? date,
+    String? from,
+    String? to,
     String? search,
     String? kind,
   }) async {
@@ -32,6 +34,8 @@ class AttendanceRemoteDatasource {
         ApiEndpoints.attendance,
         queryParameters: {
           'date': ?date,
+          'from': ?from,
+          'to': ?to,
           if (search != null && search.trim().isNotEmpty)
             'search': search.trim(),
           'kind': ?kind,

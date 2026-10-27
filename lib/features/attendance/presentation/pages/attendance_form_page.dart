@@ -69,7 +69,7 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
   @override
   void initState() {
     super.initState();
-    masterCubit.ensureLoaded('workType').then((_) {
+    masterCubit.refresh('workType').then((_) {
       if (mounted) setState(() {});
     }, onError: (_) {});
     final r = widget.edit;
@@ -193,7 +193,7 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
     try {
       final ds = ref.read(attendanceDatasourceProvider);
       _isEdit ? await ds.update(widget.edit!.id, body) : await ds.create(body);
-      ref.invalidate(attendanceDayProvider);
+      ref.invalidate(attendanceMonthProvider);
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       _snack(e.toString());
@@ -226,7 +226,7 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
     setState(() => _saving = true);
     try {
       await ref.read(attendanceDatasourceProvider).delete(widget.edit!.id);
-      ref.invalidate(attendanceDayProvider);
+      ref.invalidate(attendanceMonthProvider);
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       _snack(e.toString());

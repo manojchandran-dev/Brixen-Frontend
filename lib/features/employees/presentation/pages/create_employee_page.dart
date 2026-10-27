@@ -99,7 +99,7 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
   void initState() {
     super.initState();
     // Departments for step 2's picker.
-    masterCubit.ensureLoaded('department').then((_) {
+    masterCubit.refresh('department').then((_) {
       if (mounted) setState(() {});
     }, onError: (_) {});
     final e = widget.editEmployee;
@@ -582,9 +582,6 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
           status: _status,
           statuses: _statuses,
           onStatusChanged: (v) => setState(() => _status = v ?? 'Active'),
-          manager: _manager,
-          managerOptions: managerOptions,
-          onManagerChanged: (m) => setState(() => _manager = m),
         );
       case 2:
         return _Step3(
@@ -932,9 +929,6 @@ class _Step2 extends StatelessWidget {
   final String status;
   final List<String> statuses;
   final void Function(String?) onStatusChanged;
-  final Employee? manager;
-  final List<Employee> managerOptions;
-  final void Function(Employee?) onManagerChanged;
 
   const _Step2({
     required this.formKey,
@@ -955,9 +949,6 @@ class _Step2 extends StatelessWidget {
     required this.status,
     required this.statuses,
     required this.onStatusChanged,
-    required this.manager,
-    required this.managerOptions,
-    required this.onManagerChanged,
   });
 
   @override
@@ -1021,17 +1012,6 @@ class _Step2 extends StatelessWidget {
             onChanged: onEmploymentTypeChanged,
           ),
           const SizedBox(height: 22),
-          if (managerOptions.isNotEmpty) ...[
-            BrixenDropdown<Employee>(
-              hint: 'Manager',
-              value: manager,
-              items: managerOptions,
-              labelOf: (e) => e.fullName,
-              icon: Icons.supervisor_account_outlined,
-              onChanged: onManagerChanged,
-            ),
-            const SizedBox(height: 22),
-          ],
           Text('Salary type *', style: label),
           const SizedBox(height: 8),
           Row(
