@@ -4,12 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/money.dart';
+import '../../../../shared/widgets/app_bottom_nav.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/error_state.dart';
 import '../../../../shared/widgets/exact_amount.dart';
 import '../../../../shared/widgets/module_title.dart';
 import '../../../../shared/widgets/search_field.dart';
 import '../../../../shared/widgets/skeleton.dart';
+import '../../../../shared/widgets/theme_banner.dart';
 import '../../../employees/domain/entities/employee.dart';
 import '../../../permissions/presentation/providers/module_access_provider.dart';
 import '../../domain/attendance.dart';
@@ -113,6 +115,10 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
 
     return Scaffold(
       drawer: const AppDrawer(),
+      // AppBottomNav fills the Scaffold height (its pill is Align-ed to the
+      // bottom) — without extendBody the body gets zero height.
+      extendBody: true,
+      bottomNavigationBar: const AppBottomNav(activeIndex: 1),
       appBar: AppBar(
         leading: Builder(
           builder: (ctx) => IconButton(
@@ -306,16 +312,12 @@ class _CalendarCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Header: month, arrows and the month's totals on the brand blue.
+          // Header: month, arrows and the month's totals on the theme sweep.
           Container(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
             decoration: const BoxDecoration(
               borderRadius: BorderRadius.vertical(top: Radius.circular(21)),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.brand, AppColors.brandDeep],
-              ),
+              gradient: kThemeSweepGradient,
             ),
             child: Column(
               children: [
@@ -342,16 +344,31 @@ class _CalendarCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    _HeaderStat(
-                      '${items.length}',
-                      'record${items.length == 1 ? '' : 's'}',
+                    Expanded(
+                      child: BannerStatTile(
+                        BannerStat(
+                          '${items.length}',
+                          'record${items.length == 1 ? '' : 's'}',
+                          AppColors.brand,
+                        ),
+                      ),
                     ),
-                    _HeaderStat('$people', 'staff'),
-                    _HeaderStat(
-                      rupees(amount),
-                      'priced',
-                      exact: amount,
-                      highlight: true,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: BannerStatTile(
+                        BannerStat('$people', 'staff', AppColors.brandBlack),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: BannerStatTile(
+                        BannerStat(
+                          rupees(amount),
+                          'priced',
+                          AppColors.positive,
+                          exact: amount,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -390,6 +407,8 @@ class _CalendarCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
             child: GridView.builder(
+              // Not the Scaffold's inset: the bottom nav makes it the page height.
+              padding: EdgeInsets.zero,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -435,61 +454,6 @@ class _CalendarCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _HeaderStat extends StatelessWidget {
-  final String value, label;
-  final double? exact;
-  final bool highlight;
-  const _HeaderStat(
-    this.value,
-    this.label, {
-    this.exact,
-    this.highlight = false,
-  });
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-    child: ExactAmount(
-      amount: exact,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 3),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: highlight
-              ? AppColors.positive.withValues(alpha: 0.28)
-              : Colors.white.withValues(alpha: 0.13),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                value,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.80),
-                fontSize: 10.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
 }
 
 class _Arrow extends StatelessWidget {

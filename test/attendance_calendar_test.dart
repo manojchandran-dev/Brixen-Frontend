@@ -2,6 +2,7 @@ import 'package:brixen/features/attendance/domain/attendance.dart';
 import 'package:brixen/features/attendance/presentation/attendance_providers.dart';
 import 'package:brixen/features/attendance/presentation/pages/attendance_page.dart';
 import 'package:brixen/features/employees/domain/entities/employee.dart';
+import 'package:brixen/features/navigation/presentation/providers/nav_modules_provider.dart';
 import 'package:brixen/features/permissions/presentation/providers/module_access_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,7 +26,7 @@ void main() {
   testWidgets('month calendar: today picked, tap a day for its records', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.physicalSize = const Size(390 * 3, 1900 * 3);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
 
@@ -44,6 +45,7 @@ void main() {
       ProviderScope(
         overrides: [
           moduleAccessReadyProvider.overrideWithValue(true),
+          navModulesProvider.overrideWith((ref) async => const []),
           moduleAccessProvider.overrideWith((ref, _) => ModuleAccess.full),
           attendanceMonthProvider.overrideWith(
             (ref, q) async => AttendanceList(

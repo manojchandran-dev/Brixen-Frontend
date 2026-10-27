@@ -135,64 +135,114 @@ class _PayslipPageState extends ConsumerState<PayslipPage> {
           children: [
             PayslipView(slip: _slip, additions: add, deductions: ded),
             if (_editable) ...[
-              const SizedBox(height: 20),
-              Text(
-                'Adjust',
-                style: TextStyle(
-                  color: AppColors.ink,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.positive.withValues(alpha: 0.16),
+                      AppColors.surface,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: AppColors.positiveDeep.withValues(alpha: 0.35),
+                  ),
                 ),
-              ),
-              Text(
-                'Bonus or allowance to add, advance or other amounts to take off.',
-                style: TextStyle(color: AppColors.textHint, fontSize: 11.5),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: BrixenTextField(
-                      label: 'Additions',
-                      hint: '0',
-                      controller: _additions,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      prefixIcon: const Icon(Icons.add_circle_outline_rounded),
-                      onChanged: (_) => setState(() {}),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: AppColors.accentGradient(
+                                AppColors.positiveDeep,
+                              ),
+                            ),
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          child: const Icon(
+                            Icons.tune_rounded,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Adjust pay',
+                          style: TextStyle(
+                            color: AppColors.ink,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: BrixenTextField(
-                      label: 'Deductions',
-                      hint: '0',
-                      controller: _deductions,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
+                    const SizedBox(height: 4),
+                    Text(
+                      'Bonus or allowance to add, advance or other amounts to take off.',
+                      style: TextStyle(
+                        color: AppColors.textHint,
+                        fontSize: 11.5,
                       ),
-                      prefixIcon: const Icon(
-                        Icons.remove_circle_outline_rounded,
-                      ),
-                      onChanged: (_) => setState(() {}),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              BrixenTextField(
-                label: 'Note on the payslip',
-                hint: 'Optional, e.g. Advance recovered',
-                controller: _notes,
-                maxLines: 2,
-                prefixIcon: const Icon(Icons.notes_rounded),
-              ),
-              const SizedBox(height: 18),
-              BrixenButton(
-                label: 'Save payslip',
-                isLoading: _busy,
-                onPressed: _busy ? null : _save,
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: BrixenTextField(
+                            label: 'Additions',
+                            hint: '0',
+                            controller: _additions,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.add_circle_outline_rounded,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: BrixenTextField(
+                            label: 'Deductions',
+                            hint: '0',
+                            controller: _deductions,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.remove_circle_outline_rounded,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    BrixenTextField(
+                      label: 'Note on the payslip',
+                      hint: 'Optional, e.g. Advance recovered',
+                      controller: _notes,
+                      maxLines: 2,
+                      prefixIcon: const Icon(Icons.notes_rounded),
+                    ),
+                    const SizedBox(height: 18),
+                    BrixenButton(
+                      label: 'Save payslip',
+                      isLoading: _busy,
+                      onPressed: _busy ? null : _save,
+                    ),
+                  ],
+                ),
               ),
             ],
             if (widget.canSend && _slip.isFinalized) ...[

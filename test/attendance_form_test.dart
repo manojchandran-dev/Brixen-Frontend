@@ -37,7 +37,7 @@ void main() {
   testWidgets('a shift day stops at three shifts and totals them', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.physicalSize = const Size(390 * 3, 1500 * 3);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
 
@@ -65,6 +65,7 @@ void main() {
     expect(find.text('1½ shifts'), findsOneWidget);
     expect(find.text('₹900'), findsOneWidget); // 1.5 × ₹600 a shift
 
+    await tester.ensureVisible(find.text('Add shift 3'));
     await tester.tap(find.text('Add shift 3'));
     await tester.pump();
     // Shift 3 starts at a full shift: 2.5 in all, and no fourth shift.
@@ -74,7 +75,7 @@ void main() {
   });
 
   testWidgets('a piece day shows each line at its rate', (tester) async {
-    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.physicalSize = const Size(390 * 3, 1500 * 3);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
 

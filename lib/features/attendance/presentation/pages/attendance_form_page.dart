@@ -7,6 +7,7 @@ import '../../../../shared/widgets/brixen_button.dart';
 import '../../../../shared/widgets/brixen_date_field.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
+import '../../../../shared/widgets/theme_banner.dart';
 import '../../../employees/domain/entities/employee.dart';
 import '../../../employees/presentation/providers/employees_provider.dart';
 import '../../../masters/domain/entities/master_item.dart';
@@ -308,78 +309,118 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
       body: Form(
         key: _form,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
-            if (_isEdit)
-              _InfoTile(
-                icon: Icons.person_rounded,
-                title: widget.edit!.employeeName,
-                subtitle: [
-                  widget.edit!.employeeCode,
-                  if (widget.edit!.department != null) widget.edit!.department!,
-                  SalaryType.label(widget.edit!.kind),
-                ].join(' · '),
-              )
-            else ...[
-              BrixenDropdown<Employee>(
-                hint: 'Employee *',
-                value: _employee,
-                items: pickable,
-                labelOf: (e) => e.fullName,
-                subtitleOf: (e) => [
-                  e.employeeCode,
-                  if (e.department != null) e.department!,
-                  SalaryType.label(e.salaryType),
-                ].join(' · '),
-                icon: Icons.person_search_rounded,
-                onChanged: _pickEmployee,
+            ThemeBanner(
+              icon: showLines
+                  ? salaryTypeIcon(_kind)
+                  : Icons.how_to_reg_rounded,
+              title: _isEdit
+                  ? widget.edit!.employeeName
+                  : _employee?.fullName ?? 'Record attendance',
+              subtitle: [
+                DateFormat('EEE, d MMM yyyy').format(_date),
+                if (showLines) '${SalaryType.label(_kind)} salary',
+              ].join(' · '),
+            ),
+            const SizedBox(height: 14),
+            _SectionCard(
+              icon: Icons.badge_rounded,
+              title: 'Employee & date',
+              color: AppColors.brand,
+              children: [
+                if (_isEdit)
+                  _InfoTile(
+                    icon: Icons.person_rounded,
+                    title: widget.edit!.employeeName,
+                    subtitle: [
+                      widget.edit!.employeeCode,
+                      if (widget.edit!.department != null)
+                        widget.edit!.department!,
+                      SalaryType.label(widget.edit!.kind),
+                    ].join(' · '),
+                  )
+                else ...[
+                  BrixenDropdown<Employee>(
+                    hint: 'Employee *',
+                    value: _employee,
+                    items: pickable,
+                    labelOf: (e) => e.fullName,
+                    subtitleOf: (e) => [
+                      e.employeeCode,
+                      if (e.department != null) e.department!,
+                      SalaryType.label(e.salaryType),
+                    ].join(' · '),
+                    icon: Icons.person_search_rounded,
+                    onChanged: _pickEmployee,
+                  ),
+                  if (recorded > 0 || noType > 0) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      [
+                        if (recorded > 0)
+                          '$recorded already recorded on this day — edit them from the list.',
+                        if (noType > 0)
+                          '$noType without a salary type — set it in Employees first.',
+                      ].join(' '),
+                      style: hint,
+                    ),
+                  ],
+                ],
+                const SizedBox(height: 18),
+                if (_isEdit)
+                  _InfoTile(
+                    icon: Icons.event_rounded,
+                    title: DateFormat('EEE, d MMM yyyy').format(_date),
+                    subtitle: 'Recorded ${widget.edit!.recordedLocal}',
+                  )
+                else
+                  BrixenDateField(
+                    label: 'Date *',
+                    value: _date,
+                    onChanged: (d) => setState(() => _date = d),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime.parse(widget.today),
+                  ),
+              ],
+            ),
+            if (showLines) ...[
+              const SizedBox(height: 14),
+              _SectionCard(
+                icon: salaryTypeIcon(_kind),
+                title: switch (_kind) {
+                  SalaryType.shift => 'Shifts worked',
+                  SalaryType.piece => 'Pieces made',
+                  SalaryType.hourly => 'Hours worked',
+                  _ => 'Day',
+                },
+                color: salaryTypeColor(_kind),
+                children: [
+                  if (_isShift)
+                    ..._shiftSection(section, hint)
+                  else if (_isPiece)
+                    ..._pieceSection(section, hint)
+                  else if (_isHourly)
+                    ..._hourSection(section, hint)
+                  else
+                    ..._daySection(section, hint),
+                ],
               ),
-              if (recorded > 0 || noType > 0) ...[
-                const SizedBox(height: 6),
-                Text(
-                  [
-                    if (recorded > 0)
-                      '$recorded already recorded on this day — edit them from the list.',
-                    if (noType > 0)
-                      '$noType without a salary type — set it in Employees first.',
-                  ].join(' '),
-                  style: hint,
+            ],
+            const SizedBox(height: 14),
+            _SectionCard(
+              icon: Icons.notes_rounded,
+              title: 'Notes',
+              color: AppColors.brandDeep,
+              children: [
+                BrixenTextField(
+                  label: 'Notes',
+                  hint: 'Optional',
+                  controller: _notes,
+                  maxLines: 2,
+                  prefixIcon: const Icon(Icons.notes_rounded),
                 ),
               ],
-            ],
-            const SizedBox(height: 18),
-            if (_isEdit)
-              _InfoTile(
-                icon: Icons.event_rounded,
-                title: DateFormat('EEE, d MMM yyyy').format(_date),
-                subtitle: 'Recorded ${widget.edit!.recordedLocal}',
-              )
-            else
-              BrixenDateField(
-                label: 'Date *',
-                value: _date,
-                onChanged: (d) => setState(() => _date = d),
-                firstDate: DateTime(2000),
-                lastDate: DateTime.parse(widget.today),
-              ),
-            if (showLines) ...[
-              const SizedBox(height: 24),
-              if (_isShift)
-                ..._shiftSection(section, hint)
-              else if (_isPiece)
-                ..._pieceSection(section, hint)
-              else if (_isHourly)
-                ..._hourSection(section, hint)
-              else
-                ..._daySection(section, hint),
-            ],
-            const SizedBox(height: 20),
-            BrixenTextField(
-              label: 'Notes',
-              hint: 'Optional',
-              controller: _notes,
-              maxLines: 2,
-              prefixIcon: const Icon(Icons.notes_rounded),
             ),
             const SizedBox(height: 24),
             if (access.create || (_isEdit && access.edit))
@@ -395,7 +436,6 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
   }
 
   List<Widget> _shiftSection(TextStyle section, TextStyle hint) => [
-    Text('Shifts', style: section),
     Text(
       'Up to $kMaxShifts a day · each 1/4, 1/2, 3/4, 1, 2 or 3',
       style: hint,
@@ -470,7 +510,6 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
     final color = salaryTypeColor(SalaryType.hourly);
     final h = _hoursValue ?? 0;
     return [
-      Text('Hours worked', style: section),
       Text(
         _rate == null
             ? 'Quarter hours, up to $kMaxHours'
@@ -564,7 +603,6 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
     }
 
     return [
-      Text('Present', style: section),
       Text(
         '${SalaryType.label(_kind)} salary · the pay is worked out at salary '
         'generation',
@@ -584,7 +622,6 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
   List<Widget> _pieceSection(TextStyle section, TextStyle hint) {
     final types = _workTypes;
     return [
-      Text('Work done', style: section),
       Text(
         types.isEmpty
             ? 'No work types yet — add them in Masters → Work Type.'
@@ -697,6 +734,65 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
       ),
     ];
   }
+}
+
+/// A titled part of the form, edged and tinted in [color].
+class _SectionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Color color;
+  final List<Widget> children;
+  const _SectionCard({
+    required this.icon,
+    required this.title,
+    required this.color,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [color.withValues(alpha: 0.12), AppColors.surface],
+      ),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: color.withValues(alpha: 0.30)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: AppColors.accentGradient(color),
+                ),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(icon, size: 16, color: Colors.white),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: TextStyle(
+                color: AppColors.ink,
+                fontSize: 14.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...children,
+      ],
+    ),
+  );
 }
 
 class _InfoTile extends StatelessWidget {

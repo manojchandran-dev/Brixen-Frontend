@@ -38,82 +38,76 @@ class AttendanceCard extends StatelessWidget {
         ? [r.employeeCode, if (r.department != null) r.department!].join(' · ')
         : 'Recorded ${r.recordedLocal}';
 
+    // The whole card in the salary type's colour: a solid band with who it
+    // is, then the day's work on a tint of the same colour.
     return Material(
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
-        child: Container(
+        child: Ink(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: accent.withValues(alpha: 0.30)),
+            border: Border.all(color: accent.withValues(alpha: 0.45)),
             gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
               colors: [
-                accent.withValues(alpha: 0.07),
-                AppColors.surface,
-                AppColors.surface,
+                accent.withValues(alpha: 0.22),
+                accent.withValues(alpha: 0.10),
               ],
             ),
             boxShadow: AppColors.shadows([
               BoxShadow(
-                color: accent.withValues(alpha: 0.10),
-                blurRadius: 14,
-                offset: const Offset(0, 4),
+                color: accent.withValues(alpha: 0.22),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
               ),
             ]),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(17),
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // The salary type's colour down the left edge.
-                  Container(
-                    width: 4,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: AppColors.accentGradient(accent),
-                      ),
-                    ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(17),
                   ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 14, 14, 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _header(r, day, title, subtitle, accent),
-                          const SizedBox(height: 12),
-                          _work(r, accent),
-                          const SizedBox(height: 10),
-                          _total(r, accent),
-                          if (showEmployee ||
-                              (r.notes?.isNotEmpty ?? false)) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              [
-                                if (showEmployee) 'Recorded ${r.recordedLocal}',
-                                if (r.notes?.isNotEmpty ?? false) r.notes!,
-                              ].join(' · '),
-                              style: TextStyle(
-                                color: AppColors.textHint,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: AppColors.accentGradient(accent),
                   ),
-                ],
+                ),
+                child: _header(r, day, title, subtitle, accent),
               ),
-            ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _work(r, accent),
+                    const SizedBox(height: 10),
+                    _total(r, accent),
+                    if (showEmployee || (r.notes?.isNotEmpty ?? false)) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        [
+                          if (showEmployee) 'Recorded ${r.recordedLocal}',
+                          if (r.notes?.isNotEmpty ?? false) r.notes!,
+                        ].join(' · '),
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -133,15 +127,9 @@ class AttendanceCard extends StatelessWidget {
         height: 42,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          gradient: LinearGradient(colors: AppColors.accentGradient(accent)),
+          color: Colors.white.withValues(alpha: 0.24),
           borderRadius: BorderRadius.circular(13),
-          boxShadow: [
-            BoxShadow(
-              color: accent.withValues(alpha: 0.30),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
+          border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
         ),
         child: Text(
           showEmployee
@@ -150,7 +138,7 @@ class AttendanceCard extends StatelessWidget {
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w900,
-            fontSize: 16,
+            fontSize: 17,
           ),
         ),
       ),
@@ -163,17 +151,20 @@ class AttendanceCard extends StatelessWidget {
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: AppColors.ink,
-                fontSize: 14.5,
-                fontWeight: FontWeight.w800,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
               ),
             ),
             Text(
               subtitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: AppColors.textHint, fontSize: 11.5),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.85),
+                fontSize: 11.5,
+              ),
             ),
           ],
         ),
@@ -264,13 +255,9 @@ class AttendanceCard extends StatelessWidget {
   Widget _total(AttendanceRecord r, Color accent) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
     decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-          accent.withValues(alpha: 0.16),
-          accent.withValues(alpha: 0.05),
-        ],
-      ),
+      color: AppColors.surface,
       borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: accent.withValues(alpha: 0.35)),
     ),
     child: Row(
       children: [
@@ -313,8 +300,9 @@ class _Badge extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
     decoration: BoxDecoration(
-      gradient: LinearGradient(colors: AppColors.accentGradient(color)),
+      color: Colors.white.withValues(alpha: 0.22),
       borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
@@ -346,8 +334,9 @@ class _Pill extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
     decoration: BoxDecoration(
-      color: color.withValues(alpha: faint ? 0.06 : 0.13),
+      color: AppColors.surface.withValues(alpha: faint ? 0.55 : 0.9),
       borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: color.withValues(alpha: 0.30)),
     ),
     child: Text(
       text,

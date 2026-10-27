@@ -4,13 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/app_bottom_nav.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/brixen_button.dart';
 import '../../../../shared/widgets/error_state.dart';
 import '../../../../shared/widgets/module_title.dart';
-import '../../../../shared/widgets/rich_card_shell.dart';
 import '../../../../shared/widgets/search_field.dart';
 import '../../../../shared/widgets/skeleton.dart';
+import '../../../../shared/widgets/theme_banner.dart';
 import '../../../navigation/presentation/module_visuals.dart';
 import '../../../permissions/domain/entities/module_permission.dart'
     show AccessLevel, AccessLevelX;
@@ -172,6 +173,10 @@ class _StaffPermissionsPageState extends ConsumerState<StaffPermissionsPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       drawer: const AppDrawer(),
+      // AppBottomNav fills the Scaffold height (its pill is Align-ed to the
+      // bottom) — without extendBody the body gets zero height.
+      extendBody: true,
+      bottomNavigationBar: const AppBottomNav(activeIndex: 3),
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
@@ -187,58 +192,82 @@ class _StaffPermissionsPageState extends ConsumerState<StaffPermissionsPage> {
           subtitle: 'What each employee can use',
         ),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: SearchField(
-              controller: _search,
-              hintText: 'Search employee',
-              onChanged: (v) => setState(() => _query = v),
-            ),
-          ),
-          Expanded(
-            child: async.when(
-              skipError: true,
-              loading: () => const SkeletonListView(),
-              error: (e, _) => ErrorCard(
-                error: e,
-                onRetry: () => ref.invalidate(employeesProvider),
-              ),
-              data: (all) {
-                final list = [
-                  for (final e in all)
-                    if (e.status == 'Active' &&
-                        (q.isEmpty ||
-                            '${e.fullName} ${e.employeeCode} ${e.department ?? ''}'
-                                .toLowerCase()
-                                .contains(q)))
-                      e,
-                ];
-                if (list.isEmpty) {
-                  return Center(
-                    child: Text(
-                      q.isEmpty
-                          ? 'No active employees yet'
-                          : 'No employees match',
-                      style: TextStyle(color: AppColors.textHint),
-                    ),
-                  );
-                }
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
-                  itemCount: list.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) => _EmployeeCard(
-                    employee: list[i],
-                    index: i,
-                    onTap: () => _open(list[i]),
+      body: async.when(
+        skipError: true,
+        loading: () => const SkeletonListView(),
+        error: (e, _) => ErrorCard(
+          error: e,
+          onRetry: () => ref.invalidate(employeesProvider),
+        ),
+        data: (all) {
+          final active = [
+            for (final e in all)
+              if (e.status == 'Active') e,
+          ];
+          final list = [
+            for (final e in active)
+              if (q.isEmpty ||
+                  '${e.fullName} ${e.employeeCode} ${e.department ?? ''}'
+                      .toLowerCase()
+                      .contains(q))
+                e,
+          ];
+          final canSignIn = active.where((e) => e.loginActive).length;
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
+            children: [
+              ThemeBanner(
+                icon: Icons.admin_panel_settings_rounded,
+                title: 'Who can use what',
+                subtitle: 'Give each employee the modules they need',
+                stats: [
+                  BannerStat('${active.length}', 'employees', AppColors.brand),
+                  BannerStat('$canSignIn', 'can sign in', AppColors.positive),
+                  BannerStat(
+                    '${active.length - canSignIn}',
+                    'no login yet',
+                    AppColors.brandBlack,
                   ),
-                );
-              },
-            ),
-          ),
-        ],
+                ],
+              ),
+              const SizedBox(height: 16),
+              const StepGuide(
+                steps: [
+                  (Icons.key_rounded, 'Login', 'Activate in Employees'),
+                  (Icons.apps_rounded, 'Module', 'Pick what they use'),
+                  (Icons.tune_rounded, 'Access', 'View, add, edit, delete'),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SearchField(
+                controller: _search,
+                hintText: 'Search employee',
+                onChanged: (v) => setState(() => _query = v),
+              ),
+              const SizedBox(height: 12),
+              if (list.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 30),
+                  child: Text(
+                    q.isEmpty
+                        ? 'No active employees yet'
+                        : 'No employees match',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.textHint),
+                  ),
+                ),
+              for (final (i, e) in list.indexed)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _EmployeeCard(
+                    employee: e,
+                    index: i,
+                    onTap: () => _open(e),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -257,86 +286,121 @@ class _EmployeeCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final e = employee;
-    final accent = RichCardShell.accentFor(index);
+    // Can sign in: green. No login yet: blue.
+    final accent = e.loginActive ? AppColors.positiveDeep : AppColors.brand;
     final granted = ref
         .watch(staffGrantsProvider(e.id))
         .valueOrNull
         ?.where((g) => g.employee['view'] == true)
         .length;
-    return RichCardShell(
-      accentColor: accent,
-      showAccentBar: false,
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: AppColors.accentGradient(accent),
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                e.fullName.isEmpty ? '?' : e.fullName[0].toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
-                ),
-              ),
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: accent.withValues(alpha: 0.40)),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                accent.withValues(alpha: 0.20),
+                accent.withValues(alpha: 0.07),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    e.fullName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: AppColors.ink,
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w800,
-                    ),
+            boxShadow: AppColors.shadows([
+              BoxShadow(
+                color: accent.withValues(alpha: 0.16),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
+            ]),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: AppColors.accentGradient(accent),
                   ),
-                  Text(
-                    [
-                      e.employeeCode,
-                      if (e.department != null) e.department!,
-                    ].join(' · '),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: AppColors.textHint, fontSize: 12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  e.fullName.isEmpty ? '?' : e.fullName[0].toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
                   ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    children: [
-                      _Chip(
-                        e.loginActive ? 'Can sign in' : 'No login yet',
-                        e.loginActive ? AppColors.positive : AppColors.textHint,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      e.fullName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
                       ),
-                      if (granted != null)
+                    ),
+                    Text(
+                      [
+                        e.employeeCode,
+                        if (e.department != null) e.department!,
+                      ].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: AppColors.textHint, fontSize: 12),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
                         _Chip(
-                          '$granted module${granted == 1 ? '' : 's'}',
-                          AppColors.brand,
+                          e.loginActive ? 'Can sign in' : 'No login yet',
+                          e.loginActive
+                              ? AppColors.positiveDeep
+                              : AppColors.brandBlack,
+                          icon: e.loginActive
+                              ? Icons.verified_user_rounded
+                              : Icons.lock_outline_rounded,
                         ),
-                    ],
-                  ),
-                ],
+                        if (granted != null)
+                          _Chip(
+                            '$granted module${granted == 1 ? '' : 's'}',
+                            AppColors.brand,
+                            icon: Icons.apps_rounded,
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.textHint.withValues(alpha: 0.6),
-            ),
-          ],
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.chevron_right_rounded, color: accent),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -346,18 +410,32 @@ class _EmployeeCard extends ConsumerWidget {
 class _Chip extends StatelessWidget {
   final String text;
   final Color color;
-  const _Chip(this.text, this.color);
+  final IconData? icon;
+  const _Chip(this.text, this.color, {this.icon});
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.12),
+      gradient: LinearGradient(colors: AppColors.accentGradient(color)),
       borderRadius: BorderRadius.circular(20),
     ),
-    child: Text(
-      text,
-      style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 12, color: Colors.white),
+          const SizedBox(width: 4),
+        ],
+        Text(
+          text,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
     ),
   );
 }
@@ -411,9 +489,37 @@ class StaffModulesPage extends ConsumerWidget {
           for (final g in grants) {
             groups.putIfAbsent(g.group ?? 'Modules', () => []).add(g);
           }
+          int count(AccessLevel l) =>
+              grants.where((g) => g.levelOf(g.employee) == l).length;
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
+              ThemeBanner(
+                icon: Icons.person_rounded,
+                title: employee.fullName,
+                subtitle: [
+                  employee.employeeCode,
+                  if (employee.department != null) employee.department!,
+                ].join(' · '),
+                stats: [
+                  BannerStat(
+                    '${count(AccessLevel.full)}',
+                    'full access',
+                    AppColors.positive,
+                  ),
+                  BannerStat(
+                    '${count(AccessLevel.custom)}',
+                    'custom',
+                    AppColors.brand,
+                  ),
+                  BannerStat(
+                    '${count(AccessLevel.none)}',
+                    'no access',
+                    AppColors.brandBlack,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
               if (!employee.loginActive)
                 _Note(
                   "${employee.fullName} can't sign in yet — activate their "
@@ -475,88 +581,112 @@ class _ModuleRow extends StatelessWidget {
     final visual = moduleVisualFor(grant.name);
     final level = grant.levelOf(grant.employee);
     final c = _levelColor(level);
-    return RichCardShell(
-      accentColor: visual.color,
-      showAccentBar: false,
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: AppColors.accentGradient(visual.color),
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(visual.icon, size: 18, color: AppColors.white),
+    final on = level != AccessLevel.none;
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: on ? c.withValues(alpha: 0.45) : AppColors.border,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    grant.name,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: AppColors.ink,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      for (final a in _actions)
-                        Container(
-                          width: 7,
-                          height: 7,
-                          margin: const EdgeInsets.only(right: 5),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: grant.employee[a] == true
-                                ? AppColors.positive
-                                : Colors.transparent,
-                            border: grant.employee[a] == true
-                                ? null
-                                : Border.all(
-                                    color: AppColors.border,
-                                    width: 1.2,
-                                  ),
-                          ),
-                        ),
+            gradient: on
+                ? LinearGradient(
+                    colors: [
+                      c.withValues(alpha: 0.18),
+                      c.withValues(alpha: 0.05),
                     ],
+                  )
+                : null,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: AppColors.accentGradient(visual.color),
                   ),
-                ],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(visual.icon, size: 18, color: AppColors.white),
               ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: c.withValues(alpha: 0.13),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                level.label,
-                style: TextStyle(
-                  color: c,
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      grant.name,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        for (final a in _actions)
+                          Container(
+                            width: 7,
+                            height: 7,
+                            margin: const EdgeInsets.only(right: 5),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: grant.employee[a] == true
+                                  ? AppColors.positive
+                                  : Colors.transparent,
+                              border: grant.employee[a] == true
+                                  ? null
+                                  : Border.all(
+                                      color: AppColors.border,
+                                      width: 1.2,
+                                    ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 20,
-              color: AppColors.textHint.withValues(alpha: 0.6),
-            ),
-          ],
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  gradient: on
+                      ? LinearGradient(colors: AppColors.accentGradient(c))
+                      : null,
+                  color: on ? null : AppColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  level.label,
+                  style: TextStyle(
+                    color: on ? Colors.white : AppColors.textSecondary,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: AppColors.textHint.withValues(alpha: 0.6),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -690,59 +820,30 @@ class _StaffModuleAccessPageState extends ConsumerState<StaffModuleAccessPage> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               children: [
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: AppColors.accentGradient(
-                        visual.color,
-                      ).map((c) => c.withValues(alpha: 0.12)).toList(),
+                ThemeBanner(
+                  icon: visual.icon,
+                  title: g.name,
+                  subtitle: 'For ${widget.employee.fullName}',
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
                     ),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: visual.color.withValues(alpha: 0.2),
+                    decoration: BoxDecoration(
+                      color: _levelColor(level).withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.3),
+                      ),
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: AppColors.accentGradient(visual.color),
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Icon(visual.icon, size: 26, color: Colors.white),
+                    child: Text(
+                      level.label,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              g.name,
-                              style: TextStyle(
-                                color: AppColors.ink,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            Text(
-                              'For ${widget.employee.fullName}',
-                              style: TextStyle(
-                                color: AppColors.textHint,
-                                fontSize: 12.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -853,24 +954,35 @@ class _LevelCard extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
         decoration: BoxDecoration(
-          color: selected ? c.withValues(alpha: 0.1) : AppColors.surface,
+          gradient: selected
+              ? LinearGradient(colors: AppColors.accentGradient(c))
+              : null,
+          color: selected ? null : c.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: selected ? c : AppColors.border,
-            width: selected ? 1.6 : 1,
+            color: selected ? Colors.transparent : c.withValues(alpha: 0.30),
           ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: c.withValues(alpha: 0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           children: [
-            Icon(level.icon, color: c, size: 22),
+            Icon(level.icon, color: selected ? Colors.white : c, size: 22),
             const SizedBox(height: 8),
             Text(
               level.label,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: AppColors.ink,
+                color: selected ? Colors.white : AppColors.ink,
                 fontSize: 12.5,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ],
@@ -899,12 +1011,25 @@ class _Toggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Opacity(
     opacity: enabled || value ? 1 : 0.6,
-    child: Container(
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        gradient: value
+            ? LinearGradient(
+                colors: [
+                  AppColors.positive.withValues(alpha: 0.20),
+                  AppColors.positive.withValues(alpha: 0.06),
+                ],
+              )
+            : null,
+        color: value ? null : AppColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(
+          color: value
+              ? AppColors.positive.withValues(alpha: 0.5)
+              : AppColors.border,
+        ),
       ),
       child: Row(
         children: [
@@ -913,10 +1038,13 @@ class _Toggle extends StatelessWidget {
             height: 38,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
+              gradient: value
+                  ? LinearGradient(colors: AppColors.accentGradient(color))
+                  : null,
+              color: value ? null : color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(11),
             ),
-            child: Icon(icon, size: 18, color: color),
+            child: Icon(icon, size: 18, color: value ? Colors.white : color),
           ),
           const SizedBox(width: 12),
           Expanded(

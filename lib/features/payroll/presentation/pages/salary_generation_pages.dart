@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/money.dart';
+import '../../../../shared/widgets/app_bottom_nav.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/error_state.dart';
 import '../../../../shared/widgets/exact_amount.dart';
 import '../../../../shared/widgets/module_title.dart';
 import '../../../../shared/widgets/search_field.dart';
 import '../../../../shared/widgets/skeleton.dart';
+import '../../../../shared/widgets/theme_banner.dart';
 import '../../../attendance/presentation/salary_type_visuals.dart';
 import '../../../employees/domain/entities/employee.dart';
 import '../../../permissions/presentation/providers/module_access_provider.dart';
@@ -99,6 +101,10 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
 
     return Scaffold(
       drawer: const AppDrawer(),
+      // AppBottomNav fills the Scaffold height (its pill is Align-ed to the
+      // bottom) — without extendBody the body gets zero height.
+      extendBody: true,
+      bottomNavigationBar: const AppBottomNav(activeIndex: 3),
       appBar: AppBar(
         leading: Builder(
           builder: (ctx) => IconButton(
@@ -131,6 +137,17 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
               onGenerate: () => _generate(list),
               onOpen: current == null ? null : () => _open(current.id),
             ),
+            const SizedBox(height: 18),
+            StepGuide(
+              steps: kSalarySteps,
+              current: current == null
+                  ? 0
+                  : current.isFinalized
+                  ? 2
+                  : 1,
+            ),
+            const SizedBox(height: 18),
+            const _PayRules(),
             const SizedBox(height: 20),
             Text(
               'Salary months',
@@ -218,11 +235,7 @@ class _GenerateCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.brand, AppColors.brandDeep],
-        ),
+        gradient: kThemeSweepGradient,
         borderRadius: BorderRadius.circular(22),
         boxShadow: AppColors.shadows([
           BoxShadow(
@@ -280,18 +293,51 @@ class _GenerateCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            r == null
-                ? 'Not generated yet. Pay is worked out from this month\'s '
-                      'attendance for every employee with a salary type.'
-                : '${r.isFinalized ? 'Finalized' : 'Draft'} · '
-                      '${r.payslipCount} payslips · net ${rupees(r.totalNet)}',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.85),
-              fontSize: 12,
+          if (r == null)
+            Text(
+              'Not generated yet. Tap Generate: each employee\'s pay is worked '
+              'out from this month\'s attendance.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.85),
+                fontSize: 12,
+              ),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: BannerStatTile(
+                    BannerStat(
+                      r.isFinalized ? 'Finalized' : 'Draft',
+                      'status',
+                      r.isFinalized ? AppColors.positive : AppColors.brand,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: BannerStatTile(
+                    BannerStat(
+                      '${r.payslipCount}',
+                      'payslips',
+                      AppColors.brandBlack,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: BannerStatTile(
+                    BannerStat(
+                      rupees(r.totalNet),
+                      'net pay',
+                      AppColors.positive,
+                      exact: r.totalNet,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
           const SizedBox(height: 14),
           Row(
             children: [
@@ -343,6 +389,119 @@ class _GenerateCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Generate → review → finalize & send.
+const kSalarySteps = [
+  (Icons.auto_awesome_rounded, 'Generate', 'From attendance'),
+  (Icons.fact_check_rounded, 'Review', 'Bonus & deductions'),
+  (Icons.send_rounded, 'Finalize', 'Lock & email'),
+];
+
+/// How each salary type's pay is worked out, in its colour.
+class _PayRules extends StatelessWidget {
+  const _PayRules();
+
+  @override
+  Widget build(BuildContext context) {
+    const rules = {
+      SalaryType.shift: 'Shifts worked × amount per shift',
+      SalaryType.piece: 'Pieces × each work type\'s rate',
+      SalaryType.hourly: 'Hours worked × amount per hour',
+      SalaryType.weekly: 'Days present × (weekly salary ÷ 6)',
+      SalaryType.monthly: 'Days present × (monthly salary ÷ working days)',
+    };
+    return Material(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: AppColors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 4, 14, 4),
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: EdgeInsets.zero,
+            leading: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: AppColors.accentGradient(AppColors.brandDeep),
+                ),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.calculate_rounded,
+                size: 18,
+                color: Colors.white,
+              ),
+            ),
+            title: Text(
+              'How pay is worked out',
+              style: TextStyle(
+                color: AppColors.ink,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            subtitle: Text(
+              'Half days count ½ · additions and deductions are added after',
+              style: TextStyle(color: AppColors.textHint, fontSize: 11.5),
+            ),
+            children: [
+              for (final e in rules.entries)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        salaryTypeColor(e.key).withValues(alpha: 0.16),
+                        salaryTypeColor(e.key).withValues(alpha: 0.04),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        salaryTypeIcon(e.key),
+                        size: 18,
+                        color: salaryTypeColor(e.key),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 74,
+                        child: Text(
+                          SalaryType.label(e.key),
+                          style: TextStyle(
+                            color: AppColors.ink,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          e.value,
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -787,6 +946,24 @@ class _SalaryRunPageState extends ConsumerState<SalaryRunPage> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
               children: [
                 _RunSummary(run: run),
+                const SizedBox(height: 16),
+                StepGuide(
+                  steps: kSalarySteps,
+                  current: run.isFinalized ? 2 : 1,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  run.isFinalized
+                      ? 'Done. Email the payslips to your employees; they also '
+                            'see them in the app. Reopen to change anything.'
+                      : 'Check each payslip below — tap one to add a bonus or '
+                            'take off an advance — then Finalize.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
                 const SizedBox(height: 14),
                 _actions(run, access, ds),
                 const SizedBox(height: 18),
@@ -978,13 +1155,7 @@ class _RunSummary extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: run.isFinalized
-              ? [AppColors.positiveDeep, AppColors.brandDeep]
-              : [AppColors.brand, AppColors.brandDeep],
-        ),
+        gradient: kThemeSweepGradient,
         borderRadius: BorderRadius.circular(22),
       ),
       child: Column(
