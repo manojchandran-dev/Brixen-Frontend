@@ -60,12 +60,7 @@ void main() {
     expect(tester.takeException(), isNull);
 
     expect(find.text(DateFormat('MMMM yyyy').format(now)), findsOneWidget);
-    expect(
-      find.text(
-        '${items.length} record${items.length == 1 ? '' : 's'} this month',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text(items.length == 1 ? 'record' : 'records'), findsOneWidget);
     // Today is picked: its record shows.
     expect(find.text('Ravi'), findsOneWidget);
 

@@ -10,6 +10,9 @@ import '../../../employees/domain/entities/employee.dart';
 import '../../../employees/presentation/providers/employees_provider.dart';
 import '../../../expenses/domain/entities/expense.dart';
 import '../../../expenses/presentation/providers/expenses_provider.dart';
+import '../../../attendance/presentation/salary_type_visuals.dart';
+import '../../../payroll/domain/payroll.dart';
+import '../../../payroll/presentation/payroll_providers.dart';
 import '../../../products/domain/entities/product.dart';
 import '../../../products/presentation/providers/products_provider.dart';
 import '../../../sales/domain/entities/sale.dart';
@@ -345,6 +348,8 @@ class CompanyExpenseReport extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final expenses = ref.watch(expensesProvider);
+    // Finalized payslips; empty without the Employees permission.
+    final salaries = ref.watch(salaryReportProvider).valueOrNull;
     return CompanyReportScreen(
       loading: expenses.isLoading && !expenses.hasValue,
       error: expenses.hasValue ? null : expenses.error,
@@ -357,6 +362,11 @@ class CompanyExpenseReport extends ConsumerWidget {
         ];
         final total = list.fold<double>(0, (a, e) => a + e.amount);
         final byCategory = expensesByCategory(list);
+        final slips = [
+          for (final p in salaries ?? const <Payslip>[])
+            if (inPeriod(p.periodTo, period, now)) p,
+        ];
+        final salaryTotal = slips.fold<double>(0, (a, p) => a + p.net);
         return [
           ReportSummary([
             ReportStat(
@@ -385,6 +395,22 @@ class CompanyExpenseReport extends ConsumerWidget {
               byCategory.isEmpty ? '—' : byCategory.first.label,
               AppColors.brandBlack,
             ),
+            if (salaries != null) ...[
+              ReportStat(
+                Icons.payments_rounded,
+                'Salaries · ${slips.length} payslips',
+                rupees(salaryTotal),
+                AppColors.positiveDeep,
+                amount: salaryTotal,
+              ),
+              ReportStat(
+                Icons.account_balance_wallet_rounded,
+                'Expenses + salaries',
+                rupees(total + salaryTotal),
+                AppColors.brandLight,
+                amount: total + salaryTotal,
+              ),
+            ],
           ]),
           ReportCard(
             title: 'Expenses by date',
@@ -455,9 +481,87 @@ class CompanyExpenseReport extends ConsumerWidget {
               trailingAmount: e.amount,
             ),
           ),
+          if (salaries != null) ..._salaryReport(slips, salaryTotal),
         ];
       },
     );
+  }
+
+  /// Finalized salary months in the period: net pay by salary type and by
+  /// month, then each payslip.
+  List<Widget> _salaryReport(List<Payslip> slips, double total) {
+    final byType = <String, Tally>{};
+    final byMonth = <String, Tally>{};
+    for (final p in slips) {
+      byType
+          .putIfAbsent(
+            p.salaryType,
+            () => Tally(SalaryType.label(p.salaryType)),
+          )
+          .add(amount: p.net);
+      byMonth
+          .putIfAbsent(p.month, () => Tally(monthLabel(p.month), p.month))
+          .add(amount: p.net);
+    }
+    final types = byType.values.toList()
+      ..sort((a, b) => b.amount.compareTo(a.amount));
+    final months = byMonth.values.toList()
+      ..sort((a, b) => b.sub.compareTo(a.sub));
+    return [
+      ReportCard(
+        title: 'Salary report',
+        caption: slips.isEmpty
+            ? 'No finalized salary months in this period'
+            : 'Net pay ${rupees(total)} · by salary type',
+        child: slips.isEmpty ? const SizedBox(height: 8) : _amountDonut(types),
+      ),
+      if (months.isNotEmpty)
+        ReportList<Tally>(
+          title: 'Salary by month',
+          items: months,
+          sorts: [
+            ReportSort('Newest', (a, b) => b.sub.compareTo(a.sub)),
+            ReportSort('Amount', (a, b) => b.amount.compareTo(a.amount)),
+          ],
+          row: (t, i) => _RankRow(
+            rank: i + 1,
+            title: t.label,
+            subtitle: '${t.count} payslip${t.count == 1 ? '' : 's'}',
+            value: rupees(t.amount),
+            amount: t.amount,
+          ),
+        ),
+      if (slips.isNotEmpty)
+        ReportList<Payslip>(
+          title: 'Payslips',
+          pageSize: 5,
+          caption: '${slips.length} in this period',
+          items: slips,
+          searchText: (p) =>
+              '${p.employeeName} ${p.employeeCode} ${SalaryType.label(p.salaryType)} '
+              '${monthLabel(p.month)}',
+          sorts: [
+            ReportSort('Highest', (a, b) => b.net.compareTo(a.net)),
+            ReportSort('Newest', (a, b) => b.month.compareTo(a.month)),
+            ReportSort(
+              'Name',
+              (a, b) => a.employeeName.toLowerCase().compareTo(
+                b.employeeName.toLowerCase(),
+              ),
+            ),
+          ],
+          row: (p, _) => ReportRow(
+            icon: salaryTypeIcon(p.salaryType),
+            color: salaryTypeColor(p.salaryType),
+            title: p.employeeName,
+            subtitle:
+                '${monthLabel(p.month)} · ${SalaryType.label(p.salaryType)} · '
+                '${p.workLabel}',
+            trailing: rupees(p.net),
+            trailingAmount: p.net,
+          ),
+        ),
+    ];
   }
 }
 

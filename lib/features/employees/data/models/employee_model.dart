@@ -62,7 +62,10 @@ class EmployeeModel extends Employee {
       managerId: (json['manager_id'] ?? json['managerId'])?.toString(),
       managerName: json['manager_name'] ?? json['managerName'],
       employmentType: json['employment_type'] ?? json['employmentType'],
-      salaryType: json['salary_type']?.toString(),
+      salaryType: SalaryType.normalize(
+        json['salary_type']?.toString(),
+        json['salary_period']?.toString(),
+      ),
       salaryPeriod: json['salary_period']?.toString(),
       salary: json['salary'] != null
           ? double.tryParse(json['salary'].toString())

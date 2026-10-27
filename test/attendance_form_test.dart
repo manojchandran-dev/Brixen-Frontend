@@ -49,8 +49,8 @@ void main() {
           employeeCode: 'EMP0001',
           employeeName: 'Meena',
           kind: SalaryType.shift,
-          salaryPeriod: 'DAILY',
           salary: 600,
+          totalAmount: 900,
           workDate: '2026-10-27',
           recordedLocal: '27 Oct 2026, 9:05 am',
           timezone: 'Asia/Kolkata',
@@ -63,7 +63,7 @@ void main() {
     expect(tester.takeException(), isNull);
 
     expect(find.text('1½ shifts'), findsOneWidget);
-    expect(find.text('₹900'), findsOneWidget); // 1.5 × ₹600 a day
+    expect(find.text('₹900'), findsOneWidget); // 1.5 × ₹600 a shift
 
     await tester.tap(find.text('Add shift 3'));
     await tester.pump();

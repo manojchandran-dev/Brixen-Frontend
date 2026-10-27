@@ -65,6 +65,14 @@ Iterable<NavModule> _withInventory(Iterable<NavModule> modules) sync* {
         description: 'What each employee can use',
       );
     }
+    // Salary generation is part of Employees: anyone with it gets this.
+    if (key(m) == 'employees') {
+      yield const NavModule(
+        id: 'salarygeneration',
+        name: 'Salary Generation',
+        description: 'Payslips from attendance',
+      );
+    }
   }
 }
 
@@ -278,6 +286,8 @@ void Function(BuildContext context) _destinationFor(NavModule module) {
       return (context) => context.go(AppRouter.attendance);
     case 'staffpermissions':
       return (context) => context.go(AppRouter.staffPermissions);
+    case 'salarygeneration':
+      return (context) => context.go(AppRouter.salaryGeneration);
     // No backend module row exists for these yet — the module only reaches
     // superAdmin today via the Dashboard's Quick Actions tiles
     // (welcome_dashboard_view.dart). These cases are additive/forward-

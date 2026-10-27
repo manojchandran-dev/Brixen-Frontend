@@ -32,6 +32,7 @@ import '../../features/expenses/presentation/pages/expenses_page.dart';
 import '../../features/expenses/presentation/pages/create_expense_page.dart';
 import '../../features/expenses/domain/entities/expense.dart';
 import '../../features/attendance/presentation/pages/attendance_page.dart';
+import '../../features/payroll/presentation/pages/salary_generation_pages.dart';
 import '../../features/employees/presentation/pages/employees_page.dart';
 import '../../features/employees/presentation/pages/create_employee_page.dart';
 import '../../features/employees/domain/entities/employee.dart';
@@ -107,6 +108,7 @@ class AppRouter {
   static const String inventory = RouteNames.inventory;
   static const String attendance = RouteNames.attendance;
   static const String staffPermissions = RouteNames.staffPermissions;
+  static const String salaryGeneration = RouteNames.salaryGeneration;
   static const String createProduct = RouteNames.createProduct;
   static const String permissions = RouteNames.permissions;
   static const String createPermission = RouteNames.createPermission;
@@ -323,6 +325,14 @@ class AppRouter {
                   : StaffPermissionsPage(
                       initialEmployeeId: state.extra as String?,
                     ),
+            ),
+          ),
+          GoRoute(
+            path: _sub(salaryGeneration, dashboard),
+            // Salary generation is part of Employees.
+            builder: _guard(
+              'Employees',
+              (context, state) => const SalaryGenerationPage(),
             ),
           ),
           GoRoute(

@@ -34,6 +34,7 @@ class RouteNames {
   static const String inventory = '/dashboard/inventory';
   static const String attendance = '/dashboard/attendance';
   static const String staffPermissions = '/dashboard/staff-permissions';
+  static const String salaryGeneration = '/dashboard/salary-generation';
   static const String createProduct = '/dashboard/products/create';
   static const String permissions = '/dashboard/permissions';
   static const String createPermission = '/dashboard/permissions/create';

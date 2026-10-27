@@ -54,6 +54,8 @@ ModuleVisual moduleVisualFor(String name) {
       return const ModuleVisual(Icons.checkroom_outlined, AppColors.brandLight);
     case 'staffpermissions':
       return const ModuleVisual(Icons.admin_panel_settings_rounded, AppColors.positive);
+    case 'salarygeneration':
+      return const ModuleVisual(Icons.payments_rounded, AppColors.positiveDeep);
     case 'department':
       return const ModuleVisual(Icons.apartment_rounded, AppColors.brandDeep);
     case 'worktype':

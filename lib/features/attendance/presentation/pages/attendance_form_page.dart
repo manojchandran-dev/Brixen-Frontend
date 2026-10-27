@@ -15,10 +15,11 @@ import '../../../permissions/presentation/providers/module_access_provider.dart'
 import '../../data/attendance_remote_datasource.dart';
 import '../../domain/attendance.dart';
 import '../attendance_providers.dart';
+import '../salary_type_visuals.dart';
 
-/// Record (or edit) one employee's attendance for one day. A shift-rate
-/// employee gets up to three shifts (1/4 … 3 each); a piece-rate employee
-/// gets work types with quantities, each priced at the work type's rate.
+/// Record (or edit) one employee's attendance for one day, by their salary
+/// type: up to three shifts (1/4 … 3 each); work types with quantities, each
+/// priced at the work type's rate; hours worked; or a full / half day.
 class AttendanceFormPage extends ConsumerStatefulWidget {
   /// The day, "YYYY-MM-DD" (the list page's date).
   final String date;
@@ -59,12 +60,16 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
   Employee? _employee;
   final List<double> _shifts = [];
   final List<_PieceDraft> _pieces = [];
+  final _hours = TextEditingController();
+  double _dayUnits = 1;
   bool _saving = false;
 
   bool get _isEdit => widget.edit != null;
   String get _kind =>
       widget.edit?.kind ?? _employee?.salaryType ?? SalaryType.shift;
   bool get _isShift => _kind == SalaryType.shift;
+  bool get _isPiece => _kind == SalaryType.piece;
+  bool get _isHourly => _kind == SalaryType.hourly;
 
   @override
   void initState() {
@@ -80,6 +85,8 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
           _PieceDraft(workTypeId: p.workTypeId, quantity: p.quantity),
         );
       }
+      if (r.hours != null) _hours.text = hoursLabel(r.hours!);
+      _dayUnits = r.dayUnits ?? 1;
       _notes.text = r.notes ?? '';
     }
   }
@@ -87,6 +94,7 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
   @override
   void dispose() {
     _notes.dispose();
+    _hours.dispose();
     for (final p in _pieces) {
       p.qty.dispose();
     }
@@ -104,6 +112,8 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
       _pieces.clear();
       if (e?.salaryType == SalaryType.shift) _shifts.add(1);
       if (e?.salaryType == SalaryType.piece) _pieces.add(_PieceDraft());
+      _hours.text = e?.salaryType == SalaryType.hourly ? '8' : '';
+      _dayUnits = 1;
     });
   }
 
@@ -143,17 +153,31 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
     (a, p) => a + (int.tryParse(p.qty.text) ?? 0) * _rateOf(p.workTypeId),
   );
 
-  /// Pay for the day for a shift-rate employee paid daily.
-  double? get _shiftPay {
-    final period = widget.edit?.salaryPeriod ?? _employee?.salaryPeriod;
-    final salary = widget.edit?.salary ?? _employee?.salary;
-    if (period != 'DAILY' || salary == null) return null;
-    return _totalShifts * salary;
+  /// The salary per shift or per hour (null when the record's amount isn't
+  /// priced that way, e.g. the employee's salary type changed since).
+  double? get _rate {
+    final r = widget.edit;
+    if (r != null) {
+      return r.totalAmount == null ? null : r.salary;
+    }
+    return SalaryType.hasAmount(_employee?.salaryType)
+        ? _employee?.salary
+        : null;
   }
+
+  double? get _hoursValue => double.tryParse(_hours.text.trim());
 
   String? _problem() {
     if (!_isEdit && _employee == null) return 'Pick an employee';
-    if (_isShift) {
+    if (_isHourly) {
+      final h = _hoursValue;
+      if (h == null || h <= 0 || h > kMaxHours) {
+        return 'Hours must be more than 0 and at most $kMaxHours';
+      }
+      if ((h * 4).round() != h * 4) return 'Hours go in quarter hours (7.25)';
+    } else if (SalaryType.isDayBased(_kind)) {
+      // A full or half day: always set.
+    } else if (_isShift) {
       if (_shifts.isEmpty) return 'Add at least one shift';
       if (_shifts.length > kMaxShifts) {
         return 'At most $kMaxShifts shifts can be recorded for one day';
@@ -183,7 +207,9 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
         'shifts': [
           for (final s in _shifts) {'units': s},
         ],
-      if (!_isShift)
+      if (_isHourly) 'hours': _hoursValue,
+      if (SalaryType.isDayBased(_kind)) 'day_units': _dayUnits,
+      if (_isPiece)
         'pieces': [
           for (final p in _pieces)
             {'work_type_id': p.workTypeId, 'quantity': int.parse(p.qty.text)},
@@ -340,8 +366,12 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
               const SizedBox(height: 24),
               if (_isShift)
                 ..._shiftSection(section, hint)
+              else if (_isPiece)
+                ..._pieceSection(section, hint)
+              else if (_isHourly)
+                ..._hourSection(section, hint)
               else
-                ..._pieceSection(section, hint),
+                ..._daySection(section, hint),
             ],
             const SizedBox(height: 20),
             BrixenTextField(
@@ -431,10 +461,125 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
       label: 'Day total',
       value:
           '${shiftTotalLabel(_totalShifts)} shift${_totalShifts == 1 ? '' : 's'}',
-      amount: _shiftPay,
-      color: AppColors.brand,
+      amount: _rate == null ? null : _totalShifts * _rate!,
+      color: salaryTypeColor(SalaryType.shift),
     ),
   ];
+
+  List<Widget> _hourSection(TextStyle section, TextStyle hint) {
+    final color = salaryTypeColor(SalaryType.hourly);
+    final h = _hoursValue ?? 0;
+    return [
+      Text('Hours worked', style: section),
+      Text(
+        _rate == null
+            ? 'Quarter hours, up to $kMaxHours'
+            : 'At ${rupeesExact(_rate!)} per hour · quarter hours, up to $kMaxHours',
+        style: hint,
+      ),
+      const SizedBox(height: 12),
+      BrixenTextField(
+        label: 'Hours *',
+        hint: 'e.g. 8 or 7.5',
+        controller: _hours,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        prefixIcon: Icon(salaryTypeIcon(SalaryType.hourly)),
+        onChanged: (_) => setState(() {}),
+      ),
+      const SizedBox(height: 10),
+      Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          for (final q in const [4.0, 6.0, 8.0, 9.0, 10.0, 12.0])
+            ChoiceChip(
+              label: Text('${hoursLabel(q)} h'),
+              selected: h == q,
+              onSelected: (_) => setState(() => _hours.text = hoursLabel(q)),
+              selectedColor: color.withValues(alpha: 0.22),
+              labelStyle: TextStyle(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+        ],
+      ),
+      const SizedBox(height: 14),
+      _TotalBar(
+        label: 'Day total',
+        value: '${hoursLabel(h)} hour${h == 1 ? '' : 's'}',
+        amount: _rate == null ? null : h * _rate!,
+        color: color,
+      ),
+    ];
+  }
+
+  List<Widget> _daySection(TextStyle section, TextStyle hint) {
+    final color = salaryTypeColor(_kind);
+    Widget option(double units, String title, String sub, IconData icon) {
+      final on = _dayUnits == units;
+      return Expanded(
+        child: GestureDetector(
+          onTap: () => setState(() => _dayUnits = units),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: on
+                  ? LinearGradient(colors: AppColors.accentGradient(color))
+                  : null,
+              color: on ? null : AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: on ? Colors.transparent : AppColors.border,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, color: on ? Colors.white : color),
+                const SizedBox(height: 8),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: on ? Colors.white : AppColors.ink,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                  ),
+                ),
+                Text(
+                  sub,
+                  style: TextStyle(
+                    color: on
+                        ? Colors.white.withValues(alpha: 0.85)
+                        : AppColors.textHint,
+                    fontSize: 11.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return [
+      Text('Present', style: section),
+      Text(
+        '${SalaryType.label(_kind)} salary · the pay is worked out at salary '
+        'generation',
+        style: hint,
+      ),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          option(1, 'Full day', 'Counts 1 day', Icons.wb_sunny_rounded),
+          const SizedBox(width: 10),
+          option(0.5, 'Half day', 'Counts ½ day', Icons.wb_twilight_rounded),
+        ],
+      ),
+    ];
+  }
 
   List<Widget> _pieceSection(TextStyle section, TextStyle hint) {
     final types = _workTypes;
@@ -548,7 +693,7 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
         label: 'Day total',
         value: '$_totalPieces piece${_totalPieces == 1 ? '' : 's'}',
         amount: _totalAmount,
-        color: AppColors.positive,
+        color: salaryTypeColor(SalaryType.piece),
       ),
     ];
   }

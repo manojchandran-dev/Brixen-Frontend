@@ -13,6 +13,7 @@ import '../../../../shared/widgets/company_selector_field.dart';
 import '../../../companies/domain/entities/company.dart';
 import '../../../masters/domain/entities/master_item.dart';
 import '../../../masters/presentation/cubit/master_cubit.dart';
+import '../../../attendance/presentation/salary_type_visuals.dart';
 import '../../domain/entities/employee.dart';
 import '../providers/employees_provider.dart';
 
@@ -54,8 +55,7 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
 
   // Step 2 — Employment Info
   String? _departmentId; // from the Department master
-  String? _salaryType; // SalaryType.shift / SalaryType.piece
-  String? _salaryPeriod;
+  String? _salaryType; // one of SalaryType.all
   final _designationCtrl = TextEditingController();
   final _salaryCtrl = TextEditingController();
   DateTime? _joiningDate;
@@ -114,7 +114,6 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
       _dateOfBirth = e.dateOfBirth;
       _departmentId = e.departmentId;
       _salaryType = e.salaryType;
-      _salaryPeriod = e.salaryPeriod;
       _designationCtrl.text = e.designation ?? '';
       _salaryCtrl.text = e.salary?.toStringAsFixed(2) ?? '';
       _joiningDate = e.joiningDate;
@@ -170,13 +169,7 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
   /// validator can't cover), or null.
   String? _employmentProblem() {
     if (_departmentId == null) return 'Pick a department';
-    if (_salaryType == null) {
-      return 'Pick a salary type: Shift Rate or Piece Rate';
-    }
-    if (_salaryType == SalaryType.shift &&
-        !SalaryType.periodsFor(SalaryType.shift).contains(_salaryPeriod)) {
-      return 'Pick how the shift rate is paid: Monthly, Weekly, Daily or Hourly';
-    }
+    if (_salaryType == null) return 'Pick a salary type';
     return null;
   }
 
@@ -288,16 +281,16 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
             firstName: '',
             departmentId: _departmentId,
             salaryType: _salaryType,
-            salaryPeriod: _salaryType == SalaryType.piece
-                ? 'PER_PIECE'
-                : _salaryPeriod,
+            salaryPeriod: SalaryType.periodOf(_salaryType),
             designation: _designationCtrl.text.trim().isEmpty
                 ? null
                 : _designationCtrl.text.trim(),
             joiningDate: _joiningDate,
             managerId: _manager?.id,
             employmentType: _employmentType,
-            salary: double.tryParse(_salaryCtrl.text.trim()),
+            salary: SalaryType.hasAmount(_salaryType)
+                ? double.tryParse(_salaryCtrl.text.trim())
+                : null,
             status: _status,
             createdAt: DateTime.now(),
           );
@@ -563,15 +556,7 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
           departmentId: _departmentId,
           onDepartmentChanged: (d) => setState(() => _departmentId = d?.id),
           salaryType: _salaryType,
-          onSalaryTypeChanged: (t) => setState(() {
-            _salaryType = t;
-            // Keep the period only if it fits the new type.
-            if (!SalaryType.periodsFor(t).contains(_salaryPeriod)) {
-              _salaryPeriod = t == SalaryType.piece ? 'PER_PIECE' : null;
-            }
-          }),
-          salaryPeriod: _salaryPeriod,
-          onSalaryPeriodChanged: (p) => setState(() => _salaryPeriod = p),
+          onSalaryTypeChanged: (t) => setState(() => _salaryType = t),
           designationCtrl: _designationCtrl,
           salaryCtrl: _salaryCtrl,
           joiningDate: _joiningDate,
@@ -918,8 +903,6 @@ class _Step2 extends StatelessWidget {
   final void Function(MasterItem?) onDepartmentChanged;
   final String? salaryType;
   final void Function(String) onSalaryTypeChanged;
-  final String? salaryPeriod;
-  final void Function(String?) onSalaryPeriodChanged;
   final TextEditingController designationCtrl, salaryCtrl;
   final DateTime? joiningDate;
   final void Function(DateTime?) onJoiningDateChanged;
@@ -937,8 +920,6 @@ class _Step2 extends StatelessWidget {
     required this.onDepartmentChanged,
     required this.salaryType,
     required this.onSalaryTypeChanged,
-    required this.salaryPeriod,
-    required this.onSalaryPeriodChanged,
     required this.designationCtrl,
     required this.salaryCtrl,
     required this.joiningDate,
@@ -963,8 +944,8 @@ class _Step2 extends StatelessWidget {
       color: cs.onSurfaceVariant.withValues(alpha: 0.75),
       fontSize: 11.5,
     );
-    final isShift = salaryType == SalaryType.shift;
     final isPiece = salaryType == SalaryType.piece;
+    final hasAmount = SalaryType.hasAmount(salaryType);
     return Form(
       key: formKey,
       child: ListView(
@@ -1014,46 +995,33 @@ class _Step2 extends StatelessWidget {
           const SizedBox(height: 22),
           Text('Salary type *', style: label),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _SalaryTypeCard(
-                  title: 'Shift Rate',
-                  subtitle: 'Paid per shift worked',
-                  icon: Icons.schedule_rounded,
-                  selected: isShift,
-                  onTap: () => onSalaryTypeChanged(SalaryType.shift),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _SalaryTypeCard(
-                  title: 'Piece Rate',
-                  subtitle: 'Paid per piece made',
-                  icon: Icons.content_cut_rounded,
-                  selected: isPiece,
-                  onTap: () => onSalaryTypeChanged(SalaryType.piece),
-                ),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, c) {
+              final w = (c.maxWidth - 10) / 2;
+              return Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (final t in SalaryType.all)
+                    SizedBox(
+                      width: w,
+                      child: _SalaryTypeCard(
+                        title: SalaryType.label(t),
+                        subtitle: _salaryTypeHint(t),
+                        icon: salaryTypeIcon(t),
+                        color: salaryTypeColor(t),
+                        selected: salaryType == t,
+                        onTap: () => onSalaryTypeChanged(t),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 22),
-          if (isShift) ...[
-            BrixenDropdown<String>(
-              hint: 'Salary period *',
-              value: SalaryType.periodsFor(
-                SalaryType.shift,
-              ).where((p) => p == salaryPeriod).firstOrNull,
-              items: SalaryType.periodsFor(SalaryType.shift),
-              labelOf: SalaryType.periodLabel,
-              icon: Icons.event_repeat_rounded,
-              onChanged: onSalaryPeriodChanged,
-            ),
-            const SizedBox(height: 22),
+          if (hasAmount) ...[
             BrixenTextField(
-              label: salaryPeriod == null
-                  ? 'Salary amount *'
-                  : 'Salary amount ${SalaryType.perLabel(salaryPeriod)} *',
+              label: 'Salary amount ${SalaryType.perLabel(salaryType)} *',
               hint: '0.00',
               controller: salaryCtrl,
               keyboardType: const TextInputType.numberWithOptions(
@@ -1069,26 +1037,22 @@ class _Step2 extends StatelessWidget {
               },
             ),
             const SizedBox(height: 6),
-            Text(
-              salaryPeriod == 'DAILY'
-                  ? 'One full shift = one day. Attendance shows each day\'s pay.'
-                  : 'Attendance records shifts (1/4 to 3 a shift, up to 3 a day).',
-              style: hint,
-            ),
+            Text(switch (salaryType) {
+              SalaryType.shift =>
+                'Attendance records shifts (1/4 to 3 a shift, up to 3 a day); '
+                    'pay = shifts × this amount.',
+              SalaryType.hourly =>
+                'Attendance records hours worked; pay = hours × this amount.',
+              SalaryType.weekly =>
+                'Attendance records full or half days; a week is 6 working '
+                    'days, so a day is this amount ÷ 6.',
+              _ =>
+                'Attendance records full or half days; a day is this amount ÷ '
+                    'the month\'s working days (Sundays off).',
+            }, style: hint),
             const SizedBox(height: 22),
           ],
           if (isPiece) ...[
-            InputDecorator(
-              decoration: InputDecoration(
-                labelText: 'Salary period',
-                prefixIcon: const Icon(Icons.event_repeat_rounded),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              child: const Text('Per Piece'),
-            ),
-            const SizedBox(height: 6),
             Text(
               'Paid by each work type\'s rate (Masters → Work Type) × pieces '
               'done. No separate amount.',
@@ -1121,15 +1085,26 @@ class _Step2 extends StatelessWidget {
 }
 
 /// One salary type to pick: icon, name, one line on how it's paid.
+/// What each salary type's card says under its name.
+String _salaryTypeHint(String type) => switch (type) {
+  SalaryType.shift => 'Per shift worked',
+  SalaryType.piece => 'Per piece made',
+  SalaryType.hourly => 'Per hour worked',
+  SalaryType.weekly => 'Fixed per week',
+  _ => 'Fixed per month',
+};
+
 class _SalaryTypeCard extends StatelessWidget {
   final String title, subtitle;
   final IconData icon;
+  final Color color;
   final bool selected;
   final VoidCallback onTap;
   const _SalaryTypeCard({
     required this.title,
     required this.subtitle,
     required this.icon,
+    required this.color,
     required this.selected,
     required this.onTap,
   });
@@ -1137,9 +1112,7 @@ class _SalaryTypeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected
-          ? AppColors.brand.withValues(alpha: 0.12)
-          : AppColors.surface,
+      color: selected ? color.withValues(alpha: 0.14) : AppColors.surface,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
@@ -1150,16 +1123,27 @@ class _SalaryTypeCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: selected ? AppColors.brand : AppColors.border,
+              color: selected ? color : AppColors.border,
               width: selected ? 1.6 : 1,
             ),
           ),
           child: Row(
             children: [
-              Icon(
-                selected ? Icons.check_circle_rounded : icon,
-                size: 22,
-                color: selected ? AppColors.brand : AppColors.textHint,
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  gradient: selected
+                      ? LinearGradient(colors: AppColors.accentGradient(color))
+                      : null,
+                  color: selected ? null : color.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  selected ? Icons.check_rounded : icon,
+                  size: 18,
+                  color: selected ? Colors.white : color,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(

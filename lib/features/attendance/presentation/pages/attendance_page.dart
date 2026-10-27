@@ -2,21 +2,19 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/network/api_client.dart';
-import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/money.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/error_state.dart';
 import '../../../../shared/widgets/exact_amount.dart';
 import '../../../../shared/widgets/module_title.dart';
-import '../../../../shared/widgets/pill_segmented_control.dart';
 import '../../../../shared/widgets/search_field.dart';
 import '../../../../shared/widgets/skeleton.dart';
 import '../../../employees/domain/entities/employee.dart';
 import '../../../permissions/presentation/providers/module_access_provider.dart';
 import '../../domain/attendance.dart';
 import '../attendance_providers.dart';
+import '../salary_type_visuals.dart';
 import '../widgets/attendance_card.dart';
 import 'attendance_form_page.dart';
 
@@ -24,9 +22,10 @@ final _ymd = DateFormat('yyyy-MM-dd');
 final _ym = DateFormat('yyyy-MM');
 
 /// Company admins record and review attendance on a month calendar: every
-/// day with records is marked (shift, piece, how many); tap a day for its
-/// records, totals and to record more. Dates are the company's own, in its
-/// time zone; search by name or code and filter shift or piece workers.
+/// day with records is marked (a dot per salary type, how many); tap a day
+/// for its records, totals and to record more. Dates are the company's own
+/// (Asia/Kolkata unless set otherwise); search by name or code and filter by
+/// salary type.
 class AttendancePage extends ConsumerStatefulWidget {
   const AttendancePage({super.key});
 
@@ -109,6 +108,8 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
       for (final r in month?.items ?? const <AttendanceRecord>[])
         if (r.workDate == selected) r,
     ];
+    final canRecord =
+        access.create && month != null && selected.compareTo(month.today) <= 0;
 
     return Scaffold(
       drawer: const AppDrawer(),
@@ -119,28 +120,19 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
             onPressed: () => Scaffold.of(ctx).openDrawer(),
           ),
         ),
-        title: ModuleTitle(
+        title: const ModuleTitle(
           title: 'Attendance',
-          subtitle: month == null
-              ? 'Shifts & pieces per day'
-              : 'Times in ${month.timezone}',
+          subtitle: 'Shifts, pieces, hours & days',
         ),
         actions: [
-          IconButton(
-            tooltip: 'Company time zone',
-            onPressed: month == null
-                ? null
-                : () => _changeTimezone(month.timezone),
-            icon: const Icon(Icons.public_rounded),
-          ),
-          if (access.create &&
-              month != null &&
-              selected.compareTo(month.today) <= 0)
-            IconButton(
-              tooltip: 'Record attendance',
-              onPressed: () => _openForm(month, selected),
-              icon: const Icon(Icons.add_circle_rounded, size: 28),
-              color: AppColors.brand,
+          if (canRecord)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: _GradientIconButton(
+                icon: Icons.add_rounded,
+                tooltip: 'Record attendance',
+                onTap: () => _openForm(month, selected),
+              ),
             ),
         ],
       ),
@@ -173,60 +165,13 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
                 );
               },
             ),
-            const SizedBox(height: 8),
-            PillSegmentedControl<String>(
-              value: _kind ?? 'ALL',
-              onChanged: (v) => setState(() => _kind = v == 'ALL' ? null : v),
-              segments: const [
-                PillSegment(value: 'ALL', label: 'All'),
-                PillSegment(
-                  value: SalaryType.shift,
-                  label: 'Shift',
-                  icon: Icons.schedule_rounded,
-                ),
-                PillSegment(
-                  value: SalaryType.piece,
-                  label: 'Piece',
-                  icon: Icons.content_cut_rounded,
-                ),
-              ],
+            const SizedBox(height: 10),
+            _KindFilter(
+              value: _kind,
+              onChanged: (v) => setState(() => _kind = v),
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    DateFormat(
-                      'EEEE, d MMM yyyy',
-                    ).format(DateTime.parse(selected)),
-                    style: TextStyle(
-                      color: AppColors.ink,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                if (selected == today)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.positive.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      'Today',
-                      style: TextStyle(
-                        color: AppColors.positive,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+            _DayHeader(day: selected, isToday: selected == today),
             const SizedBox(height: 10),
             async.when(
               skipError: true,
@@ -244,8 +189,7 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
                   if (dayItems.isEmpty)
                     _Empty(
                       searching: _search.isNotEmpty || _kind != null,
-                      canCreate:
-                          access.create && selected.compareTo(list.today) <= 0,
+                      canCreate: canRecord,
                       onCreate: () => _openForm(list, selected),
                     )
                   else
@@ -267,79 +211,51 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
       ),
     );
   }
+}
 
-  /// The company's time zone for attendance dates and times.
-  Future<void> _changeTimezone(String current) async {
-    const zones = [
-      'Asia/Kolkata',
-      'Asia/Dubai',
-      'Asia/Singapore',
-      'Asia/Dhaka',
-      'Asia/Kathmandu',
-      'Asia/Colombo',
-      'Asia/Riyadh',
-      'Europe/London',
-      'America/New_York',
-      'UTC',
-    ];
-    final picked = await showModalBottomSheet<String>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            const ListTile(
-              title: Text(
-                'Company time zone',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-              subtitle: Text(
-                'Attendance dates and times use this zone. Records already '
-                'saved keep their date.',
-              ),
+class _GradientIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  const _GradientIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppColors.brand, AppColors.brandDeep],
+          ),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.brand.withValues(alpha: 0.35),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
             ),
-            for (final z in {current, ...zones})
-              ListTile(
-                title: Text(z),
-                trailing: z == current
-                    ? const Icon(Icons.check_rounded, color: AppColors.brand)
-                    : null,
-                onTap: () => Navigator.of(ctx).pop(z),
-              ),
           ],
         ),
+        child: Icon(icon, color: Colors.white, size: 24),
       ),
-    );
-    if (picked == null || picked == current || !mounted) return;
-    try {
-      await ref
-          .read(dioProvider)
-          .put(ApiEndpoints.me, data: {'timezone': picked});
-      _selected = null; // "today" may be a different date in the new zone
-      ref.invalidate(attendanceMonthProvider);
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Time zone set to $picked')));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: AppColors.dangerFill,
-          ),
-        );
-      }
-    }
-  }
+    ),
+  );
 }
 
 // ── Month calendar ────────────────────────────────────────────────────────
 
-/// The month as a grid (Monday first): each day with records shows how
-/// many and whether shift (blue) or piece (green); today ringed, the picked
-/// day filled, days after today dimmed and not tappable.
+/// The month as a grid (Monday first) under a blue header with the month's
+/// totals: each day with records shows a dot per salary type and how many;
+/// today ringed, the picked day filled, days after today dimmed and not
+/// tappable.
 class _CalendarCard extends StatelessWidget {
   final DateTime month;
   final String selected;
@@ -371,59 +287,79 @@ class _CalendarCard extends StatelessWidget {
     final cells = ((pad + days) / 7).ceil() * 7;
     final isLatest =
         today != null && _ym.format(month) == today!.substring(0, 7);
+    final people = {for (final r in items) r.employeeId}.length;
+    final amount = items.fold<double>(0, (a, r) => a + (r.totalAmount ?? 0));
+    final kinds = {for (final r in items) r.kind};
 
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: AppColors.border),
         boxShadow: AppColors.shadows([
           BoxShadow(
-            color: AppColors.shadowDark.withValues(alpha: 0.06),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+            color: AppColors.brand.withValues(alpha: 0.12),
+            blurRadius: 22,
+            offset: const Offset(0, 8),
           ),
         ]),
       ),
       child: Column(
         children: [
-          // Accent strip, like the rest of the app's cards.
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(17)),
-            child: Row(
-              children: [
-                for (final c in [
-                  AppColors.brand,
-                  AppColors.positive,
-                  AppColors.brandDeep,
-                  AppColors.brandLight,
-                ])
-                  Expanded(child: Container(height: 3, color: c)),
-              ],
+          // Header: month, arrows and the month's totals on the brand blue.
+          Container(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+            decoration: const BoxDecoration(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(21)),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.brand, AppColors.brandDeep],
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-            child: Row(
+            child: Column(
               children: [
-                _Arrow(Icons.chevron_left_rounded, onPrev),
-                Expanded(
-                  child: Text(
-                    DateFormat('MMMM yyyy').format(month),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppColors.ink,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
+                Row(
+                  children: [
+                    _Arrow(Icons.chevron_left_rounded, onPrev),
+                    Expanded(
+                      child: Text(
+                        DateFormat('MMMM yyyy').format(month),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
                     ),
-                  ),
+                    _Arrow(
+                      Icons.chevron_right_rounded,
+                      isLatest ? null : onNext,
+                    ),
+                  ],
                 ),
-                _Arrow(Icons.chevron_right_rounded, isLatest ? null : onNext),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _HeaderStat(
+                      '${items.length}',
+                      'record${items.length == 1 ? '' : 's'}',
+                    ),
+                    _HeaderStat('$people', 'staff'),
+                    _HeaderStat(
+                      rupees(amount),
+                      'priced',
+                      exact: amount,
+                      highlight: true,
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
             child: Row(
               children: [
                 for (final (i, d) in const [
@@ -440,11 +376,11 @@ class _CalendarCard extends StatelessWidget {
                       d,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: i >= 5
-                            ? AppColors.brandDeep.withValues(alpha: 0.6)
-                            : AppColors.textHint,
+                        color: i == 6
+                            ? AppColors.positiveDeep
+                            : AppColors.brand,
                         fontSize: 11,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ),
@@ -452,7 +388,7 @@ class _CalendarCard extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
             child: GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -471,7 +407,7 @@ class _CalendarCard extends StatelessWidget {
                   records: byDay[key] ?? const [],
                   isToday: key == today,
                   isSelected: key == selected,
-                  isWeekend: date.weekday >= 6,
+                  isSunday: date.weekday == 7,
                   disabled: future,
                   loading: loading,
                   onTap: future ? null : () => onPick(key),
@@ -480,22 +416,18 @@ class _CalendarCard extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Row(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 6,
+              alignment: WrapAlignment.center,
               children: [
-                _Legend(AppColors.brand, 'Shift'),
-                const SizedBox(width: 14),
-                _Legend(AppColors.positive, 'Piece'),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    '${items.length} record${items.length == 1 ? '' : 's'} this month',
-                    textAlign: TextAlign.end,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: AppColors.textHint, fontSize: 11),
+                for (final t in SalaryType.all)
+                  _Legend(
+                    salaryTypeColor(t),
+                    SalaryType.label(t),
+                    dim: kinds.isNotEmpty && !kinds.contains(t),
                   ),
-                ),
               ],
             ),
           ),
@@ -503,6 +435,61 @@ class _CalendarCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _HeaderStat extends StatelessWidget {
+  final String value, label;
+  final double? exact;
+  final bool highlight;
+  const _HeaderStat(
+    this.value,
+    this.label, {
+    this.exact,
+    this.highlight = false,
+  });
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: ExactAmount(
+      amount: exact,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: highlight
+              ? AppColors.positive.withValues(alpha: 0.28)
+              : Colors.white.withValues(alpha: 0.13),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.80),
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _Arrow extends StatelessWidget {
@@ -519,10 +506,9 @@ class _Arrow extends StatelessWidget {
         width: 34,
         height: 34,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: AppColors.accentGradient(AppColors.brand),
-          ),
+          color: Colors.white.withValues(alpha: 0.16),
           borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
         ),
         child: Icon(icon, size: 20, color: Colors.white),
       ),
@@ -533,14 +519,14 @@ class _Arrow extends StatelessWidget {
 class _DayCell extends StatelessWidget {
   final int day;
   final List<AttendanceRecord> records;
-  final bool isToday, isSelected, isWeekend, disabled, loading;
+  final bool isToday, isSelected, isSunday, disabled, loading;
   final VoidCallback? onTap;
   const _DayCell({
     required this.day,
     required this.records,
     required this.isToday,
     required this.isSelected,
-    required this.isWeekend,
+    required this.isSunday,
     required this.disabled,
     required this.loading,
     required this.onTap,
@@ -548,22 +534,21 @@ class _DayCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shifts = records.where((r) => r.isShift).length;
-    final pieces = records.length - shifts;
+    // The day's salary types, most records first.
+    final counts = <String, int>{};
+    for (final r in records) {
+      counts[r.kind] = (counts[r.kind] ?? 0) + 1;
+    }
+    final kinds = counts.keys.toList()
+      ..sort((a, b) => counts[b]!.compareTo(counts[a]!));
     final has = records.isNotEmpty;
-    final Color? bg = isSelected
-        ? AppColors.brand
-        : has
-        ? (pieces > shifts ? AppColors.positive : AppColors.brand).withValues(
-            alpha: 0.10,
-          )
-        : null;
+    final tint = has ? salaryTypeColor(kinds.first) : null;
     final fg = isSelected
         ? Colors.white
         : disabled
         ? AppColors.textHint.withValues(alpha: 0.5)
-        : isWeekend
-        ? AppColors.ink.withValues(alpha: 0.55)
+        : isSunday
+        ? AppColors.positiveDeep
         : AppColors.ink;
 
     return GestureDetector(
@@ -571,17 +556,32 @@ class _DayCell extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.all(2.5),
         decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(10),
+          gradient: isSelected
+              ? const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppColors.brand, AppColors.brandDeep],
+                )
+              : has
+              ? LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    tint!.withValues(alpha: 0.20),
+                    tint.withValues(alpha: 0.07),
+                  ],
+                )
+              : null,
+          borderRadius: BorderRadius.circular(11),
           border: isToday && !isSelected
-              ? Border.all(color: AppColors.brand, width: 1.6)
+              ? Border.all(color: AppColors.brand, width: 1.8)
               : null,
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppColors.brand.withValues(alpha: 0.35),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
+                    color: AppColors.brand.withValues(alpha: 0.40),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
                 ]
               : null,
@@ -594,7 +594,7 @@ class _DayCell extends StatelessWidget {
               style: TextStyle(
                 color: fg,
                 fontSize: 13.5,
-                fontWeight: isToday || isSelected
+                fontWeight: isToday || isSelected || has
                     ? FontWeight.w900
                     : FontWeight.w600,
               ),
@@ -604,10 +604,8 @@ class _DayCell extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  if (shifts > 0)
-                    _Dot(isSelected ? Colors.white : AppColors.brand),
-                  if (pieces > 0)
-                    _Dot(isSelected ? Colors.white : AppColors.positive),
+                  for (final k in kinds.take(3))
+                    _Dot(isSelected ? Colors.white : salaryTypeColor(k)),
                   const SizedBox(width: 2),
                   Text(
                     '${records.length}',
@@ -646,77 +644,349 @@ class _Dot extends StatelessWidget {
 class _Legend extends StatelessWidget {
   final Color color;
   final String label;
-  const _Legend(this.color, this.label);
+
+  /// No records of this type this month.
+  final bool dim;
+  const _Legend(this.color, this.label, {this.dim = false});
 
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      _Dot(color),
-      const SizedBox(width: 4),
-      Text(label, style: TextStyle(color: AppColors.textHint, fontSize: 11)),
-    ],
+  Widget build(BuildContext context) => Opacity(
+    opacity: dim ? 0.45 : 1,
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    ),
   );
 }
 
-/// Present · shifts · pieces · amount for the day.
+// ── Filter, day header, totals ────────────────────────────────────────────
+
+/// All, or one salary type — coloured chips that scroll sideways.
+class _KindFilter extends StatelessWidget {
+  final String? value;
+  final ValueChanged<String?> onChanged;
+  const _KindFilter({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget chip(String? kind) {
+      final on = value == kind;
+      final color = kind == null ? AppColors.brand : salaryTypeColor(kind);
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: GestureDetector(
+          onTap: () => onChanged(kind),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(
+              gradient: on
+                  ? LinearGradient(colors: AppColors.accentGradient(color))
+                  : null,
+              color: on ? null : color.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: on
+                  ? [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  kind == null ? Icons.groups_rounded : salaryTypeIcon(kind),
+                  size: 16,
+                  color: on ? Colors.white : color,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  kind == null ? 'All' : SalaryType.label(kind),
+                  style: TextStyle(
+                    color: on ? Colors.white : AppColors.ink,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [chip(null), for (final t in SalaryType.all) chip(t)],
+      ),
+    );
+  }
+}
+
+class _DayHeader extends StatelessWidget {
+  final String day;
+  final bool isToday;
+  const _DayHeader({required this.day, required this.isToday});
+
+  @override
+  Widget build(BuildContext context) {
+    final d = DateTime.parse(day);
+    return Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: AppColors.accentGradient(
+                isToday ? AppColors.positive : AppColors.brand,
+              ),
+            ),
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '${d.day}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  height: 1.1,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                DateFormat('MMM').format(d).toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                DateFormat('EEEE').format(d),
+                style: TextStyle(
+                  color: AppColors.ink,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                DateFormat('d MMMM yyyy').format(d),
+                style: TextStyle(color: AppColors.textHint, fontSize: 11.5),
+              ),
+            ],
+          ),
+        ),
+        if (isToday)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: AppColors.accentGradient(AppColors.positive),
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              'Today',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// The day's totals: present, then each kind of work recorded (shifts,
+/// pieces, hours, days) and the priced amount — each in its type's colour.
 class _DaySummary extends StatelessWidget {
   final List<AttendanceRecord> items;
   const _DaySummary(this.items);
 
   @override
   Widget build(BuildContext context) {
-    final shifts = items.fold<double>(0, (a, r) => a + r.totalShifts);
-    final pieces = items.fold<int>(0, (a, r) => a + r.totalPieces);
+    double sum(String kind, double Function(AttendanceRecord) f) =>
+        items.where((r) => r.kind == kind).fold<double>(0, (a, r) => a + f(r));
+    final shifts = sum(SalaryType.shift, (r) => r.totalShifts);
+    final pieces = sum(SalaryType.piece, (r) => r.totalPieces.toDouble());
+    final hours = sum(SalaryType.hourly, (r) => r.hours ?? 0);
+    final days =
+        sum(SalaryType.weekly, (r) => r.dayUnits ?? 1) +
+        sum(SalaryType.monthly, (r) => r.dayUnits ?? 1);
     final amount = items.fold<double>(0, (a, r) => a + (r.totalAmount ?? 0));
-    Widget tile(String label, String value, Color c, {double? exact}) =>
-        Expanded(
-          child: ExactAmount(
-            amount: exact,
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: c.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      value,
-                      style: TextStyle(
-                        color: AppColors.ink,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+
+    final tiles = <Widget>[
+      _Tile(
+        Icons.how_to_reg_rounded,
+        'Present',
+        '${items.length}',
+        AppColors.brand,
+      ),
+      if (shifts > 0)
+        _Tile(
+          salaryTypeIcon(SalaryType.shift),
+          'Shifts',
+          shiftTotalLabel(shifts),
+          salaryTypeColor(SalaryType.shift),
+        ),
+      if (pieces > 0)
+        _Tile(
+          salaryTypeIcon(SalaryType.piece),
+          'Pieces',
+          pieces.toStringAsFixed(0),
+          salaryTypeColor(SalaryType.piece),
+        ),
+      if (hours > 0)
+        _Tile(
+          salaryTypeIcon(SalaryType.hourly),
+          'Hours',
+          hoursLabel(hours),
+          salaryTypeColor(SalaryType.hourly),
+        ),
+      if (days > 0)
+        _Tile(
+          salaryTypeIcon(SalaryType.monthly),
+          'Days',
+          daysLabel(days),
+          salaryTypeColor(SalaryType.monthly),
+        ),
+      _Tile(
+        Icons.currency_rupee_rounded,
+        'Amount',
+        rupees(amount),
+        AppColors.positiveDeep,
+        exact: amount,
+        solid: true,
+      ),
+    ];
+    return LayoutBuilder(
+      builder: (context, c) {
+        final perRow = tiles.length <= 3 ? tiles.length : 3;
+        final w = (c.maxWidth - 8 * (perRow - 1)) / perRow;
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [for (final t in tiles) SizedBox(width: w, child: t)],
         );
-    return Row(
-      children: [
-        tile('Present', '${items.length}', AppColors.brand),
-        const SizedBox(width: 6),
-        tile('Shifts', shiftTotalLabel(shifts), AppColors.brandDeep),
-        const SizedBox(width: 6),
-        tile('Pieces', '$pieces', AppColors.positive),
-        const SizedBox(width: 6),
-        tile('Amount', rupees(amount), AppColors.brandBlack, exact: amount),
-      ],
+      },
     );
   }
+}
+
+class _Tile extends StatelessWidget {
+  final IconData icon;
+  final String label, value;
+  final Color color;
+  final double? exact;
+
+  /// Filled with the colour (the amount stands out).
+  final bool solid;
+  const _Tile(
+    this.icon,
+    this.label,
+    this.value,
+    this.color, {
+    this.exact,
+    this.solid = false,
+  });
+
+  @override
+  Widget build(BuildContext context) => ExactAmount(
+    amount: exact,
+    child: Container(
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: solid
+              ? AppColors.accentGradient(color)
+              : [color.withValues(alpha: 0.18), color.withValues(alpha: 0.06)],
+        ),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: solid
+                  ? Colors.white.withValues(alpha: 0.22)
+                  : color.withValues(alpha: 0.22),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(icon, size: 16, color: solid ? Colors.white : color),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      color: solid ? Colors.white : AppColors.ink,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: solid
+                        ? Colors.white.withValues(alpha: 0.85)
+                        : AppColors.textSecondary,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _Empty extends StatelessWidget {
@@ -730,17 +1000,40 @@ class _Empty extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 24),
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 16),
+    decoration: BoxDecoration(
+      color: AppColors.brand.withValues(alpha: 0.05),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: AppColors.brand.withValues(alpha: 0.15)),
+    ),
     child: Column(
       children: [
-        Icon(Icons.event_busy_rounded, size: 42, color: AppColors.textHint),
-        const SizedBox(height: 8),
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: AppColors.accentGradient(AppColors.brandLight),
+            ),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.event_busy_rounded,
+            size: 28,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 10),
         Text(
           searching
               ? 'No attendance matches'
               : 'No attendance recorded for this day',
-          style: TextStyle(color: AppColors.textSecondary),
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         if (!searching && canCreate) ...[
           const SizedBox(height: 12),

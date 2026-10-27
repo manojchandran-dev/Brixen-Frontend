@@ -41,6 +41,15 @@ class ApiEndpoints {
   static const String myEmployee = '/api/v1/me/employee';
   static const String myAttendance = '/api/v1/me/attendance';
   static const String myPermissions = '/api/v1/me/permissions';
+  static const String myPayslips = '/api/v1/me/payslips';
+  // Salary generation (part of Employees).
+  static const String payrollRuns = '/api/v1/payroll/runs';
+  static const String payrollPreview = '/api/v1/payroll/preview';
+  static String payrollRun(String id) => '/api/v1/payroll/runs/$id';
+  static String payrollRunAction(String id, String action) =>
+      '/api/v1/payroll/runs/$id/$action';
+  static const String payslips = '/api/v1/payroll/payslips';
+  static String payslip(String id) => '/api/v1/payroll/payslips/$id';
   static String employeePermissions(String employeeId) =>
       '/api/v1/employee-permissions/$employeeId';
   static String employeeLoginActivate(String id) =>

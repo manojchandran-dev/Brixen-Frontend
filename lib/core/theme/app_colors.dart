@@ -30,6 +30,9 @@ class AppColors {
   static const Color brandLight = Color(0xFF6B9AB0);
   static const Color brandPale = Color(0xFFDCE8ED);
 
+  // A deeper shade of the green, for a fifth series beside the blues.
+  static const Color positiveDeep = Color(0xFF4E9A5E);
+
   static const Color primary = brand;
   static const Color lightPrimary = brand;
 

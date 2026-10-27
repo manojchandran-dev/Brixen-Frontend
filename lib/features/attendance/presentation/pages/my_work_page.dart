@@ -8,13 +8,16 @@ import '../../../../shared/widgets/error_state.dart';
 import '../../../../shared/widgets/exact_amount.dart';
 import '../../../../shared/widgets/skeleton.dart';
 import '../../../employees/domain/entities/employee.dart';
+import '../../../payroll/presentation/pages/salary_generation_pages.dart';
 import '../../domain/attendance.dart';
 import '../attendance_providers.dart';
+import '../salary_type_visuals.dart';
 import '../widgets/attendance_card.dart';
 
-/// An employee login's home: who they are (code, department, salary terms)
-/// and their attendance month by month, with the month's totals. Read-only;
-/// everything comes from /me, scoped to this employee by the server.
+/// An employee login's home: who they are (code, department, salary terms),
+/// their payslips, and their attendance month by month with the month's
+/// totals. Read-only; everything comes from /me, scoped to this employee by
+/// the server.
 class MyWorkPage extends ConsumerStatefulWidget {
   const MyWorkPage({super.key});
 
@@ -97,6 +100,12 @@ class _MyWorkPageState extends ConsumerState<MyWorkPage> {
             data: (m) =>
                 _ProfileCard(employee: m.employee, company: m.companyName),
           ),
+          const SizedBox(height: 12),
+          _PayslipsLink(
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const MyPayslipsPage())),
+          ),
           const SizedBox(height: 18),
           Row(
             children: [
@@ -147,36 +156,35 @@ class _MyWorkPageState extends ConsumerState<MyWorkPage> {
             ),
             data: (w) {
               final type = me.valueOrNull?.employee.salaryType;
+              final (label, value) = switch (type) {
+                SalaryType.piece => ('Pieces', '${w.pieces}'),
+                SalaryType.hourly => ('Hours', hoursLabel(w.hours)),
+                SalaryType.weekly ||
+                SalaryType.monthly => ('Days worked', daysLabel(w.dayUnits)),
+                _ => ('Shifts', shiftTotalLabel(w.shifts)),
+              };
               return Column(
                 children: [
                   Row(
                     children: [
                       _Total('Days', '${w.days}', AppColors.brand),
                       const SizedBox(width: 8),
-                      if (type == SalaryType.piece)
-                        _Total('Pieces', '${w.pieces}', AppColors.positive)
-                      else
-                        _Total(
-                          'Shifts',
-                          shiftTotalLabel(w.shifts),
-                          AppColors.positive,
-                        ),
+                      _Total(label, value, salaryTypeColor(type)),
                       const SizedBox(width: 8),
                       _Total(
                         'Earned',
                         w.amount > 0 ? rupees(w.amount) : '—',
-                        AppColors.brandDeep,
+                        AppColors.positiveDeep,
                         amount: w.amount > 0 ? w.amount : null,
                       ),
                     ],
                   ),
-                  if (type == SalaryType.shift &&
-                      me.valueOrNull?.employee.salaryPeriod != 'DAILY')
+                  if (SalaryType.isDayBased(type))
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
                         'Your pay is ${me.valueOrNull?.employee.salarySummary ?? ''}; '
-                        'earnings are worked out by your company.',
+                        'it\'s worked out at salary generation — see your payslips.',
                         style: TextStyle(
                           color: AppColors.textHint,
                           fontSize: 11.5,
@@ -291,6 +299,75 @@ class _ProfileCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _PayslipsLink extends StatelessWidget {
+  final VoidCallback onTap;
+  const _PayslipsLink({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: AppColors.surface,
+    borderRadius: BorderRadius.circular(16),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppColors.positiveDeep.withValues(alpha: 0.3),
+          ),
+          gradient: LinearGradient(
+            colors: [
+              AppColors.positive.withValues(alpha: 0.12),
+              AppColors.surface,
+            ],
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: AppColors.accentGradient(AppColors.positiveDeep),
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.receipt_long_rounded,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'My payslips',
+                    style: TextStyle(
+                      color: AppColors.ink,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    'Monthly salary from your company',
+                    style: TextStyle(color: AppColors.textHint, fontSize: 11.5),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _Total extends StatelessWidget {

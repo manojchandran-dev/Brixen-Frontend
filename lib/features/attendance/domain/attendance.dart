@@ -5,6 +5,9 @@ import '../../employees/domain/entities/employee.dart';
 const kShiftUnits = [0.25, 0.5, 0.75, 1.0, 2.0, 3.0];
 const kMaxShifts = 3;
 
+/// The most hours an hourly day can hold.
+const kMaxHours = 24;
+
 /// "1/4", "1/2", "3/4", "1", "2", "3".
 String shiftUnitLabel(double u) => switch (u) {
   0.25 => '1/4',
@@ -25,6 +28,14 @@ String shiftTotalLabel(double total) {
   };
   return whole == 0 && f.isNotEmpty ? f : '$whole$f';
 }
+
+/// "7.5", "8" — hours without trailing zeros.
+String hoursLabel(double h) => h % 1 == 0
+    ? h.toStringAsFixed(0)
+    : h.toStringAsFixed(2).replaceAll(RegExp(r'0+$'), '');
+
+/// "1", "½", "2½" — days present (half days count ½).
+String daysLabel(double d) => shiftTotalLabel(d);
 
 /// One work type's pieces in a day; [rate] is as it was that day.
 class PieceLine {
@@ -60,7 +71,7 @@ class AttendanceRecord {
   final String? salaryPeriod;
   final double? salary;
 
-  /// [SalaryType.shift] or [SalaryType.piece].
+  /// The employee's [SalaryType] when it was recorded.
   final String kind;
 
   /// "2026-10-27".
@@ -75,8 +86,14 @@ class AttendanceRecord {
   final double totalShifts;
   final int totalPieces;
 
-  /// Pieces: Σ quantity × rate. Shifts: total × daily rate when paid daily;
-  /// otherwise null (not a per-day figure).
+  /// Hourly: hours worked.
+  final double? hours;
+
+  /// Weekly / monthly: 1 (full day) or 0.5 (half day).
+  final double? dayUnits;
+
+  /// Pieces: Σ quantity × rate. Shifts / hours: × the salary. Weekly and
+  /// monthly: null (salary generation works the pay out).
   final double? totalAmount;
 
   const AttendanceRecord({
@@ -96,10 +113,23 @@ class AttendanceRecord {
     this.pieces = const [],
     this.totalShifts = 0,
     this.totalPieces = 0,
+    this.hours,
+    this.dayUnits,
     this.totalAmount,
   });
 
   bool get isShift => kind == SalaryType.shift;
+  bool get isPiece => kind == SalaryType.piece;
+
+  /// "1¾ shifts", "230 pieces", "7.5 hours", "Full day", "Half day".
+  String get workSummary => switch (kind) {
+    SalaryType.shift =>
+      '${shiftTotalLabel(totalShifts)} shift${totalShifts == 1 ? '' : 's'}',
+    SalaryType.piece => '$totalPieces piece${totalPieces == 1 ? '' : 's'}',
+    SalaryType.hourly =>
+      '${hoursLabel(hours ?? 0)} hour${hours == 1 ? '' : 's'}',
+    _ => (dayUnits ?? 1) < 1 ? 'Half day' : 'Full day',
+  };
 
   factory AttendanceRecord.fromJson(Map<String, dynamic> j) {
     final e = (j['employee'] as Map?)?.cast<String, dynamic>() ?? const {};
@@ -126,6 +156,8 @@ class AttendanceRecord {
       ],
       totalShifts: (j['total_shifts'] as num?)?.toDouble() ?? 0,
       totalPieces: (j['total_pieces'] as num?)?.toInt() ?? 0,
+      hours: (j['hours'] as num?)?.toDouble(),
+      dayUnits: (j['day_units'] as num?)?.toDouble(),
       totalAmount: (j['total_amount'] as num?)?.toDouble(),
     );
   }
@@ -163,6 +195,10 @@ class MyAttendance {
   final int days;
   final double shifts;
   final int pieces;
+  final double hours;
+
+  /// Weekly / monthly days, half days counting ½.
+  final double dayUnits;
   final double amount;
   final String from, to;
   const MyAttendance({
@@ -170,6 +206,8 @@ class MyAttendance {
     required this.days,
     required this.shifts,
     required this.pieces,
+    this.hours = 0,
+    this.dayUnits = 0,
     required this.amount,
     required this.from,
     required this.to,
@@ -183,6 +221,8 @@ class MyAttendance {
       days: (t['days'] as num?)?.toInt() ?? 0,
       shifts: (t['shifts'] as num?)?.toDouble() ?? 0,
       pieces: (t['pieces'] as num?)?.toInt() ?? 0,
+      hours: (t['hours'] as num?)?.toDouble() ?? 0,
+      dayUnits: (t['day_units'] as num?)?.toDouble() ?? 0,
       amount: (t['amount'] as num?)?.toDouble() ?? 0,
       from: (meta['from'] ?? '').toString(),
       to: (meta['to'] ?? '').toString(),
