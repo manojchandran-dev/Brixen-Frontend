@@ -359,7 +359,7 @@ class PayslipView extends StatelessWidget {
                       ),
                     ),
                     _WhitePill(
-                      slip.isFinalized ? 'Finalized' : 'Draft',
+                      slip.isFinalized ? 'Confirmed' : 'To check',
                       slip.isFinalized
                           ? Icons.verified_rounded
                           : Icons.edit_note_rounded,

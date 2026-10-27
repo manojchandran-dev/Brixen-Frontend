@@ -14,6 +14,7 @@ import '../../domain/entities/purchase.dart';
 import '../providers/purchases_provider.dart';
 import '../../../../shared/widgets/list_count_bar.dart';
 import '../../../../shared/widgets/module_title.dart';
+import '../../../../shared/widgets/module_tabs.dart';
 
 class PurchasesPage extends ConsumerStatefulWidget {
   final bool fromMasters;
@@ -47,10 +48,20 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
         elevation: 0,
         shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: Theme.of(context).dividerColor),
-        ),
+        // One menu entry for the group: its screens as tabs (not when
+        // opened from Masters).
+        bottom: widget.fromMasters
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(1),
+                child: Container(
+                  height: 1,
+                  color: Theme.of(context).dividerColor,
+                ),
+              )
+            : const ModuleTabs(
+                group: ModuleGroup.money,
+                current: AppRouter.purchases,
+              ),
         leading: widget.fromMasters
             ? GestureDetector(
                 onTap: () => context.pop(),

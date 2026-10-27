@@ -73,12 +73,13 @@ void main() {
     expect(tester.takeException(), isNull);
 
     expect(find.text('October 2026'), findsOneWidget);
-    expect(find.text('Generate again'), findsOneWidget);
-    expect(find.text('Finalize'), findsOneWidget);
-    expect(find.text('Email payslips'), findsNothing); // draft
+    expect(find.text('Count again'), findsOneWidget);
+    expect(find.text('Confirm salary'), findsOneWidget);
+    expect(find.text('Send payslips'), findsNothing); // not confirmed yet
     expect(find.text('Ravi'), findsOneWidget);
-    expect(find.textContaining('24 shifts'), findsOneWidget);
-    expect(find.textContaining('16½ of 27 days'), findsOneWidget);
+    // Each payslip shows how its pay was worked out.
+    expect(find.textContaining('24 shifts × ₹600'), findsOneWidget);
+    expect(find.textContaining('16½ days × ₹22.22'), findsOneWidget);
 
     // Filter to monthly staff.
     await tester.tap(find.text('Monthly'));
@@ -114,9 +115,10 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 300));
     expect(tester.takeException(), isNull);
-    expect(find.text('Generate salary'), findsOneWidget);
+    expect(find.text('Step 1 of 3'), findsOneWidget);
+    expect(find.textContaining('salary'), findsWidgets);
     expect(find.text('September 2026'), findsOneWidget);
-    expect(find.text('Finalized'), findsOneWidget);
+    expect(find.text('Confirmed'), findsOneWidget);
   });
 
   testWidgets('hourly and monthly attendance forms', (tester) async {

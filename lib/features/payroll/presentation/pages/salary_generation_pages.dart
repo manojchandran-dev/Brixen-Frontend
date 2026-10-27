@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/money.dart';
 import '../../../../shared/widgets/app_bottom_nav.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/error_state.dart';
 import '../../../../shared/widgets/exact_amount.dart';
+import '../../../../shared/widgets/module_tabs.dart';
 import '../../../../shared/widgets/module_title.dart';
 import '../../../../shared/widgets/search_field.dart';
 import '../../../../shared/widgets/skeleton.dart';
@@ -75,7 +77,7 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
       if (!mounted) return;
       _snack(
         context,
-        '${run.label}: ${run.payslipCount} payslips generated',
+        '${run.label} salary made for ${run.payslipCount} employees',
         error: false,
       );
       _open(run.id);
@@ -98,6 +100,10 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
     final current = list
         .where((r) => r.month == _ym.format(_month))
         .firstOrNull;
+    final past = [
+      for (final r in list)
+        if (r.id != current?.id) r,
+    ];
 
     return Scaffold(
       drawer: const AppDrawer(),
@@ -113,8 +119,12 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
           ),
         ),
         title: const ModuleTitle(
-          title: 'Salary Generation',
-          subtitle: 'Payslips from attendance',
+          title: 'Salary',
+          subtitle: 'Monthly pay worked out from attendance',
+        ),
+        bottom: const ModuleTabs(
+          group: ModuleGroup.staff,
+          current: AppRouter.salaryGeneration,
         ),
       ),
       body: RefreshIndicator(
@@ -122,21 +132,30 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
           children: [
-            _GenerateCard(
+            _MonthPicker(
               month: _month,
-              run: current,
-              busy: _busy,
               canNext: !_isCurrent,
-              canGenerate: access.create,
               onPrev: () => setState(
                 () => _month = DateTime(_month.year, _month.month - 1),
               ),
               onNext: () => setState(
                 () => _month = DateTime(_month.year, _month.month + 1),
               ),
-              onGenerate: () => _generate(list),
-              onOpen: current == null ? null : () => _open(current.id),
             ),
+            const SizedBox(height: 14),
+            if (runs.isLoading && !runs.hasValue)
+              const Shimmer(
+                child: SkeletonBox(width: double.infinity, height: 200),
+              )
+            else
+              _NextStep(
+                month: _month,
+                run: current,
+                busy: _busy,
+                canGenerate: access.create,
+                onGenerate: () => _generate(list),
+                onOpen: current == null ? null : () => _open(current.id),
+              ),
             const SizedBox(height: 18),
             StepGuide(
               steps: kSalarySteps,
@@ -148,45 +167,28 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
             ),
             const SizedBox(height: 18),
             const _PayRules(),
-            const SizedBox(height: 20),
-            Text(
-              'Salary months',
-              style: TextStyle(
-                color: AppColors.ink,
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
+            if (past.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              Text(
+                'Other months',
+                style: TextStyle(
+                  color: AppColors.ink,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            runs.when(
-              skipError: true,
-              loading: () => const Shimmer(
-                child: SkeletonBox(width: double.infinity, height: 140),
-              ),
-              error: (e, _) => ErrorCard(
-                error: e,
+              const SizedBox(height: 10),
+              for (final r in past)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _RunTile(run: r, onTap: () => _open(r.id)),
+                ),
+            ],
+            if (runs.hasError && !runs.hasValue)
+              ErrorCard(
+                error: runs.error!,
                 onRetry: () => ref.invalidate(payrollRunsProvider),
               ),
-              data: (items) => items.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      child: Text(
-                        'No salary generated yet. Pick a month above and '
-                        'generate it.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: AppColors.textSecondary),
-                      ),
-                    )
-                  : Column(
-                      children: [
-                        for (final r in items)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _RunTile(run: r, onTap: () => _open(r.id)),
-                          ),
-                      ],
-                    ),
-            ),
           ],
         ),
       ),
@@ -194,38 +196,30 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
   }
 }
 
-/// The month picker and Generate button, on the brand gradient.
-class _GenerateCard extends StatelessWidget {
+/// "‹ October 2026 ›" on the theme sweep.
+class _MonthPicker extends StatelessWidget {
   final DateTime month;
-  final PayrollRun? run;
-  final bool busy, canNext, canGenerate;
-  final VoidCallback onPrev, onNext, onGenerate;
-  final VoidCallback? onOpen;
-  const _GenerateCard({
+  final bool canNext;
+  final VoidCallback onPrev, onNext;
+  const _MonthPicker({
     required this.month,
-    required this.run,
-    required this.busy,
     required this.canNext,
-    required this.canGenerate,
     required this.onPrev,
     required this.onNext,
-    required this.onGenerate,
-    required this.onOpen,
   });
 
   @override
   Widget build(BuildContext context) {
-    final r = run;
     Widget arrow(IconData icon, VoidCallback? onTap) => Opacity(
       opacity: onTap == null ? 0.35 : 1,
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          width: 36,
-          height: 36,
+          width: 40,
+          height: 40,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.16),
-            borderRadius: BorderRadius.circular(11),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
           ),
           child: Icon(icon, color: Colors.white),
@@ -233,17 +227,102 @@ class _GenerateCard extends StatelessWidget {
       ),
     );
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
       decoration: BoxDecoration(
         gradient: kThemeSweepGradient,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: AppColors.shadows([
-          BoxShadow(
-            color: AppColors.brand.withValues(alpha: 0.30),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          arrow(Icons.chevron_left_rounded, onPrev),
+          Expanded(
+            child: Column(
+              children: [
+                Text(
+                  'Salary for',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    fontSize: 12,
+                  ),
+                ),
+                Text(
+                  DateFormat('MMMM yyyy').format(month),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ]),
+          arrow(Icons.chevron_right_rounded, canNext ? onNext : null),
+        ],
+      ),
+    );
+  }
+}
+
+/// What to do next for the month, in plain words, with one big button:
+///   not made → Make the salary; made → Check the payslips;
+///   confirmed → Send the payslips.
+class _NextStep extends StatelessWidget {
+  final DateTime month;
+  final PayrollRun? run;
+  final bool busy, canGenerate;
+  final VoidCallback onGenerate;
+  final VoidCallback? onOpen;
+  const _NextStep({
+    required this.month,
+    required this.run,
+    required this.busy,
+    required this.canGenerate,
+    required this.onGenerate,
+    required this.onOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final r = run;
+    final name = DateFormat('MMMM').format(month);
+    final (step, color, icon, title, text) = r == null
+        ? (
+            1,
+            AppColors.brand,
+            Icons.auto_awesome_rounded,
+            'Make $name salary',
+            'Brixen counts each employee\'s attendance for $name and works '
+                'out their pay. Nothing is paid or sent yet — you check it next.',
+          )
+        : !r.isFinalized
+        ? (
+            2,
+            AppColors.positiveDeep,
+            Icons.fact_check_rounded,
+            'Check the payslips',
+            '${r.payslipCount} payslips are ready. Open them, add a bonus or '
+                'take off an advance if needed, then tap Confirm.',
+          )
+        : (
+            3,
+            AppColors.brandBlack,
+            Icons.verified_rounded,
+            '$name salary is confirmed',
+            'Send each employee their payslip by email. They can also see it '
+                'in their app.',
+          );
+    final tone = AppColors.isDark && step == 3 ? AppColors.brandLight : color;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [tone.withValues(alpha: 0.18), tone.withValues(alpha: 0.05)],
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: tone.withValues(alpha: 0.40)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -251,143 +330,157 @@ class _GenerateCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 46,
+                height: 46,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: AppColors.accentGradient(AppColors.positive),
+                    colors: AppColors.accentGradient(tone),
                   ),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(Icons.payments_rounded, color: Colors.white),
+                child: Icon(icon, color: Colors.white),
               ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Text(
-                  'Generate salary',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              arrow(Icons.chevron_left_rounded, onPrev),
+              const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  DateFormat('MMMM yyyy').format(month),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Step $step of 3',
+                      style: TextStyle(
+                        color: tone,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              arrow(Icons.chevron_right_rounded, canNext ? onNext : null),
             ],
           ),
-          const SizedBox(height: 12),
-          if (r == null)
-            Text(
-              'Not generated yet. Tap Generate: each employee\'s pay is worked '
-              'out from this month\'s attendance.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.85),
-                fontSize: 12,
+          const SizedBox(height: 10),
+          Text(
+            text,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              height: 1.35,
+            ),
+          ),
+          if (r != null) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(14),
               ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Total to pay',
+                          style: TextStyle(
+                            color: AppColors.textHint,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                        ExactAmount(
+                          amount: r.totalNet,
+                          child: Text(
+                            rupees(r.totalNet),
+                            style: TextStyle(
+                              color: AppColors.ink,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${r.payslipCount}',
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        'employees',
+                        style: TextStyle(
+                          color: AppColors.textHint,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+          if (r == null && !canGenerate)
+            Text(
+              'Not made yet. Ask your company admin to make it.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textHint, fontSize: 12.5),
             )
           else
-            Row(
-              children: [
-                Expanded(
-                  child: BannerStatTile(
-                    BannerStat(
-                      r.isFinalized ? 'Finalized' : 'Draft',
-                      'status',
-                      r.isFinalized ? AppColors.positive : AppColors.brand,
-                    ),
-                  ),
+            FilledButton.icon(
+              onPressed: busy ? null : (r == null ? onGenerate : onOpen),
+              style: FilledButton.styleFrom(
+                backgroundColor: tone,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: BannerStatTile(
-                    BannerStat(
-                      '${r.payslipCount}',
-                      'payslips',
-                      AppColors.brandBlack,
-                    ),
-                  ),
+                textStyle: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: BannerStatTile(
-                    BannerStat(
-                      rupees(r.totalNet),
-                      'net pay',
-                      AppColors.positive,
-                      exact: r.totalNet,
+              ),
+              icon: busy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Icon(
+                      r == null
+                          ? Icons.auto_awesome_rounded
+                          : r.isFinalized
+                          ? Icons.forward_to_inbox_rounded
+                          : Icons.fact_check_rounded,
                     ),
-                  ),
-                ),
-              ],
+              label: Text(
+                r == null
+                    ? 'Make $name salary'
+                    : r.isFinalized
+                    ? 'Open & send payslips'
+                    : 'Check payslips',
+              ),
             ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              if (r != null)
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onOpen,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.6),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    icon: const Icon(Icons.receipt_long_rounded, size: 18),
-                    label: const Text('Open'),
-                  ),
-                ),
-              if (r != null && canGenerate && !r.isFinalized)
-                const SizedBox(width: 10),
-              if (canGenerate && !(r?.isFinalized ?? false))
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: busy ? null : onGenerate,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.positive,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    icon: busy
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.auto_awesome_rounded, size: 18),
-                    label: Text(r == null ? 'Generate' : 'Generate again'),
-                  ),
-                ),
-            ],
-          ),
         ],
       ),
     );
@@ -396,9 +489,9 @@ class _GenerateCard extends StatelessWidget {
 
 /// Generate → review → finalize & send.
 const kSalarySteps = [
-  (Icons.auto_awesome_rounded, 'Generate', 'From attendance'),
-  (Icons.fact_check_rounded, 'Review', 'Bonus & deductions'),
-  (Icons.send_rounded, 'Finalize', 'Lock & email'),
+  (Icons.auto_awesome_rounded, 'Make', 'From attendance'),
+  (Icons.fact_check_rounded, 'Check', 'Bonus & advance'),
+  (Icons.send_rounded, 'Confirm', 'Lock & send'),
 ];
 
 /// How each salary type's pay is worked out, in its colour.
@@ -552,7 +645,7 @@ class _GenerateSheetState extends State<_GenerateSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              '${widget.again ? 'Generate again' : 'Generate'} · '
+              '${widget.again ? 'Count again' : 'Make salary'} · '
               '${monthLabel(widget.month)}',
               style: TextStyle(
                 color: AppColors.ink,
@@ -618,7 +711,7 @@ class _GenerateSheetState extends State<_GenerateSheet> {
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               icon: const Icon(Icons.auto_awesome_rounded),
-              label: Text(widget.again ? 'Generate again' : 'Generate'),
+              label: Text(widget.again ? 'Count again' : 'Make salary'),
             ),
           ],
         ),
@@ -650,7 +743,7 @@ class _StatusChip extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           Text(
-            finalized ? 'Finalized' : 'Draft',
+            finalized ? 'Confirmed' : 'To check',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 11,
@@ -840,7 +933,7 @@ class _SalaryRunPageState extends ConsumerState<SalaryRunPage> {
   Future<void> _send(PayrollRun run) async {
     final withEmail = run.payslips.where((p) => p.email != null).length;
     if (!await _confirm(
-      'Email payslips?',
+      'Send payslips?',
       '$withEmail of ${run.payslips.length} employees have an email address '
           'and will get their ${run.label} payslip.',
       'Send',
@@ -954,10 +1047,10 @@ class _SalaryRunPageState extends ConsumerState<SalaryRunPage> {
                 const SizedBox(height: 10),
                 Text(
                   run.isFinalized
-                      ? 'Done. Email the payslips to your employees; they also '
-                            'see them in the app. Reopen to change anything.'
+                      ? 'Done. Send the payslips to your employees; they also '
+                            'see them in the app. Tap Edit again to change anything.'
                       : 'Check each payslip below — tap one to add a bonus or '
-                            'take off an advance — then Finalize.',
+                            'take off an advance — then Confirm salary.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: AppColors.textSecondary,
@@ -1045,7 +1138,7 @@ class _SalaryRunPageState extends ConsumerState<SalaryRunPage> {
       if (!run.isFinalized && access.create)
         _ActionButton(
           icon: Icons.refresh_rounded,
-          label: 'Generate again',
+          label: 'Count again',
           color: AppColors.brandLight,
           onTap: _busy
               ? null
@@ -1057,20 +1150,20 @@ class _SalaryRunPageState extends ConsumerState<SalaryRunPage> {
       if (!run.isFinalized && access.create)
         _ActionButton(
           icon: Icons.verified_rounded,
-          label: 'Finalize',
+          label: 'Confirm salary',
           color: AppColors.positiveDeep,
           onTap: _busy
               ? null
               : () async {
                   if (await _confirm(
-                    'Finalize ${run.label}?',
-                    'Payslips are locked (reopen to change them), can be '
+                    'Confirm ${run.label} salary?',
+                    'Payslips are locked (tap Edit again to change them), can be '
                         'emailed, and count in the salary report.',
-                    'Finalize',
+                    'Confirm',
                   )) {
                     _act(
                       () => ds.finalize(run.id),
-                      done: '${run.label} finalized',
+                      done: '${run.label} salary confirmed',
                     );
                   }
                 },
@@ -1078,20 +1171,20 @@ class _SalaryRunPageState extends ConsumerState<SalaryRunPage> {
       if (run.isFinalized && access.create)
         _ActionButton(
           icon: Icons.forward_to_inbox_rounded,
-          label: 'Email payslips',
+          label: 'Send payslips',
           color: AppColors.brand,
           onTap: _busy ? null : () => _send(run),
         ),
       if (run.isFinalized && access.edit)
         _ActionButton(
           icon: Icons.lock_open_rounded,
-          label: 'Reopen',
+          label: 'Edit again',
           color: AppColors.brandDeep,
           onTap: _busy
               ? null
               : () => _act(
                   () => ds.reopen(run.id),
-                  done: '${run.label} reopened as a draft',
+                  done: '${run.label} is open to change again',
                 ),
         ),
     ];
@@ -1387,13 +1480,40 @@ class PayslipTile extends StatelessWidget {
                       [
                         if (!showMonth) slip.employeeCode,
                         SalaryType.label(slip.salaryType),
-                        slip.workLabel,
                       ].join(' · '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: AppColors.textHint,
                         fontSize: 11.5,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    // How the pay was worked out, e.g. "24 shifts × ₹600".
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        [
+                          slip.formula(rupeesExact),
+                          if (slip.additions > 0)
+                            '+ ${rupeesExact(slip.additions)}',
+                          if (slip.deductions > 0)
+                            '− ${rupeesExact(slip.deductions)}',
+                        ].join(' '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],

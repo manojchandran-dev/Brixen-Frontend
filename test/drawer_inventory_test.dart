@@ -19,22 +19,33 @@ Future<void> _pump(WidgetTester tester, List<NavModule> modules) async {
 }
 
 void main() {
-  testWidgets('Inventory sits right after Products in the side menu', (tester) async {
+  testWidgets('grouped screens share one menu entry', (tester) async {
     await _pump(tester, const [
       NavModule(id: '1', name: 'Employees'),
       NavModule(id: '2', name: 'Products'),
-      NavModule(id: '3', name: 'Sales'),
+      NavModule(id: '3', name: 'Expenses'),
+      NavModule(id: '4', name: 'Purchases'),
+      NavModule(id: '5', name: 'Sales'),
     ]);
-    expect(find.text('Inventory'), findsOneWidget);
-    final products = tester.getTopLeft(find.text('Products')).dy;
-    final inventory = tester.getTopLeft(find.text('Inventory')).dy;
-    final sales = tester.getTopLeft(find.text('Sales')).dy;
-    expect(inventory > products && inventory < sales, isTrue);
+    expect(find.text('Products & Inventory'), findsOneWidget);
+    expect(find.text('Expenses & Purchases'), findsOneWidget);
+    expect(find.text('Employees'), findsOneWidget);
+    expect(find.text('Staff, permissions & salary'), findsOneWidget);
+    for (final gone in [
+      'Inventory',
+      'Purchases',
+      'Staff Permissions',
+      'Salary Generation',
+    ]) {
+      expect(find.text(gone), findsNothing);
+    }
+    expect(find.text('Sales'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('No Products access → no Inventory', (tester) async {
-    await _pump(tester, const [NavModule(id: '1', name: 'Employees')]);
-    expect(find.text('Inventory'), findsNothing);
+  testWidgets('purchases alone keeps its own entry', (tester) async {
+    await _pump(tester, const [NavModule(id: '4', name: 'Purchases')]);
+    expect(find.text('Purchases'), findsOneWidget);
+    expect(find.text('Expenses & Purchases'), findsNothing);
   });
 }

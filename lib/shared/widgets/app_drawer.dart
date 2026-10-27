@@ -41,37 +41,41 @@ bool _notificationsInBell(NavModule m) =>
       'announcements',
     }.contains(m.name.toLowerCase().replaceAll(RegExp(r'\s+'), ''));
 
-/// Inventory is its own menu item, right after Products. The backend grants
-/// it through the Products permission (there's no separate module row), so
-/// anyone with Products gets it — unless the API already sends Inventory.
-Iterable<NavModule> _withInventory(Iterable<NavModule> modules) sync* {
+/// Screens that share one menu entry, switched by the tabs at their top
+/// (see ModuleTabs):
+///   Employees — Employees · Staff Permissions · Salary;
+///   Expenses & Purchases — when the user has both (either alone keeps
+///     its own name);
+///   Products & Inventory — Inventory goes with the Products permission.
+Iterable<NavModule> _grouped(Iterable<NavModule> modules) sync* {
   String key(NavModule m) =>
       m.name.toLowerCase().replaceAll(RegExp(r'\s+'), '');
-  final hasInventory = modules.any((m) => key(m) == 'inventory');
+  final keys = {for (final m in modules) key(m)};
+  final both = keys.contains('expenses') && keys.contains('purchases');
   for (final m in modules) {
-    yield m;
-    if (!hasInventory && key(m) == 'products') {
-      yield const NavModule(
-        id: 'inventory',
-        name: 'Inventory',
-        description: 'Stock levels and movements',
+    final k = key(m);
+    if (k == 'inventory' || k == 'stock') continue;
+    if (k == 'purchases' && both) continue;
+    if (k == 'expenses' && both) {
+      yield NavModule(
+        id: m.id,
+        name: 'Expenses & Purchases',
+        description: 'Spending and stock bought',
       );
-    }
-    // Company admins grant their employees modules, right after Employees.
-    if (key(m) == 'employees' && Session.role == UserRole.companyAdmin) {
-      yield const NavModule(
-        id: 'staffpermissions',
-        name: 'Staff Permissions',
-        description: 'What each employee can use',
+    } else if (k == 'products') {
+      yield NavModule(
+        id: m.id,
+        name: 'Products & Inventory',
+        description: 'Catalogue, stock and movements',
       );
-    }
-    // Salary generation is part of Employees: anyone with it gets this.
-    if (key(m) == 'employees') {
-      yield const NavModule(
-        id: 'salarygeneration',
-        name: 'Salary Generation',
-        description: 'Payslips from attendance',
+    } else if (k == 'employees') {
+      yield NavModule(
+        id: m.id,
+        name: m.name,
+        description: 'Staff, permissions & salary',
       );
+    } else {
+      yield m;
     }
   }
 }
@@ -189,7 +193,7 @@ class AppDrawer extends ConsumerWidget {
                   children: [
                     // Groups (Masters) always last, whatever order the API returns.
                     for (final m in [
-                      ..._withInventory(
+                      ..._grouped(
                         modules.where(
                           (m) =>
                               m.children.isEmpty &&
@@ -245,8 +249,10 @@ void Function(BuildContext context) _destinationFor(NavModule module) {
     case 'customers':
       return (context) => context.go(AppRouter.customers);
     case 'expenses':
+    case 'expenses&purchases':
       return (context) => context.go(AppRouter.expenses);
     case 'products':
+    case 'products&inventory':
       return (context) => context.go(AppRouter.products);
     case 'inventory':
     case 'stock':

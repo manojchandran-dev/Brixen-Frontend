@@ -25,6 +25,7 @@ import '../../../../shared/widgets/search_field.dart';
 import '../providers/expenses_provider.dart';
 import '../../../../shared/widgets/list_count_bar.dart';
 import '../../../../shared/widgets/module_title.dart';
+import '../../../../shared/widgets/module_tabs.dart';
 
 class ExpensesPage extends ConsumerStatefulWidget {
   final bool fromMasters;
@@ -152,10 +153,20 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
         elevation: 0,
         shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: Theme.of(context).dividerColor),
-        ),
+        // One menu entry for the group: its screens as tabs (not when
+        // opened from Masters).
+        bottom: widget.fromMasters
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(1),
+                child: Container(
+                  height: 1,
+                  color: Theme.of(context).dividerColor,
+                ),
+              )
+            : const ModuleTabs(
+                group: ModuleGroup.money,
+                current: AppRouter.expenses,
+              ),
         leading: widget.fromMasters
             ? GestureDetector(
                 onTap: () => context.pop(),

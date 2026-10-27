@@ -108,6 +108,22 @@ class Payslip {
     _ => '${daysLabel(units)} days',
   };
 
+  /// How [gross] was worked out: "24 shifts × ₹600", "210 pieces × work
+  /// type rates", "7.5 h × ₹100", "20½ days × ₹1,000" (a day's share of a
+  /// weekly or monthly salary).
+  String formula(String Function(double) money) {
+    final r = rate ?? 0;
+    return switch (salaryType) {
+      SalaryType.shift => '${shiftTotalLabel(units)} shifts × ${money(r)}',
+      SalaryType.piece => '${units.round()} pieces × work type rates',
+      SalaryType.hourly => '${hoursLabel(units)} h × ${money(r)}',
+      SalaryType.weekly => '${daysLabel(units)} days × ${money(r / 6)}',
+      SalaryType.monthly when (workingDays ?? 0) > 0 =>
+        '${daysLabel(units)} days × ${money(r / workingDays!)}',
+      _ => workLabel,
+    };
+  }
+
   /// "₹600 per shift", or "Work type rates" for piece rate.
   String rateLabel(String Function(double) money) => rate == null
       ? 'Work type rates'

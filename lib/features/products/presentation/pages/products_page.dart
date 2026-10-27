@@ -27,6 +27,7 @@ import '../../../../shared/widgets/search_field.dart';
 import '../providers/products_provider.dart';
 import '../../../../shared/widgets/list_count_bar.dart';
 import '../../../../shared/widgets/module_title.dart';
+import '../../../../shared/widgets/module_tabs.dart';
 
 class ProductsPage extends ConsumerStatefulWidget {
   final bool fromMasters;
@@ -142,10 +143,20 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
         elevation: 0,
         shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: Theme.of(context).dividerColor),
-        ),
+        // One menu entry for the group: its screens as tabs (not when
+        // opened from Masters).
+        bottom: widget.fromMasters
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(1),
+                child: Container(
+                  height: 1,
+                  color: Theme.of(context).dividerColor,
+                ),
+              )
+            : const ModuleTabs(
+                group: ModuleGroup.stock,
+                current: AppRouter.products,
+              ),
         leading: widget.fromMasters
             ? GestureDetector(
                 onTap: () => context.pop(),

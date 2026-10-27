@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/money.dart';
+import '../../../../shared/widgets/app_bottom_nav.dart';
+import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/exact_amount.dart';
 import '../../../../shared/widgets/error_state.dart';
+import '../../../../shared/widgets/module_tabs.dart';
 import '../../../../shared/widgets/module_title.dart';
 import '../../../../shared/widgets/search_field.dart';
 import '../../../../shared/widgets/skeleton.dart';
@@ -33,53 +37,72 @@ class InventoryPage extends StatelessWidget {
       length: _tabs.length,
       child: Scaffold(
         backgroundColor: AppColors.background,
+        drawer: const AppDrawer(),
+        // AppBottomNav fills the Scaffold height (its pill is Align-ed to the
+        // bottom) — without extendBody the body gets zero height.
+        extendBody: true,
+        bottomNavigationBar: const AppBottomNav(activeIndex: 3),
         appBar: AppBar(
           backgroundColor: AppColors.background,
           elevation: 0,
           scrolledUnderElevation: 0,
-          titleSpacing: 0,
+          leading: Builder(
+            builder: (ctx) => IconButton(
+              icon: const Icon(Icons.menu_rounded),
+              onPressed: () => Scaffold.of(ctx).openDrawer(),
+            ),
+          ),
           title: const ModuleTitle(
             title: 'Inventory',
             subtitle: 'Stock by product, size and colour',
           ),
+          // Products · Inventory, then this screen's own tabs.
           bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(52),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-              child: TabBar(
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                dividerColor: Colors.transparent,
-                indicatorSize: TabBarIndicatorSize.tab,
-                indicator: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.brand, AppColors.brandDeep],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
+            preferredSize: const Size.fromHeight(ModuleTabs.height + 52),
+            child: Column(
+              children: [
+                const ModuleTabs(
+                  group: ModuleGroup.stock,
+                  current: AppRouter.inventory,
                 ),
-                labelColor: Colors.white,
-                unselectedLabelColor: AppColors.textSecondary,
-                labelStyle: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-                labelPadding: const EdgeInsets.symmetric(horizontal: 14),
-                splashBorderRadius: BorderRadius.circular(20),
-                tabs: [
-                  for (final (icon, label) in _tabs)
-                    Tab(
-                      height: 38,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(icon, size: 16),
-                          const SizedBox(width: 6),
-                          Text(label),
-                        ],
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                  child: TabBar(
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    dividerColor: Colors.transparent,
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    indicator: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppColors.brand, AppColors.brandDeep],
                       ),
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                ],
-              ),
+                    labelColor: Colors.white,
+                    unselectedLabelColor: AppColors.textSecondary,
+                    labelStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 14),
+                    splashBorderRadius: BorderRadius.circular(20),
+                    tabs: [
+                      for (final (icon, label) in _tabs)
+                        Tab(
+                          height: 38,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(icon, size: 16),
+                              const SizedBox(width: 6),
+                              Text(label),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -254,9 +277,11 @@ class _OverviewTab extends ConsumerWidget {
       ]..sort((a, b) => a.item.quantity.compareTo(b.item.quantity));
       final recent = ref.watch(stockMovementsProvider(movementsQuery()));
       return ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
         children: [
           GridView.count(
+            // Not the Scaffold's inset: the bottom nav makes it the page height.
+            padding: EdgeInsets.zero,
             crossAxisCount: 2,
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
@@ -380,7 +405,7 @@ class _StockTabState extends ConsumerState<_StockTab> {
             l,
       ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       return ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
         children: [
           SearchField(
             controller: _search,
@@ -449,7 +474,7 @@ class _MovementsTabState extends ConsumerState<_MovementsTab> {
     return RefreshIndicator(
       onRefresh: () => ref.refresh(stockMovementsProvider(query).future),
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
         children: [
           if (canEdit) ...[const _EntryActions(), const SizedBox(height: 14)],
           _chips<String?>(
@@ -502,7 +527,7 @@ class _TransfersTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 110),
       children: [
         Container(
           padding: const EdgeInsets.all(20),
@@ -666,7 +691,7 @@ class _ReportsTab extends ConsumerWidget {
       );
 
       return ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
         children: [
           InvCard(
             title: 'Stock summary',

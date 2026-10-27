@@ -37,8 +37,10 @@ ModuleVisual moduleVisualFor(String name) {
     case 'customers':
       return const ModuleVisual(Icons.people_alt_rounded, AppColors.brandLight);
     case 'expenses':
+    case 'expenses&purchases':
       return const ModuleVisual(Icons.receipt_outlined, AppColors.brandBlack);
     case 'products':
+    case 'products&inventory':
       return const ModuleVisual(Icons.checkroom_rounded, AppColors.brand);
     case 'inventory':
     case 'stock':
@@ -53,7 +55,10 @@ ModuleVisual moduleVisualFor(String name) {
     case 'productcategory':
       return const ModuleVisual(Icons.checkroom_outlined, AppColors.brandLight);
     case 'staffpermissions':
-      return const ModuleVisual(Icons.admin_panel_settings_rounded, AppColors.positive);
+      return const ModuleVisual(
+        Icons.admin_panel_settings_rounded,
+        AppColors.positive,
+      );
     case 'salarygeneration':
       return const ModuleVisual(Icons.payments_rounded, AppColors.positiveDeep);
     case 'department':
