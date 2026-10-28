@@ -15,6 +15,7 @@ import '../../domain/attendance.dart';
 import '../attendance_providers.dart';
 import '../salary_type_visuals.dart';
 import '../widgets/attendance_card.dart';
+import 'lots_pages.dart';
 
 /// An employee login's home: who they are (code, department, salary terms),
 /// their payslips, and their attendance month by month with the month's
@@ -252,6 +253,27 @@ class _MyWorkPageState extends ConsumerState<MyWorkPage> {
                       ),
                     ),
                   const SizedBox(height: 14),
+                  // Lots delivered (piece work counted at delivery).
+                  if (w.lots.isNotEmpty) ...[
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Lots delivered',
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    for (final l in w.lots)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: LotCard(lot: l, showEmployee: false),
+                      ),
+                    const SizedBox(height: 6),
+                  ],
                   if (w.list.items.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 30),

@@ -45,3 +45,15 @@ final myAttendanceProvider = FutureProvider.autoDispose
             to: '$month-${last.toString().padLeft(2, '0')}',
           );
     });
+
+/// A month's ("YYYY-MM") lots delivered, for the Lots page. Saving or
+/// deleting a lot invalidates the family.
+final lotsMonthProvider = FutureProvider.autoDispose
+    .family<List<PieceLot>, String>((ref, month) {
+      final y = int.parse(month.substring(0, 4));
+      final m = int.parse(month.substring(5, 7));
+      final last = DateTime(y, m + 1, 0).day.toString().padLeft(2, '0');
+      return ref
+          .read(attendanceDatasourceProvider)
+          .lots(from: '$month-01', to: '$month-$last');
+    });

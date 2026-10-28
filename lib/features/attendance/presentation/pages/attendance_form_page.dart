@@ -51,8 +51,14 @@ class AttendanceFormPage extends ConsumerStatefulWidget {
 class _PieceDraft {
   String? workTypeId;
   final TextEditingController qty;
+
+  /// The quantity is in dozens (saved as × 12 pieces).
+  bool dozen = false;
   _PieceDraft({this.workTypeId, int? quantity})
     : qty = TextEditingController(text: quantity?.toString() ?? '');
+
+  /// Pieces this line stands for.
+  int get pieces => (int.tryParse(qty.text.trim()) ?? 0) * (dozen ? 12 : 1);
 }
 
 class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
@@ -152,12 +158,9 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
   }
 
   double get _totalShifts => _shifts.fold(0, (a, s) => a + s);
-  int get _totalPieces =>
-      _pieces.fold(0, (a, p) => a + (int.tryParse(p.qty.text) ?? 0));
-  double get _totalAmount => _pieces.fold(
-    0,
-    (a, p) => a + (int.tryParse(p.qty.text) ?? 0) * _rateOf(p.workTypeId),
-  );
+  int get _totalPieces => _pieces.fold(0, (a, p) => a + p.pieces);
+  double get _totalAmount =>
+      _pieces.fold(0, (a, p) => a + p.pieces * _rateOf(p.workTypeId));
 
   /// The salary per shift or per hour (null when the record's amount isn't
   /// priced that way, e.g. the employee's salary type changed since).
@@ -230,7 +233,7 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
       if (_isPiece && !_absent)
         'pieces': [
           for (final p in _pieces)
-            {'work_type_id': p.workTypeId, 'quantity': int.parse(p.qty.text)},
+            {'work_type_id': p.workTypeId, 'quantity': p.pieces},
         ],
       'notes': _notes.text.trim(),
     };
@@ -718,13 +721,24 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
                 onChanged: (w) => setState(() => _pieces[i].workTypeId = w?.id),
               ),
               const SizedBox(height: 10),
+              // Count in pieces or dozens (× 12).
+              PillSegmentedControl<bool>(
+                height: 38,
+                value: _pieces[i].dozen,
+                onChanged: (d) => setState(() => _pieces[i].dozen = d),
+                segments: const [
+                  PillSegment(value: false, label: 'Pieces'),
+                  PillSegment(value: true, label: 'Dozens'),
+                ],
+              ),
+              const SizedBox(height: 10),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: BrixenTextField(
-                      label: 'Quantity *',
-                      hint: 'Pieces done',
+                      label: _pieces[i].dozen ? 'Dozens *' : 'Quantity *',
+                      hint: _pieces[i].dozen ? 'Dozens done' : 'Pieces done',
                       controller: _pieces[i].qty,
                       keyboardType: TextInputType.number,
                       onChanged: (_) => setState(() {}),
@@ -750,8 +764,7 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
                         ),
                         Text(
                           rupeesExact(
-                            (int.tryParse(_pieces[i].qty.text) ?? 0) *
-                                _rateOf(_pieces[i].workTypeId),
+                            _pieces[i].pieces * _rateOf(_pieces[i].workTypeId),
                           ),
                           style: TextStyle(
                             color: AppColors.ink,

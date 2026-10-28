@@ -19,6 +19,7 @@ import '../attendance_providers.dart';
 import '../salary_type_visuals.dart';
 import '../widgets/attendance_card.dart';
 import 'attendance_form_page.dart';
+import 'lots_pages.dart';
 
 final _ymd = DateFormat('yyyy-MM-dd');
 final _ym = DateFormat('yyyy-MM');
@@ -131,6 +132,17 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
           subtitle: 'Shifts, pieces, hours & days',
         ),
         actions: [
+          // Piece work counted at delivery (e.g. 800 dozen), not daily.
+          IconButton(
+            tooltip: 'Lots delivered',
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const LotsPage())),
+            icon: const Icon(
+              Icons.local_shipping_outlined,
+              color: AppColors.brand,
+            ),
+          ),
           if (canRecord)
             Padding(
               padding: const EdgeInsets.only(right: 8),

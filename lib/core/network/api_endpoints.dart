@@ -37,6 +37,9 @@ class ApiEndpoints {
   static const String attendance = '/api/v1/attendance';
   static const String attendanceMeta = '/api/v1/attendance/meta';
   static String attendanceById(String id) => '/api/v1/attendance/$id';
+  // Piece lots: piece work counted at delivery.
+  static const String attendanceLots = '/api/v1/attendance/lots';
+  static String attendanceLot(String id) => '/api/v1/attendance/lots/$id';
   // An employee login's own data.
   static const String myEmployee = '/api/v1/me/employee';
   static const String myAttendance = '/api/v1/me/attendance';
