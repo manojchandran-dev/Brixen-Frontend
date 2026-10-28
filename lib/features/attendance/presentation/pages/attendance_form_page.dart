@@ -437,52 +437,60 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
 
   List<Widget> _shiftSection(TextStyle section, TextStyle hint) => [
     Text(
-      'Up to $kMaxShifts a day · each 1/4, 1/2, 3/4, 1, 2 or 3',
+      'Up to $kMaxShifts a day · each from ¼ to 3, in quarters',
       style: hint,
     ),
     const SizedBox(height: 12),
     for (var i = 0; i < _shifts.length; i++)
       Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Row(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox(
-              width: 64,
-              child: Text(
-                'Shift ${i + 1}',
-                style: TextStyle(
-                  color: AppColors.ink,
-                  fontWeight: FontWeight.w700,
+            Row(
+              children: [
+                Text(
+                  'Shift ${i + 1}',
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                Text(
+                  '${shiftUnitLabel(_shifts[i])} '
+                  'shift${_shifts[i] == 1 ? '' : 's'}',
+                  style: TextStyle(color: AppColors.textHint, fontSize: 12),
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'Remove shift',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: _shifts.length == 1
+                      ? null
+                      : () => setState(() => _shifts.removeAt(i)),
+                  icon: const Icon(Icons.remove_circle_outline_rounded),
+                ),
+              ],
             ),
-            Expanded(
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final u in kShiftUnits)
-                    ChoiceChip(
-                      label: Text(shiftUnitLabel(u)),
-                      selected: _shifts[i] == u,
-                      onSelected: (_) => setState(() => _shifts[i] = u),
-                      selectedColor: AppColors.brand.withValues(alpha: 0.18),
-                      labelStyle: TextStyle(
-                        color: _shifts[i] == u
-                            ? AppColors.brand
-                            : AppColors.ink,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            IconButton(
-              tooltip: 'Remove shift',
-              onPressed: _shifts.length == 1
-                  ? null
-                  : () => setState(() => _shifts.removeAt(i)),
-              icon: const Icon(Icons.remove_circle_outline_rounded),
+            const SizedBox(height: 6),
+            // ¼ to 3 in quarters: four a row.
+            GridView.count(
+              padding: EdgeInsets.zero,
+              crossAxisCount: 4,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                for (final u in kShiftUnits)
+                  _UnitTile(
+                    label: shiftUnitLabel(u),
+                    selected: _shifts[i] == u,
+                    onTap: () => setState(() => _shifts[i] = u),
+                  ),
+              ],
             ),
           ],
         ),
@@ -734,6 +742,49 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
       ),
     ];
   }
+}
+
+/// One shift size to pick: filled blue when picked.
+class _UnitTile extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _UnitTile({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 140),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        gradient: selected
+            ? const LinearGradient(
+                colors: [AppColors.brand, AppColors.brandDeep],
+              )
+            : null,
+        color: selected ? null : AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: selected
+              ? Colors.transparent
+              : AppColors.brand.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: selected ? Colors.white : AppColors.ink,
+          fontSize: 15,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    ),
+  );
 }
 
 /// A titled part of the form, edged and tinted in [color].

@@ -517,7 +517,7 @@ class CompanyExpenseReport extends ConsumerWidget {
       ),
       if (months.isNotEmpty)
         ReportList<Tally>(
-          title: 'Salary by month',
+          title: 'Salary by period',
           items: months,
           sorts: [
             ReportSort('Newest', (a, b) => b.sub.compareTo(a.sub)),

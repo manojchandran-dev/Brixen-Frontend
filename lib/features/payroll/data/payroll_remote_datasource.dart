@@ -18,6 +18,11 @@ class PayrollRemoteDatasource {
       ((resp.data is Map ? resp.data['data'] : null) ?? resp.data)
           as Map<String, dynamic>;
 
+  /// A run key as the API names it: a week's Monday "2026-10-26" →
+  /// week_start, a month "2026-10" → month.
+  static Map<String, String> _period(String key) =>
+      key.length == 10 ? {'week_start': key} : {'month': key};
+
   Future<T> _call<T>(Future<T> Function() fn) async {
     try {
       return await fn();
@@ -44,7 +49,8 @@ class PayrollRemoteDatasource {
         PayrollRun.fromJson(_data(await _dio.get(ApiEndpoints.payrollRun(id)))),
   );
 
-  /// [month]'s default working days (the month less Sundays), and its run
+  /// The period's ([month]: "2026-10" or a week's Monday) default working
+  /// days (its month less Sundays), and its run
   /// if there is one.
   Future<({int workingDays, String? runId, String? status})> preview(
     String month,
@@ -52,7 +58,7 @@ class PayrollRemoteDatasource {
     final data = _data(
       await _dio.get(
         ApiEndpoints.payrollPreview,
-        queryParameters: {'month': month},
+        queryParameters: _period(month),
       ),
     );
     final run = (data['run'] as Map?)?.cast<String, dynamic>();
@@ -63,13 +69,14 @@ class PayrollRemoteDatasource {
     );
   });
 
-  /// Works out [month]'s payslips (again, for a draft).
+  /// Works out the period's ([month]: "2026-10" or a week's Monday)
+  /// payslips (again, for a draft).
   Future<PayrollRun> generate(String month, {int? workingDays}) => _call(
     () async => PayrollRun.fromJson(
       _data(
         await _dio.post(
           ApiEndpoints.payrollRuns,
-          data: {'month': month, 'working_days': ?workingDays},
+          data: {..._period(month), 'working_days': ?workingDays},
         ),
       ),
     ),

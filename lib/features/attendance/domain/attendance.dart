@@ -2,19 +2,28 @@ import '../../employees/domain/entities/employee.dart';
 
 /// Shift sizes a shift-rate day can hold, and how many shifts at most.
 /// Mirrors the server (attendance/service.js).
-const kShiftUnits = [0.25, 0.5, 0.75, 1.0, 2.0, 3.0];
+/// ¼, ½, ¾, 1, 1¼ … 2¾, 3.
+const kShiftUnits = [
+  0.25,
+  0.5,
+  0.75,
+  1.0,
+  1.25,
+  1.5,
+  1.75,
+  2.0,
+  2.25,
+  2.5,
+  2.75,
+  3.0,
+];
 const kMaxShifts = 3;
 
 /// The most hours an hourly day can hold.
 const kMaxHours = 24;
 
-/// "1/4", "1/2", "3/4", "1", "2", "3".
-String shiftUnitLabel(double u) => switch (u) {
-  0.25 => '1/4',
-  0.5 => '1/2',
-  0.75 => '3/4',
-  _ => u % 1 == 0 ? u.toStringAsFixed(0) : u.toString(),
-};
+/// "¼", "½", "1", "1¼", "2¾", "3".
+String shiftUnitLabel(double u) => shiftTotalLabel(u);
 
 /// A day's total shifts: "1¾", "2", "½".
 String shiftTotalLabel(double total) {

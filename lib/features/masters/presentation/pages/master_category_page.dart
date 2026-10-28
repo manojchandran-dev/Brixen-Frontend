@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/app_bottom_nav.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../shared/widgets/deleted_items_button.dart';
@@ -67,6 +68,10 @@ class _MasterCategoryPageState extends ConsumerState<MasterCategoryPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       drawer: isForm ? null : const AppDrawer(),
+      // The list has the bottom nav like every module; the form doesn't.
+      // (AppBottomNav fills the Scaffold height, hence extendBody.)
+      extendBody: !isForm,
+      bottomNavigationBar: isForm ? null : const AppBottomNav(activeIndex: 3),
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,

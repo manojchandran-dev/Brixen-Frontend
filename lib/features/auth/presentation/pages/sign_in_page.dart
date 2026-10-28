@@ -67,10 +67,16 @@ class _SignInViewState extends State<_SignInView> {
             );
           }
           // Temporary password (first sign-in): choose a new one first.
+          // A pushed route sits outside this page's BlocProvider, so the
+          // cubit is handed on (without it the page can't build — a grey
+          // screen in release).
           if (state is AuthPasswordChangeRequired) {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => SetFirstPasswordPage(email: state.email),
+                builder: (_) => BlocProvider.value(
+                  value: authCubit,
+                  child: SetFirstPasswordPage(email: state.email),
+                ),
               ),
             );
           }

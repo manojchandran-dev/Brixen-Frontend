@@ -61,17 +61,10 @@ class _SalesPageState extends ConsumerState<SalesPage> {
   /// Search + filters as API params, as a stable query string (the results
   /// provider's key). '' = neither → the full list. "days" → from/to.
   String _query() {
-    final days = _filters['days'] as int?;
-    final now = DateTime.now();
-    final day = DateFormat('yyyy-MM-dd');
     final p = <String, String>{
       if (_search.isNotEmpty) 'search': _search,
-      for (final e in _filters.entries)
-        if (e.key != 'days' && e.value != null) e.key: '${e.value}',
-      if (days != null) ...{
-        'from': day.format(now.subtract(Duration(days: days - 1))),
-        'to': day.format(now),
-      },
+      // A date filter becomes ?from=&to=.
+      ...filterQueryParams(_filters),
     };
     final keys = p.keys.toList()..sort();
     return Uri(queryParameters: {for (final k in keys) k: p[k]!}).query;
@@ -121,11 +114,7 @@ class _SalesPageState extends ConsumerState<SalesPage> {
             distinctOptions(all, (e) => e.invoiceType),
           ),
         ),
-        FilterSection(
-          key: 'days',
-          title: 'Bill date',
-          options: const [(7, 'Last 7 days'), (30, 'Last 30 days')],
-        ),
+        FilterSection.dates(key: 'days', title: 'Bill date'),
       ],
       selected: _filters,
       onApply: (v) => setState(() => _filters = v),

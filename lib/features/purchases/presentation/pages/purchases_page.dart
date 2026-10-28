@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/app_bottom_nav.dart';
 import '../../../../shared/widgets/app_drawer.dart';
+import '../../../../shared/widgets/chip_filter_sheet.dart';
 import '../../../../shared/widgets/rich_card_shell.dart';
 import '../../../../shared/widgets/skeleton.dart';
 import '../../../../shared/widgets/detail_sheet.dart';
@@ -27,11 +28,36 @@ class PurchasesPage extends ConsumerStatefulWidget {
 class _PurchasesPageState extends ConsumerState<PurchasesPage> {
   final _searchCtrl = TextEditingController();
 
+  /// Payment status and bill date (a [DateFilter]), applied to the loaded
+  /// list.
+  Map<String, Object?> _filters = {};
+
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
   }
+
+  static DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  void _openFilter(List<Purchase> all) => showChipFilterSheet(
+    context,
+    title: 'Filter purchases',
+    sections: [
+      FilterSection(
+        key: 'payment_status',
+        title: 'Payment status',
+        options: [
+          for (final s in {for (final p in all) p.paymentStatus})
+            if (s.isNotEmpty) (s, s),
+        ],
+      ),
+      const FilterSection.dates(key: 'days', title: 'Bill date'),
+    ],
+    selected: _filters,
+    onApply: (v) => setState(() => _filters = v),
+    onClear: () => setState(() => _filters = {}),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -228,45 +254,66 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: Container(
-              height: 48,
-              decoration: BoxDecoration(
-                color: isDark ? cs.surfaceContainerHighest : AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: isDark
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: AppColors.shadowDark.withValues(alpha: 0.06),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? cs.surfaceContainerHighest
+                          : AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: isDark
+                          ? null
+                          : [
+                              BoxShadow(
+                                color: AppColors.shadowDark.withValues(
+                                  alpha: 0.06,
+                                ),
+                                blurRadius: 14,
+                                offset: const Offset(0, 6),
+                              ),
+                              BoxShadow(
+                                color: AppColors.highlightShadow(0.85),
+                                blurRadius: 6,
+                                offset: const Offset(-3, -3),
+                              ),
+                            ],
+                    ),
+                    child: TextField(
+                      controller: _searchCtrl,
+                      onChanged: (_) => setState(() {}),
+                      style: TextStyle(color: cs.onSurface, fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'Search',
+                        hintStyle: TextStyle(
+                          color: cs.onSurfaceVariant,
+                          fontSize: 14,
                         ),
-                        BoxShadow(
-                          color: AppColors.highlightShadow(0.85),
-                          blurRadius: 6,
-                          offset: const Offset(-3, -3),
+                        prefixIcon: Icon(
+                          Icons.search_rounded,
+                          color: cs.onSurfaceVariant,
+                          size: 20,
                         ),
-                      ],
-              ),
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (_) => setState(() {}),
-                style: TextStyle(color: cs.onSurface, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Search',
-                  hintStyle: TextStyle(
-                    color: cs.onSurfaceVariant,
-                    fontSize: 14,
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 13,
+                        ),
+                      ),
+                    ),
                   ),
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    color: cs.onSurfaceVariant,
-                    size: 20,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 13),
                 ),
-              ),
+                const SizedBox(width: 10),
+                HeaderIconButton(
+                  tooltip: 'Filter',
+                  icon: Icons.filter_list_rounded,
+                  active: _filters.values.any((v) => v != null),
+                  onTap: () => _openFilter(
+                    purchasesAsync.valueOrNull ?? const <Purchase>[],
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(
@@ -279,15 +326,19 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage> {
               ),
               data: (list) {
                 final q = _searchCtrl.text.trim().toLowerCase();
-                final filtered = q.isEmpty
-                    ? list
-                    : list
-                          .where(
-                            (p) =>
-                                p.supplierName.toLowerCase().contains(q) ||
-                                p.paymentStatus.toLowerCase().contains(q),
-                          )
-                          .toList();
+                final dates = _filters['days'];
+                final status = _filters['payment_status'];
+                final filtered = [
+                  for (final p in list)
+                    if ((q.isEmpty ||
+                            p.supplierName.toLowerCase().contains(q) ||
+                            p.paymentStatus.toLowerCase().contains(q)) &&
+                        (status == null || p.paymentStatus == status) &&
+                        (dates is! DateFilter ||
+                            (!_day(p.billDate).isBefore(dates.from) &&
+                                !_day(p.billDate).isAfter(dates.to))))
+                      p,
+                ];
                 if (filtered.isEmpty) {
                   return Center(
                     child: Column(

@@ -193,11 +193,8 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
                   _DaySummary(dayItems),
                   const SizedBox(height: 12),
                   if (dayItems.isEmpty)
-                    _Empty(
-                      searching: _search.isNotEmpty || _kind != null,
-                      canCreate: canRecord,
-                      onCreate: () => _openForm(list, selected),
-                    )
+                    // Recording is the + at the top.
+                    _Empty(searching: _search.isNotEmpty || _kind != null)
                   else
                     for (final r in dayItems)
                       Padding(
@@ -955,13 +952,7 @@ class _Tile extends StatelessWidget {
 
 class _Empty extends StatelessWidget {
   final bool searching;
-  final bool canCreate;
-  final VoidCallback onCreate;
-  const _Empty({
-    required this.searching,
-    required this.canCreate,
-    required this.onCreate,
-  });
+  const _Empty({required this.searching});
 
   @override
   Widget build(BuildContext context) => Container(
@@ -999,14 +990,7 @@ class _Empty extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        if (!searching && canCreate) ...[
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: onCreate,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Record attendance'),
-          ),
-        ],
+
       ],
     ),
   );

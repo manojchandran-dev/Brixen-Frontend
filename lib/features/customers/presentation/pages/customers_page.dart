@@ -52,17 +52,10 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
   /// Search + filters as API params, as a stable query string (the results
   /// provider's key). '' = neither → the full list. "days" → from/to.
   String _query() {
-    final days = _filters['days'] as int?;
-    final now = DateTime.now();
-    final day = DateFormat('yyyy-MM-dd');
     final p = <String, String>{
       if (_search.isNotEmpty) 'search': _search,
-      for (final e in _filters.entries)
-        if (e.key != 'days' && e.value != null) e.key: '${e.value}',
-      if (days != null) ...{
-        'from': day.format(now.subtract(Duration(days: days - 1))),
-        'to': day.format(now),
-      },
+      // A date filter becomes ?from=&to=.
+      ...filterQueryParams(_filters),
     };
     final keys = p.keys.toList()..sort();
     return Uri(queryParameters: {for (final k in keys) k: p[k]!}).query;
@@ -85,11 +78,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
           title: 'GST',
           options: const [(true, 'Registered'), (false, 'Not registered')],
         ),
-        FilterSection(
-          key: 'days',
-          title: 'Added',
-          options: const [(7, 'Last 7 days'), (30, 'Last 30 days')],
-        ),
+        FilterSection.dates(key: 'days', title: 'Added'),
       ],
       selected: _filters,
       onApply: (v) => setState(() => _filters = v),
@@ -474,25 +463,13 @@ class _CustomerCard extends ConsumerWidget {
             onTap: () => _confirmDelete(context, ref),
           ),
       ],
-      // Tinted with the card's accent (light or dark theme), like the sales
-      // cards; opaque, so the swipe buttons stay hidden until swiped.
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: AppColors.cardTintGradient(accent),
-          ),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: accent.withValues(alpha: 0.18)),
-          boxShadow: AppColors.shadows([
-            BoxShadow(
-              color: accent.withValues(alpha: 0.22),
-              blurRadius: 12,
-              offset: const Offset(2, 6),
-            ),
-          ]),
-        ),
+      // The same card as the other modules: tinted with its accent, with the
+      // accent edge; opaque, so the swipe buttons stay hidden until swiped.
+      child: RichCardShell(
+        accentColor: accent,
+        backgroundGradient: AppColors.cardTintGradient(accent),
+        edgeColor: accent,
+        showAccentBar: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
           child: Row(

@@ -10,6 +10,7 @@ import '../../../../shared/widgets/error_state.dart';
 import '../../../../shared/widgets/exact_amount.dart';
 import '../../../../shared/widgets/module_tabs.dart';
 import '../../../../shared/widgets/module_title.dart';
+import '../../../../shared/widgets/pill_segmented_control.dart';
 import '../../../../shared/widgets/search_field.dart';
 import '../../../../shared/widgets/skeleton.dart';
 import '../../../../shared/widgets/theme_banner.dart';
@@ -45,14 +46,31 @@ class SalaryGenerationPage extends ConsumerStatefulWidget {
 
 class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
   late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+
+  /// Paying by the week (Monday to Sunday) instead of the month.
+  bool _weekly = false;
+  late DateTime _week = weekStartOf(DateTime.now());
   bool _busy = false;
 
-  bool get _isCurrent =>
-      _ym.format(_month) ==
-      _ym.format(DateTime(DateTime.now().year, DateTime.now().month));
+  /// The run key: "2026-10", or the week's Monday "2026-10-26".
+  String get _key =>
+      _weekly ? DateFormat('yyyy-MM-dd').format(_week) : _ym.format(_month);
+
+  bool get _isCurrent => _weekly
+      ? _week == weekStartOf(DateTime.now())
+      : _ym.format(_month) ==
+            _ym.format(DateTime(DateTime.now().year, DateTime.now().month));
+
+  void _step(int by) => setState(() {
+    if (_weekly) {
+      _week = _week.add(Duration(days: 7 * by));
+    } else {
+      _month = DateTime(_month.year, _month.month + by);
+    }
+  });
 
   Future<void> _generate(List<PayrollRun> runs) async {
-    final month = _ym.format(_month);
+    final month = _key;
     final existing = runs.where((r) => r.month == month).firstOrNull;
     if (existing?.isFinalized ?? false) {
       return _open(existing!.id);
@@ -77,10 +95,28 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
       if (!mounted) return;
       _snack(
         context,
-        '${run.label} salary made for ${run.payslipCount} employees',
+        '${run.label}: salary made for ${run.payslipCount} employees',
         error: false,
       );
-      _open(run.id);
+      // Already paid for some of these days in another run: say who.
+      if (run.skipped.isNotEmpty) {
+        await showDialog<void>(
+          context: context,
+          builder: (d) => AlertDialog(
+            title: Text(
+              '${run.skipped.length} left out — already paid for these days',
+            ),
+            content: SingleChildScrollView(child: Text(run.skipped.join('\n'))),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(d).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+      if (mounted) _open(run.id);
     } catch (e) {
       if (mounted) _snack(context, e.toString());
     } finally {
@@ -97,9 +133,7 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
     final access = ref.watch(moduleAccessProvider('Employees'));
     final runs = ref.watch(payrollRunsProvider);
     final list = runs.valueOrNull ?? const <PayrollRun>[];
-    final current = list
-        .where((r) => r.month == _ym.format(_month))
-        .firstOrNull;
+    final current = list.where((r) => r.month == _key).firstOrNull;
     final past = [
       for (final r in list)
         if (r.id != current?.id) r,
@@ -120,7 +154,7 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
         ),
         title: const ModuleTitle(
           title: 'Salary',
-          subtitle: 'Monthly pay worked out from attendance',
+          subtitle: 'Weekly or monthly pay from attendance',
         ),
         bottom: const ModuleTabs(
           group: ModuleGroup.staff,
@@ -132,15 +166,30 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
           children: [
+            // Pay by the month or by the week.
+            PillSegmentedControl<bool>(
+              value: _weekly,
+              onChanged: (v) => setState(() => _weekly = v),
+              segments: const [
+                PillSegment(
+                  value: false,
+                  label: 'Monthly',
+                  icon: Icons.calendar_month_rounded,
+                ),
+                PillSegment(
+                  value: true,
+                  label: 'Weekly',
+                  icon: Icons.view_week_rounded,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
             _MonthPicker(
-              month: _month,
+              label: monthLabel(_key),
+              caption: _weekly ? 'Salary for the week' : 'Salary for',
               canNext: !_isCurrent,
-              onPrev: () => setState(
-                () => _month = DateTime(_month.year, _month.month - 1),
-              ),
-              onNext: () => setState(
-                () => _month = DateTime(_month.year, _month.month + 1),
-              ),
+              onPrev: () => _step(-1),
+              onNext: () => _step(1),
             ),
             const SizedBox(height: 14),
             if (runs.isLoading && !runs.hasValue)
@@ -149,7 +198,12 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
               )
             else
               _NextStep(
-                month: _month,
+                name: _weekly
+                    ? 'this week\'s'
+                    : DateFormat('MMMM').format(_month),
+                period: _weekly
+                    ? 'the week ${monthLabel(_key)}'
+                    : DateFormat('MMMM').format(_month),
                 run: current,
                 busy: _busy,
                 canGenerate: access.create,
@@ -170,7 +224,7 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
             if (past.isNotEmpty) ...[
               const SizedBox(height: 20),
               Text(
-                'Other months',
+                'Other salary runs',
                 style: TextStyle(
                   color: AppColors.ink,
                   fontSize: 16,
@@ -196,13 +250,14 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
   }
 }
 
-/// "‹ October 2026 ›" on the theme sweep.
+/// "‹ October 2026 ›" (or a week) on the theme sweep.
 class _MonthPicker extends StatelessWidget {
-  final DateTime month;
+  final String label, caption;
   final bool canNext;
   final VoidCallback onPrev, onNext;
   const _MonthPicker({
-    required this.month,
+    required this.label,
+    required this.caption,
     required this.canNext,
     required this.onPrev,
     required this.onNext,
@@ -239,18 +294,21 @@ class _MonthPicker extends StatelessWidget {
             child: Column(
               children: [
                 Text(
-                  'Salary for',
+                  caption,
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.8),
                     fontSize: 12,
                   ),
                 ),
-                Text(
-                  DateFormat('MMMM yyyy').format(month),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w900,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ],
@@ -267,13 +325,18 @@ class _MonthPicker extends StatelessWidget {
 ///   not made → Make the salary; made → Check the payslips;
 ///   confirmed → Send the payslips.
 class _NextStep extends StatelessWidget {
-  final DateTime month;
+  /// "October" / "this week's" — in "Make October salary".
+  final String name;
+
+  /// "October" / "the week 26 Oct – 1 Nov 2026" — in "attendance for …".
+  final String period;
   final PayrollRun? run;
   final bool busy, canGenerate;
   final VoidCallback onGenerate;
   final VoidCallback? onOpen;
   const _NextStep({
-    required this.month,
+    required this.name,
+    required this.period,
     required this.run,
     required this.busy,
     required this.canGenerate,
@@ -284,14 +347,13 @@ class _NextStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = run;
-    final name = DateFormat('MMMM').format(month);
     final (step, color, icon, title, text) = r == null
         ? (
             1,
             AppColors.brand,
             Icons.auto_awesome_rounded,
             'Make $name salary',
-            'Brixen counts each employee\'s attendance for $name and works '
+            'Brixen counts each employee\'s attendance for $period and works '
                 'out their pay. Nothing is paid or sent yet — you check it next.',
           )
         : !r.isFinalized
@@ -619,8 +681,11 @@ class _GenerateSheet extends StatefulWidget {
 class _GenerateSheetState extends State<_GenerateSheet> {
   late int _days = widget.workingDays;
 
+  /// The days in the period's month (a week counts in its Monday's month).
   int get _max {
-    final d = DateTime.parse('${widget.month}-01');
+    final d = DateTime.parse(
+      widget.month.length == 10 ? widget.month : '${widget.month}-01',
+    );
     return DateTime(d.year, d.month + 1, 0).day;
   }
 
@@ -764,7 +829,12 @@ class _RunTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = run.isFinalized ? AppColors.positiveDeep : AppColors.brand;
-    final d = DateTime.parse('${run.month}-01');
+    final d =
+        run.periodFrom ??
+        DateTime.tryParse(
+          run.month.length == 10 ? run.month : '${run.month}-01',
+        ) ??
+        DateTime(2000);
     return Material(
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(18),
@@ -795,7 +865,9 @@ class _RunTile extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      DateFormat('MMM').format(d).toUpperCase(),
+                      (run.isWeek ? DateFormat('d MMM') : DateFormat('MMM'))
+                          .format(d)
+                          .toUpperCase(),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
@@ -803,7 +875,7 @@ class _RunTile extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '${d.year}',
+                      run.isWeek ? 'WEEK' : '${d.year}',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.85),
                         fontSize: 10,

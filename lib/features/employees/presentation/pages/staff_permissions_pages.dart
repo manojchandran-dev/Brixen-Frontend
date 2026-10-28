@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
-import '../../../../core/router/app_router.dart';
+
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/app_bottom_nav.dart';
 import '../../../../shared/widgets/app_drawer.dart';
 import '../../../../shared/widgets/brixen_button.dart';
 import '../../../../shared/widgets/error_state.dart';
-import '../../../../shared/widgets/module_tabs.dart';
+
 import '../../../../shared/widgets/module_title.dart';
 import '../../../../shared/widgets/search_field.dart';
 import '../../../../shared/widgets/skeleton.dart';
@@ -183,19 +183,18 @@ class _StaffPermissionsPageState extends ConsumerState<StaffPermissionsPage> {
         backgroundColor: AppColors.background,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu_rounded),
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-          ),
-        ),
+        // Opened from Employees: back. Opened on its own: the menu.
+        leading: Navigator.of(context).canPop()
+            ? const BackButton()
+            : Builder(
+                builder: (ctx) => IconButton(
+                  icon: const Icon(Icons.menu_rounded),
+                  onPressed: () => Scaffold.of(ctx).openDrawer(),
+                ),
+              ),
         title: const ModuleTitle(
           title: 'Staff Permissions',
           subtitle: 'What each employee can use',
-        ),
-        bottom: const ModuleTabs(
-          group: ModuleGroup.staff,
-          current: AppRouter.staffPermissions,
         ),
       ),
       body: async.when(

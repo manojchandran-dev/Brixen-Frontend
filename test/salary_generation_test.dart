@@ -9,6 +9,7 @@ import 'package:brixen/features/permissions/presentation/providers/module_access
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 
 class _Employees extends EmployeesNotifier {
   @override
@@ -92,6 +93,7 @@ void main() {
     tester,
   ) async {
     _phone(tester);
+    tester.view.physicalSize = const Size(390 * 3, 1600 * 3);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -119,6 +121,19 @@ void main() {
     expect(find.textContaining('salary'), findsWidgets);
     expect(find.text('September 2026'), findsOneWidget);
     expect(find.text('Confirmed'), findsOneWidget);
+
+    // Pay by the week: the picker shows this week, Monday to Sunday.
+    await tester.tap(find.text('Weekly'));
+    await tester.pump();
+    expect(find.text('Salary for the week'), findsOneWidget);
+    expect(
+      find.text(
+        monthLabel(
+          DateFormat('yyyy-MM-dd').format(weekStartOf(DateTime.now())),
+        ),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('hourly and monthly attendance forms', (tester) async {

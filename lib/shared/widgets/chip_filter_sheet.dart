@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
 
 /// Square icon button beside a search box (filter, trash…). [active]
@@ -53,17 +54,88 @@ class HeaderIconButton extends StatelessWidget {
   }
 }
 
+/// A date filter: [from] to [to], both days included. [label] is what its
+/// chip says ("Last 7 days", or the custom range's dates).
+class DateFilter {
+  final DateTime from, to;
+  final String label;
+  const DateFilter(this.from, this.to, this.label);
+
+  static DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  /// Today, Last 7 days, Last 30 days, This month — as of [now].
+  static List<DateFilter> presets([DateTime? now]) {
+    final today = _day(now ?? DateTime.now());
+    return [
+      DateFilter(today, today, 'Today'),
+      DateFilter(today.subtract(const Duration(days: 6)), today, 'Last 7 days'),
+      DateFilter(
+        today.subtract(const Duration(days: 29)),
+        today,
+        'Last 30 days',
+      ),
+      DateFilter(DateTime(today.year, today.month), today, 'This month'),
+    ];
+  }
+
+  /// A picked range, labelled with its dates.
+  factory DateFilter.custom(DateTimeRange r) {
+    final f = DateFormat('d MMM yy');
+    final from = _day(r.start), to = _day(r.end);
+    return DateFilter(
+      from,
+      to,
+      from == to ? f.format(from) : '${f.format(from)} – ${f.format(to)}',
+    );
+  }
+
+  bool get isCustom => !presets().any((p) => p == this);
+
+  /// The API's ?from=&to=.
+  Map<String, String> get params {
+    final f = DateFormat('yyyy-MM-dd');
+    return {'from': f.format(from), 'to': f.format(to)};
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is DateFilter && other.from == from && other.to == to;
+
+  @override
+  int get hashCode => Object.hash(from, to);
+}
+
+/// A filter sheet's choices as API query params: a [DateFilter] becomes
+/// from / to, anything else its text; unset (null) ones are left out.
+Map<String, String> filterQueryParams(Map<String, Object?> filters) => {
+  for (final e in filters.entries)
+    if (e.value is DateFilter)
+      ...(e.value as DateFilter).params
+    else if (e.value != null)
+      e.key: '${e.value}',
+};
+
 /// One section of a [showChipFilterSheet]: a title and its options as
 /// (value, label) pairs. [key] names it in the selected/applied maps.
 class FilterSection {
   final String key;
   final String title;
   final List<(Object, String)> options;
+
+  /// A date section ([FilterSection.dates]): the presets plus a custom
+  /// range picker; its value is a [DateFilter].
+  final bool isDate;
   const FilterSection({
     required this.key,
     required this.title,
     required this.options,
-  });
+  }) : isDate = false;
+
+  /// Date-wise: Today, Last 7 days, Last 30 days, This month, or a custom
+  /// range.
+  const FilterSection.dates({required this.key, this.title = 'Date'})
+    : options = const [],
+      isDate = true;
 }
 
 /// Bottom panel of chip filters: one row of chips per [FilterSection],
@@ -118,7 +190,8 @@ void showChipFilterSheet(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                   children: [
                     for (final section in sections)
-                      if (section.options.length >= 2 ||
+                      if (section.isDate ||
+                          section.options.length >= 2 ||
                           draft[section.key] != null) ...[
                         Padding(
                           padding: const EdgeInsets.only(top: 12, bottom: 8),
@@ -142,6 +215,50 @@ void showChipFilterSheet(
                               onTap: () =>
                                   setSheet(() => draft[section.key] = null),
                             ),
+                            if (section.isDate) ...[
+                              for (final p in DateFilter.presets())
+                                _ChipPill(
+                                  label: p.label,
+                                  selected: draft[section.key] == p,
+                                  onTap: () => setSheet(
+                                    () => draft[section.key] =
+                                        draft[section.key] == p ? null : p,
+                                  ),
+                                ),
+                              _ChipPill(
+                                label: switch (draft[section.key]) {
+                                  final DateFilter d when d.isCustom =>
+                                    d.label,
+                                  _ => 'Custom dates…',
+                                },
+                                icon: Icons.date_range_rounded,
+                                selected: switch (draft[section.key]) {
+                                  final DateFilter d => d.isCustom,
+                                  _ => false,
+                                },
+                                onTap: () async {
+                                  final now = DateTime.now();
+                                  final current = draft[section.key];
+                                  final picked = await showDateRangePicker(
+                                    context: sheetCtx,
+                                    firstDate: DateTime(2000),
+                                    lastDate: DateTime(now.year + 1, 12, 31),
+                                    initialDateRange: current is DateFilter
+                                        ? DateTimeRange(
+                                            start: current.from,
+                                            end: current.to,
+                                          )
+                                        : null,
+                                  );
+                                  if (picked != null) {
+                                    setSheet(
+                                      () => draft[section.key] =
+                                          DateFilter.custom(picked),
+                                    );
+                                  }
+                                },
+                              ),
+                            ],
                             for (final (value, label) in section.options)
                               _ChipPill(
                                 label: label,
@@ -223,10 +340,12 @@ void showChipFilterSheet(
 
 class _ChipPill extends StatelessWidget {
   final String label;
+  final IconData? icon;
   final bool selected;
   final VoidCallback onTap;
   const _ChipPill({
     required this.label,
+    this.icon,
     required this.selected,
     required this.onTap,
   });
@@ -249,13 +368,26 @@ class _ChipPill extends StatelessWidget {
             color: selected ? AppColors.brand : Theme.of(context).dividerColor,
           ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : AppColors.ink,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 15,
+                color: selected ? Colors.white : AppColors.brand,
+              ),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : AppColors.ink,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );

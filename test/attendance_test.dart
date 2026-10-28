@@ -8,7 +8,7 @@ void main() {
   test('shift labels and day totals', () {
     expect(
       [for (final u in kShiftUnits) shiftUnitLabel(u)],
-      ['1/4', '1/2', '3/4', '1', '2', '3'],
+      ['¼', '½', '¾', '1', '1¼', '1½', '1¾', '2', '2¼', '2½', '2¾', '3'],
     );
     expect(shiftTotalLabel(1.75), '1¾');
     expect(shiftTotalLabel(0.5), '½');

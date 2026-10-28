@@ -109,15 +109,18 @@ class _MyWorkPageState extends ConsumerState<MyWorkPage> {
           const SizedBox(height: 18),
           Row(
             children: [
-              Text(
-                'My attendance',
-                style: TextStyle(
-                  color: AppColors.ink,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
+              Expanded(
+                child: Text(
+                  'My attendance',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
-              const Spacer(),
               if (month != null) ...[
                 IconButton(
                   tooltip: 'Previous month',

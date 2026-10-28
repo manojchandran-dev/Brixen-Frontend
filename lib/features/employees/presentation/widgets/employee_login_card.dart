@@ -209,43 +209,50 @@ class _EmployeeLoginCardState extends ConsumerState<EmployeeLoginCard> {
                 'with their temporary password goes there.',
               )
             else
+              // The main action full width (its label fits); remove and
+              // permissions below it.
+              BrixenButton(
+                label: !e.loginActive
+                    ? 'Activate login'
+                    : failed
+                    ? 'Resend setup email'
+                    : 'Send new password',
+                isLoading: _busy,
+                onPressed: _busy
+                    ? null
+                    : () => _activate(e, resend: e.loginActive),
+              ),
+            if (e.loginActive || Session.role == UserRole.companyAdmin) ...[
+              const SizedBox(height: 10),
               Row(
                 children: [
-                  Expanded(
-                    child: BrixenButton(
-                      label: !e.loginActive
-                          ? 'Activate login'
-                          : failed
-                          ? 'Resend setup email'
-                          : 'Send new password',
-                      isLoading: _busy,
-                      onPressed: _busy
-                          ? null
-                          : () => _activate(e, resend: e.loginActive),
-                    ),
-                  ),
-                  if (e.loginActive) ...[
-                    const SizedBox(width: 10),
+                  if (e.loginActive && e.status == 'Active' && hasEmail)
                     Expanded(
                       child: BrixenButton(
-                        label: 'Remove',
+                        label: 'Remove login',
                         isOutlined: true,
                         onPressed: _busy ? null : () => _remove(e),
                       ),
                     ),
-                  ],
+                  if (e.loginActive &&
+                      e.status == 'Active' &&
+                      hasEmail &&
+                      Session.role == UserRole.companyAdmin)
+                    const SizedBox(width: 10),
+                  if (Session.role == UserRole.companyAdmin)
+                    Expanded(
+                      child: BrixenButton(
+                        label: 'Permissions',
+                        isOutlined: true,
+                        onPressed: () => context.push(
+                          AppRouter.staffPermissions,
+                          extra: e.id,
+                        ),
+                      ),
+                    ),
                 ],
               ),
-            if (Session.role == UserRole.companyAdmin)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: () =>
-                      context.push(AppRouter.staffPermissions, extra: e.id),
-                  icon: const Icon(Icons.admin_panel_settings_outlined),
-                  label: const Text('Staff permissions'),
-                ),
-              ),
+            ],
           ],
         ],
       ),

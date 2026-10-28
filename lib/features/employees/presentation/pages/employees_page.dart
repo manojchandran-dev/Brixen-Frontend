@@ -6,6 +6,7 @@ import '../../../../core/network/api_endpoints.dart';
 import '../../../../shared/widgets/deleted_items_button.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/services/session_service.dart';
+import '../../../auth/domain/entities/user_role.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/action_sheet.dart';
@@ -54,17 +55,10 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
   /// Search + filters as API params, as a stable query string (the results
   /// provider's key). '' = neither → the full list. "days" → from/to.
   String _query() {
-    final days = _filters['days'] as int?;
-    final now = DateTime.now();
-    final day = DateFormat('yyyy-MM-dd');
     final p = <String, String>{
       if (_search.isNotEmpty) 'search': _search,
-      for (final e in _filters.entries)
-        if (e.key != 'days' && e.value != null) e.key: '${e.value}',
-      if (days != null) ...{
-        'from': day.format(now.subtract(Duration(days: days - 1))),
-        'to': day.format(now),
-      },
+      // A date filter becomes ?from=&to=.
+      ...filterQueryParams(_filters),
     };
     final keys = p.keys.toList()..sort();
     return Uri(queryParameters: {for (final k in keys) k: p[k]!}).query;
@@ -113,6 +107,7 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
             distinctOptions(all, (e) => e.employmentType),
           ),
         ),
+        FilterSection.dates(key: 'days', title: 'Joined'),
       ],
       selected: _filters,
       onApply: (v) => setState(() => _filters = v),
@@ -275,6 +270,16 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
               )
             : ModuleTitle(title: 'Employees', subtitle: 'Manage your staff'),
         actions: [
+          // Staff Permissions lives in Employees (company admins only).
+          if (!widget.fromMasters && Session.role == UserRole.companyAdmin)
+            IconButton(
+              tooltip: 'Staff permissions',
+              onPressed: () => context.push(AppRouter.staffPermissions),
+              icon: const Icon(
+                Icons.admin_panel_settings_outlined,
+                color: AppColors.brand,
+              ),
+            ),
           if (ref.watch(moduleAccessProvider('Employees')).create)
             GestureDetector(
               onTap: () => context.push(

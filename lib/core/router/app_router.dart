@@ -148,6 +148,17 @@ class AppRouter {
 
   /// [builder]'s page, shown only to a user who may view [module] — so an
   /// address typed or saved can't open a screen the menu hides.
+  /// [_guard] as a page with no transition: the grouped screens (see
+  /// ModuleTabs) switch in place instead of sliding.
+  static GoRouterPageBuilder _guardStill(
+    String module,
+    GoRouterWidgetBuilder builder,
+  ) =>
+      (context, state) => NoTransitionPage(
+        key: state.pageKey,
+        child: _guard(module, builder)(context, state),
+      );
+
   static GoRouterWidgetBuilder _guard(
     String module,
     GoRouterWidgetBuilder builder,
@@ -254,7 +265,7 @@ class AppRouter {
           ),
           GoRoute(
             path: _sub(purchases, dashboard),
-            builder: _guard(
+            pageBuilder: _guardStill(
               'Purchases',
               (context, state) =>
                   PurchasesPage(fromMasters: state.extra == 'masters'),
@@ -277,7 +288,7 @@ class AppRouter {
           ),
           GoRoute(
             path: _sub(expenses, dashboard),
-            builder: _guard(
+            pageBuilder: _guardStill(
               'Expenses',
               (context, state) =>
                   ExpensesPage(fromMasters: state.extra == 'masters'),
@@ -297,7 +308,7 @@ class AppRouter {
           ),
           GoRoute(
             path: _sub(employees, dashboard),
-            builder: _guard(
+            pageBuilder: _guardStill(
               'Employees',
               (context, state) =>
                   EmployeesPage(fromMasters: state.extra == 'masters'),
@@ -330,7 +341,7 @@ class AppRouter {
           GoRoute(
             path: _sub(salaryGeneration, dashboard),
             // Salary generation is part of Employees.
-            builder: _guard(
+            pageBuilder: _guardStill(
               'Employees',
               (context, state) => const SalaryGenerationPage(),
             ),
@@ -338,7 +349,7 @@ class AppRouter {
           GoRoute(
             path: _sub(inventory, dashboard),
             // Stock is part of a product: the Products permission.
-            builder: _guard(
+            pageBuilder: _guardStill(
               'Products',
               (context, state) => const InventoryPage(),
             ),
@@ -352,7 +363,7 @@ class AppRouter {
           ),
           GoRoute(
             path: _sub(products, dashboard),
-            builder: _guard(
+            pageBuilder: _guardStill(
               'Products',
               (context, state) =>
                   ProductsPage(fromMasters: state.extra == 'masters'),

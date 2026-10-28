@@ -10,10 +10,24 @@ abstract final class PayrollStatus {
   static const finalized = 'FINALIZED';
 }
 
-/// "October 2026" from "2026-10".
-String monthLabel(String month) => month.length < 7
-    ? month
-    : DateFormat('MMMM yyyy').format(DateTime.parse('$month-01'));
+/// A run's period as people say it: "October 2026" from "2026-10", or the
+/// week "26 Oct – 1 Nov 2026" from its Monday "2026-10-26".
+String monthLabel(String key) {
+  if (key.length == 10) {
+    final from = DateTime.tryParse(key);
+    if (from == null) return key;
+    final to = from.add(const Duration(days: 6));
+    return '${DateFormat('d MMM').format(from)} – '
+        '${DateFormat('d MMM yyyy').format(to)}';
+  }
+  return key.length < 7
+      ? key
+      : DateFormat('MMMM yyyy').format(DateTime.parse('$key-01'));
+}
+
+/// The Monday of [d]'s week.
+DateTime weekStartOf(DateTime d) =>
+    DateTime(d.year, d.month, d.day).subtract(Duration(days: d.weekday - 1));
 
 double _d(Object? v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
 
@@ -165,12 +179,17 @@ class Payslip {
   }
 }
 
-/// A month's salary generation and its payslips (empty in the run list).
+/// A month's or week's salary generation and its payslips (empty in the run
+/// list).
 class PayrollRun {
   final String id;
 
-  /// "2026-10".
+  /// The period's key: "2026-10", or a week's Monday "2026-10-26".
   final String month;
+
+  /// MONTH or WEEK.
+  final String periodType;
+  final DateTime? periodFrom;
   final int workingDays;
   final String status;
   final double totalGross, totalNet;
@@ -186,14 +205,28 @@ class PayrollRun {
     required this.totalNet,
     required this.payslipCount,
     this.payslips = const [],
+    this.periodType = 'MONTH',
+    this.periodFrom,
+    this.skipped = const [],
   });
 
+  /// After generating: "Name — paid in October 2026" for employees left out
+  /// because another run already pays them for some of these days.
+  final List<String> skipped;
+
   bool get isFinalized => status == PayrollStatus.finalized;
+  bool get isWeek => periodType == 'WEEK';
   String get label => monthLabel(month);
 
   factory PayrollRun.fromJson(Map<String, dynamic> j) => PayrollRun(
     id: j['id'].toString(),
     month: (j['month'] ?? '').toString(),
+    periodType: (j['period_type'] ?? 'MONTH').toString(),
+    periodFrom: DateTime.tryParse((j['period_from'] ?? '').toString()),
+    skipped: [
+      for (final s in (j['skipped'] as List? ?? const []))
+        '${(s as Map)['name']} — paid in ${s['paid_in']}',
+    ],
     workingDays: (j['working_days'] as num?)?.toInt() ?? 0,
     status: (j['status'] ?? PayrollStatus.draft).toString(),
     totalGross: _d(j['total_gross']),
