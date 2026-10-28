@@ -54,6 +54,14 @@ class MasterCubit extends Cubit<MasterState> {
   /// need names (Expenses/Products resolving category and unit). Fetches
   /// only when not cached yet, shares one request between callers, and
   /// leaves the Masters page's visible list alone.
+  /// Drops every cached list: another account (another company) is now
+  /// signed in, so they load afresh on next use.
+  void forgetAll() {
+    _store.clear();
+    _inFlight.clear();
+    _emit();
+  }
+
   Future<void> ensureLoaded(String typeKey) {
     if (_store.containsKey(typeKey) || !_repository.isRemote(typeKey)) {
       return Future.value();

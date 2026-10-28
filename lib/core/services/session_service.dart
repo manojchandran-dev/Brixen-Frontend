@@ -28,6 +28,7 @@ class Session {
   static String? get companyName => TokenService.companyName;
   static String? get companyCode => TokenService.companyCode;
   static String? get ownerName => TokenService.ownerName;
+  static String? get userName => TokenService.userName;
   static String? get subscriptionPlan => TokenService.subscriptionPlan;
   static String? get onboardingStatus => TokenService.onboardingStatus;
   static String? get companyStatus => TokenService.companyStatus;

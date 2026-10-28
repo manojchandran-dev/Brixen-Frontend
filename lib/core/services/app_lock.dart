@@ -31,7 +31,14 @@ class AppLock with WidgetsBindingObserver {
   DateTime? _leftAt;
   bool _showing = false;
 
-  void start() => WidgetsBinding.instance.addObserver(this);
+  bool _started = false;
+
+  /// Once: the app root can be rebuilt (a new one per signed-in account).
+  void start() {
+    if (_started) return;
+    _started = true;
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {

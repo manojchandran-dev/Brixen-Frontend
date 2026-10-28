@@ -18,6 +18,9 @@ class AccountSnapshot {
   final String? companyName;
   final String? companyCode;
   final String? ownerName;
+
+  /// Who it is: an employee's full name, or the company's owner.
+  final String? userName;
   final String? subscriptionPlan;
   final String? onboardingStatus;
   final String? companyStatus;
@@ -34,6 +37,7 @@ class AccountSnapshot {
     this.companyName,
     this.companyCode,
     this.ownerName,
+    this.userName,
     this.subscriptionPlan,
     this.onboardingStatus,
     this.companyStatus,
@@ -51,6 +55,7 @@ class AccountSnapshot {
     companyName: TokenService.companyName,
     companyCode: TokenService.companyCode,
     ownerName: TokenService.ownerName,
+    userName: TokenService.userName,
     subscriptionPlan: TokenService.subscriptionPlan,
     onboardingStatus: TokenService.onboardingStatus,
     companyStatus: TokenService.companyStatus,
@@ -68,6 +73,7 @@ class AccountSnapshot {
     companyName: j['companyName'] as String?,
     companyCode: j['companyCode'] as String?,
     ownerName: j['ownerName'] as String?,
+    userName: j['userName'] as String?,
     subscriptionPlan: j['subscriptionPlan'] as String?,
     onboardingStatus: j['onboardingStatus'] as String?,
     companyStatus: j['companyStatus'] as String?,
@@ -85,6 +91,7 @@ class AccountSnapshot {
     'companyName': companyName,
     'companyCode': companyCode,
     'ownerName': ownerName,
+    'userName': userName,
     'subscriptionPlan': subscriptionPlan,
     'onboardingStatus': onboardingStatus,
     'companyStatus': companyStatus,
@@ -107,6 +114,7 @@ class AccountSnapshot {
       companyName: companyName,
       companyCode: companyCode,
       ownerName: ownerName,
+      userName: userName,
       subscriptionPlan: subscriptionPlan,
       onboardingStatus: onboardingStatus,
       companyStatus: companyStatus,

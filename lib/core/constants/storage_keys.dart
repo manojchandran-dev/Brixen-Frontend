@@ -17,6 +17,9 @@ class StorageKeys {
   static const authCompanyName = 'auth_company_name';
   static const authCompanyCode = 'auth_company_code';
   static const authOwnerName = 'auth_owner_name';
+
+  /// The signed-in person's own name (an employee's, a company's owner).
+  static const authUserName = 'auth_user_name';
   static const authSubscriptionPlan = 'auth_subscription_plan';
   static const authOnboardingStatus = 'auth_onboarding_status';
   static const authCompanyStatus = 'auth_company_status';

@@ -16,6 +16,7 @@ class TokenService {
   static const _kCompanyName = StorageKeys.authCompanyName;
   static const _kCompanyCode = StorageKeys.authCompanyCode;
   static const _kOwnerName = StorageKeys.authOwnerName;
+  static const _kUserName = StorageKeys.authUserName;
   static const _kSubscriptionPlan = StorageKeys.authSubscriptionPlan;
   static const _kOnboardingStatus = StorageKeys.authOnboardingStatus;
   static const _kCompanyStatus = StorageKeys.authCompanyStatus;
@@ -31,6 +32,7 @@ class TokenService {
   static String? _companyName;
   static String? _companyCode;
   static String? _ownerName;
+  static String? _userName;
   static String? _subscriptionPlan;
   static String? _onboardingStatus;
   static String? _companyStatus;
@@ -54,6 +56,9 @@ class TokenService {
   static String? get companyName => _companyName;
   static String? get companyCode => _companyCode;
   static String? get ownerName => _ownerName;
+
+  /// Who is signed in: an employee's full name, or the company's owner.
+  static String? get userName => _userName;
   static String? get subscriptionPlan => _subscriptionPlan;
   static String? get onboardingStatus => _onboardingStatus;
   static String? get companyStatus => _companyStatus;
@@ -73,6 +78,7 @@ class TokenService {
     _companyName = prefs.getString(_kCompanyName);
     _companyCode = prefs.getString(_kCompanyCode);
     _ownerName = prefs.getString(_kOwnerName);
+    _userName = prefs.getString(_kUserName);
     _subscriptionPlan = prefs.getString(_kSubscriptionPlan);
     _onboardingStatus = prefs.getString(_kOnboardingStatus);
     _companyStatus = prefs.getString(_kCompanyStatus);
@@ -101,6 +107,7 @@ class TokenService {
     String? companyName,
     String? companyCode,
     String? ownerName,
+    String? userName,
     String? subscriptionPlan,
     String? onboardingStatus,
     String? companyStatus,
@@ -116,6 +123,7 @@ class TokenService {
     _companyName = companyName ?? _companyName;
     _companyCode = companyCode ?? _companyCode;
     _ownerName = ownerName ?? _ownerName;
+    _userName = userName ?? _userName;
     _subscriptionPlan = subscriptionPlan ?? _subscriptionPlan;
     _onboardingStatus = onboardingStatus ?? _onboardingStatus;
     _companyStatus = companyStatus ?? _companyStatus;
@@ -134,6 +142,7 @@ class TokenService {
       setIfPresent(_kCompanyName, companyName),
       setIfPresent(_kCompanyCode, companyCode),
       setIfPresent(_kOwnerName, ownerName),
+      setIfPresent(_kUserName, userName),
       setIfPresent(_kSubscriptionPlan, subscriptionPlan),
       setIfPresent(_kOnboardingStatus, onboardingStatus),
       setIfPresent(_kCompanyStatus, companyStatus),
@@ -157,6 +166,7 @@ class TokenService {
     _companyName = null;
     _companyCode = null;
     _ownerName = null;
+    _userName = null;
     _subscriptionPlan = null;
     _onboardingStatus = null;
     _companyStatus = null;
@@ -173,6 +183,7 @@ class TokenService {
       prefs.remove(_kCompanyName),
       prefs.remove(_kCompanyCode),
       prefs.remove(_kOwnerName),
+      prefs.remove(_kUserName),
       prefs.remove(_kSubscriptionPlan),
       prefs.remove(_kOnboardingStatus),
       prefs.remove(_kCompanyStatus),

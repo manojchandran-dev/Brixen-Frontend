@@ -6,6 +6,10 @@ import 'core/router/app_router.dart';
 import 'core/services/app_lock.dart';
 import 'core/router/route_names.dart';
 import 'core/services/session_service.dart';
+import 'core/services/token_service.dart';
+import 'features/auth/presentation/cubit/auth_cubit.dart';
+import 'features/auth/presentation/cubit/auth_state.dart';
+import 'features/masters/presentation/cubit/master_cubit.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_cubit.dart';
@@ -79,6 +83,45 @@ List<ProviderOrFamily> _dataFor(String path) {
     RouteNames.profile || RouteNames.more => [profileProvider],
     _ => const [],
   };
+}
+
+/// The app under one [ProviderScope] per signed-in account: switching
+/// account, signing in or out starts every provider fresh, so no screen
+/// keeps the previous account's data (its dashboard, menu, permissions…).
+/// The router is app-wide, so where the user is doesn't change.
+class SessionScope extends StatefulWidget {
+  const SessionScope({super.key});
+
+  @override
+  State<SessionScope> createState() => _SessionScopeState();
+}
+
+class _SessionScopeState extends State<SessionScope> {
+  String? _account = TokenService.email;
+  late final StreamSubscription<AuthState> _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = authCubit.stream.listen((s) {
+      if (s is! AuthAuthenticated && s is! AuthUnauthenticated) return;
+      final now = TokenService.email;
+      if (now == _account || !mounted) return;
+      // Kept outside Riverpod, so cleared by hand.
+      masterCubit.forgetAll();
+      setState(() => _account = now);
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      ProviderScope(key: ValueKey(_account), child: const BrixenApp());
 }
 
 class BrixenApp extends ConsumerStatefulWidget {

@@ -1,7 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'core/services/account_store.dart';
 import 'features/auth/data/datasources/auth_remote_datasource.dart';
@@ -41,5 +40,6 @@ void main() async {
       statusBarIconBrightness: Brightness.dark,
     ),
   );
-  runApp(const ProviderScope(child: BrixenApp()));
+  // A fresh ProviderScope per signed-in account (see SessionScope).
+  runApp(const SessionScope());
 }

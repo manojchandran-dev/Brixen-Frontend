@@ -15,9 +15,12 @@ String _profileDisplayName() {
     case UserRole.superAdmin:
       return 'Admin';
     case UserRole.companyAdmin:
-      return Session.ownerName ?? Session.companyName ?? 'Admin';
+      return Session.userName ??
+          Session.ownerName ??
+          Session.companyName ??
+          'Admin';
     case UserRole.employee:
-      return Session.email ?? 'Employee';
+      return Session.userName ?? Session.email ?? 'Employee';
   }
 }
 

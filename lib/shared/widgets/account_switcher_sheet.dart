@@ -36,9 +36,10 @@ String accountDisplayName(AccountSnapshot a) {
     case UserRole.superAdmin:
       return 'Admin';
     case UserRole.companyAdmin:
-      return a.ownerName ?? a.companyName ?? 'Admin';
+      return a.ownerName ?? a.userName ?? a.companyName ?? 'Admin';
+    // Their own name (older saved sessions may not have it yet).
     case UserRole.employee:
-      return a.email;
+      return a.userName ?? a.email;
   }
 }
 
@@ -349,8 +350,7 @@ class _ActiveAccountCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   _roleLabel(account),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: 3,
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,
@@ -359,8 +359,7 @@ class _ActiveAccountCard extends StatelessWidget {
                 ),
                 Text(
                   account.email,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: 3,
                   style: TextStyle(color: AppColors.textHint, fontSize: 12),
                 ),
               ],
@@ -444,8 +443,7 @@ class _AccountRow extends StatelessWidget {
                     const SizedBox(height: 1),
                     Text(
                       switching ? 'Switching…' : _roleLabel(account),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      maxLines: 3,
                       style: TextStyle(
                         color: switching
                             ? AppColors.brand
@@ -456,8 +454,7 @@ class _AccountRow extends StatelessWidget {
                     ),
                     Text(
                       account.email,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      maxLines: 3,
                       style: TextStyle(color: AppColors.textHint, fontSize: 12),
                     ),
                   ],

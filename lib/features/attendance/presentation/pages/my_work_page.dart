@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/services/account_store.dart';
+import '../../../../core/services/token_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../../../../core/utils/money.dart';
@@ -40,6 +42,21 @@ class _MyWorkPageState extends ConsumerState<MyWorkPage> {
   @override
   Widget build(BuildContext context) {
     final me = ref.watch(myEmployeeProvider);
+    // A session saved before names were kept learns the employee's name
+    // here, for the More tab and the account switcher.
+    ref.listen(myEmployeeProvider, (_, next) {
+      final name = next.valueOrNull?.employee.fullName;
+      final token = TokenService.token;
+      if (name == null || name.isEmpty || name == TokenService.userName) {
+        return;
+      }
+      if (token == null) return;
+      TokenService.save(
+        token: token,
+        role: TokenService.role ?? '',
+        userName: name,
+      ).then((_) => AccountStore.upsertCurrent());
+    });
     final work = ref.watch(myAttendanceProvider(_month));
     final thisMonth = work.valueOrNull?.list.today.substring(0, 7);
     final month = _month ?? thisMonth;
@@ -52,35 +69,53 @@ class _MyWorkPageState extends ConsumerState<MyWorkPage> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
         children: [
+          // The page's name on top, like the company dashboard; the greeting
+          // is in the card below.
           Row(
             children: [
               Builder(
-                builder: (ctx) => IconButton(
-                  onPressed: () => Scaffold.of(ctx).openDrawer(),
-                  icon: const Icon(Icons.menu_rounded),
+                builder: (ctx) => GestureDetector(
+                  onTap: () => Scaffold.of(ctx).openDrawer(),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: AppColors.shadows([
+                        BoxShadow(
+                          color: AppColors.shadowDark.withValues(alpha: 0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]),
+                    ),
+                    child: Icon(
+                      Icons.menu_rounded,
+                      size: 18,
+                      color: AppColors.ink,
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      greetingPrefix(),
+                      'Dashboard',
                       style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
+                        color: AppColors.ink,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     Text(
-                      me.valueOrNull?.employee.fullName ?? ' ',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: AppColors.ink,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                      ),
+                      weekdayDateLabel(DateTime.now()),
+                      style: TextStyle(color: AppColors.textHint, fontSize: 12),
                     ),
                   ],
                 ),
@@ -260,6 +295,28 @@ class _ProfileCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Greeting small, name large.
+          Text(
+            greetingPrefix(),
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.8),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            e.fullName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.4,
+            ),
+          ),
+          const SizedBox(height: 10),
           Row(
             children: [
               Container(
@@ -359,7 +416,7 @@ class _PayslipsLink extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Monthly salary from your company',
+                    'Weekly or monthly salary from your company',
                     style: TextStyle(color: AppColors.textHint, fontSize: 11.5),
                   ),
                 ],

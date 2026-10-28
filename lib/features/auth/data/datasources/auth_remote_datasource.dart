@@ -91,6 +91,15 @@ class AuthRemoteDatasource {
           employee?['id'] ??
           (userType == 'employee' ? user['id'] : null);
       final employeeId = rawEmployeeId?.toString();
+      // Who signed in: an employee's own name (not the company owner's),
+      // or the owner for a company admin.
+      final employeeName = employee == null
+          ? null
+          : [
+              employee['first_name'],
+              employee['last_name'],
+            ].where((v) => v != null && '$v'.trim().isNotEmpty).join(' ');
+      final userName = userType == 'employee' ? employeeName : ownerName;
 
       return {
         'token': token,
@@ -111,6 +120,7 @@ class AuthRemoteDatasource {
         if (companyCode != null && companyCode.isNotEmpty)
           'companyCode': companyCode,
         if (ownerName != null && ownerName.isNotEmpty) 'ownerName': ownerName,
+        if (userName != null && userName.isNotEmpty) 'userName': userName,
         if (subscriptionPlan != null && subscriptionPlan.isNotEmpty)
           'subscriptionPlan': subscriptionPlan,
         if (onboardingStatus != null && onboardingStatus.isNotEmpty)

@@ -70,6 +70,7 @@ class AuthCubit extends Cubit<AuthState> {
         companyName: result['companyName'],
         companyCode: result['companyCode'],
         ownerName: result['ownerName'],
+        userName: result['userName'],
         subscriptionPlan: result['subscriptionPlan'],
         onboardingStatus: result['onboardingStatus'],
         companyStatus: result['companyStatus'],
