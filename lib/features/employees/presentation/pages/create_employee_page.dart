@@ -10,6 +10,7 @@ import '../../../../shared/widgets/brixen_date_field.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
 import '../../../../shared/widgets/company_selector_field.dart';
+import '../../../../shared/widgets/pill_segmented_control.dart';
 import '../../../companies/domain/entities/company.dart';
 import '../../../masters/domain/entities/master_item.dart';
 import '../../../masters/presentation/cubit/master_cubit.dart';
@@ -56,6 +57,9 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
   // Step 2 — Employment Info
   String? _departmentId; // from the Department master
   String? _salaryType; // one of SalaryType.all
+
+  /// A piece rate is per dozen (12 pieces) rather than per piece.
+  bool _perDozen = false;
   final _designationCtrl = TextEditingController();
   final _salaryCtrl = TextEditingController();
   DateTime? _joiningDate;
@@ -114,6 +118,7 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
       _dateOfBirth = e.dateOfBirth;
       _departmentId = e.departmentId;
       _salaryType = e.salaryType;
+      _perDozen = e.salaryPeriod == SalaryType.perDozen;
       _designationCtrl.text = e.designation ?? '';
       _salaryCtrl.text = e.salary?.toStringAsFixed(2) ?? '';
       _joiningDate = e.joiningDate;
@@ -281,7 +286,7 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
             firstName: '',
             departmentId: _departmentId,
             salaryType: _salaryType,
-            salaryPeriod: SalaryType.periodOf(_salaryType),
+            salaryPeriod: SalaryType.periodOf(_salaryType, dozen: _perDozen),
             designation: _designationCtrl.text.trim().isEmpty
                 ? null
                 : _designationCtrl.text.trim(),
@@ -557,6 +562,8 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
           onDepartmentChanged: (d) => setState(() => _departmentId = d?.id),
           salaryType: _salaryType,
           onSalaryTypeChanged: (t) => setState(() => _salaryType = t),
+          perDozen: _perDozen,
+          onPerDozenChanged: (d) => setState(() => _perDozen = d),
           designationCtrl: _designationCtrl,
           salaryCtrl: _salaryCtrl,
           joiningDate: _joiningDate,
@@ -903,6 +910,8 @@ class _Step2 extends StatelessWidget {
   final void Function(MasterItem?) onDepartmentChanged;
   final String? salaryType;
   final void Function(String) onSalaryTypeChanged;
+  final bool perDozen;
+  final ValueChanged<bool> onPerDozenChanged;
   final TextEditingController designationCtrl, salaryCtrl;
   final DateTime? joiningDate;
   final void Function(DateTime?) onJoiningDateChanged;
@@ -920,6 +929,8 @@ class _Step2 extends StatelessWidget {
     required this.onDepartmentChanged,
     required this.salaryType,
     required this.onSalaryTypeChanged,
+    required this.perDozen,
+    required this.onPerDozenChanged,
     required this.designationCtrl,
     required this.salaryCtrl,
     required this.joiningDate,
@@ -1019,9 +1030,31 @@ class _Step2 extends StatelessWidget {
             },
           ),
           const SizedBox(height: 22),
+          if (isPiece) ...[
+            // The rate is per piece or per dozen.
+            PillSegmentedControl<bool>(
+              value: perDozen,
+              onChanged: onPerDozenChanged,
+              segments: const [
+                PillSegment(
+                  value: false,
+                  label: 'Per piece',
+                  icon: Icons.checkroom_rounded,
+                ),
+                PillSegment(
+                  value: true,
+                  label: 'Per dozen',
+                  icon: Icons.grid_view_rounded,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
           if (hasAmount) ...[
             BrixenTextField(
-              label: 'Salary amount ${SalaryType.perLabel(salaryType)} *',
+              label: isPiece
+                  ? 'Piece rate ${perDozen ? 'per dozen' : 'per piece'} *'
+                  : 'Salary amount ${SalaryType.perLabel(salaryType)} *',
               hint: '0.00',
               controller: salaryCtrl,
               keyboardType: const TextInputType.numberWithOptions(
@@ -1038,6 +1071,11 @@ class _Step2 extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(switch (salaryType) {
+              SalaryType.piece =>
+                'Paid when the products they make are sold (set in Products '
+                    '→ Made by): pieces sold × this rate'
+                    '${perDozen ? ' ÷ 12' : ''}. Attendance just marks them '
+                    'present or absent.',
               SalaryType.shift =>
                 'Attendance records shifts (1/4 to 3 a shift, up to 3 a day); '
                     'pay = shifts × this amount.',
@@ -1050,14 +1088,6 @@ class _Step2 extends StatelessWidget {
                 'Attendance records full or half days; a day is this amount ÷ '
                     'the month\'s working days (Sundays off).',
             }, style: hint),
-            const SizedBox(height: 22),
-          ],
-          if (isPiece) ...[
-            Text(
-              'Paid by each work type\'s rate (Masters → Work Type) × pieces '
-              'done. No separate amount.',
-              style: hint,
-            ),
             const SizedBox(height: 22),
           ],
           Text('Status', style: label),
@@ -1088,7 +1118,7 @@ class _Step2 extends StatelessWidget {
 /// What each salary type's card says under its name.
 String _salaryTypeHint(String type) => switch (type) {
   SalaryType.shift => 'Per shift worked',
-  SalaryType.piece => 'Per piece made',
+  SalaryType.piece => 'Per piece sold',
   SalaryType.hourly => 'Per hour worked',
   SalaryType.weekly => 'Fixed per week',
   _ => 'Fixed per month',

@@ -76,46 +76,6 @@ class AttendanceRemoteDatasource {
     }
   }
 
-  /// Lots delivered from [from] to [to] ("YYYY-MM-DD"), newest first.
-  Future<List<PieceLot>> lots({
-    required String from,
-    required String to,
-  }) async {
-    try {
-      final resp = await _dio.get(
-        ApiEndpoints.attendanceLots,
-        queryParameters: {'from': from, 'to': to},
-      );
-      return [
-        for (final l in (_data(resp)['items'] as List? ?? const []))
-          PieceLot.fromJson((l as Map).cast<String, dynamic>()),
-      ];
-    } on DioException catch (e) {
-      throw mapDioError(e);
-    }
-  }
-
-  /// [body]: employee_id (new only), lot_date, work_type_id, unit
-  /// (PIECE / DOZEN), quantity, notes.
-  Future<PieceLot> saveLot(Map<String, dynamic> body, {String? id}) async {
-    try {
-      final resp = id == null
-          ? await _dio.post(ApiEndpoints.attendanceLots, data: body)
-          : await _dio.put(ApiEndpoints.attendanceLot(id), data: body);
-      return PieceLot.fromJson(_data(resp));
-    } on DioException catch (e) {
-      throw mapDioError(e);
-    }
-  }
-
-  Future<void> deleteLot(String id) async {
-    try {
-      await _dio.delete(ApiEndpoints.attendanceLot(id));
-    } on DioException catch (e) {
-      throw mapDioError(e);
-    }
-  }
-
   /// The signed-in employee, their company's name and time zone.
   Future<({Employee employee, String? companyName, String? timezone})>
   myEmployee() async {

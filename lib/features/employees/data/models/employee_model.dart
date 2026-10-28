@@ -132,8 +132,7 @@ class EmployeeModel extends Employee {
     'department_id': e.departmentId,
     'salary_type': e.salaryType,
     'salary_period': e.salaryPeriod,
-    // Piece rate has no amount of its own: null clears an old one.
-    'salary': e.salaryType == SalaryType.piece ? null : e.salary,
+    'salary': e.salary,
     if (e.designation != null && e.designation!.isNotEmpty)
       'designation': e.designation,
     if (e.joiningDate != null) 'joining_date': e.joiningDate!.toIso8601String(),

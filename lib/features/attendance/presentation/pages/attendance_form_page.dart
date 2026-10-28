@@ -11,8 +11,7 @@ import '../../../../shared/widgets/pill_segmented_control.dart';
 import '../../../../shared/widgets/theme_banner.dart';
 import '../../../employees/domain/entities/employee.dart';
 import '../../../employees/presentation/providers/employees_provider.dart';
-import '../../../masters/domain/entities/master_item.dart';
-import '../../../masters/presentation/cubit/master_cubit.dart';
+
 import '../../../permissions/presentation/providers/module_access_provider.dart';
 import '../../data/attendance_remote_datasource.dart';
 import '../../domain/attendance.dart';
@@ -47,27 +46,12 @@ class AttendanceFormPage extends ConsumerStatefulWidget {
   ConsumerState<AttendanceFormPage> createState() => _AttendanceFormPageState();
 }
 
-/// One work-type line being edited.
-class _PieceDraft {
-  String? workTypeId;
-  final TextEditingController qty;
-
-  /// The quantity is in dozens (saved as × 12 pieces).
-  bool dozen = false;
-  _PieceDraft({this.workTypeId, int? quantity})
-    : qty = TextEditingController(text: quantity?.toString() ?? '');
-
-  /// Pieces this line stands for.
-  int get pieces => (int.tryParse(qty.text.trim()) ?? 0) * (dozen ? 12 : 1);
-}
-
 class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
   final _form = GlobalKey<FormState>();
   final _notes = TextEditingController();
   late DateTime _date = DateTime.parse(widget.date);
   Employee? _employee;
   final List<double> _shifts = [];
-  final List<_PieceDraft> _pieces = [];
   final _hours = TextEditingController();
   double _dayUnits = 1;
 
@@ -85,17 +69,9 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
   @override
   void initState() {
     super.initState();
-    masterCubit.refresh('workType').then((_) {
-      if (mounted) setState(() {});
-    }, onError: (_) {});
     final r = widget.edit;
     if (r != null) {
       _shifts.addAll(r.shifts);
-      for (final p in r.pieces) {
-        _pieces.add(
-          _PieceDraft(workTypeId: p.workTypeId, quantity: p.quantity),
-        );
-      }
       if (r.hours != null) _hours.text = hoursLabel(r.hours!);
       _dayUnits = r.dayUnits ?? 1;
       _absent = r.isAbsent;
@@ -107,9 +83,6 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
   void dispose() {
     _notes.dispose();
     _hours.dispose();
-    for (final p in _pieces) {
-      p.qty.dispose();
-    }
     super.dispose();
   }
 
@@ -118,49 +91,13 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
     setState(() {
       _employee = e;
       _shifts.clear();
-      for (final p in _pieces) {
-        p.qty.dispose();
-      }
-      _pieces.clear();
       if (e?.salaryType == SalaryType.shift) _shifts.add(1);
-      if (e?.salaryType == SalaryType.piece) _pieces.add(_PieceDraft());
       _hours.text = e?.salaryType == SalaryType.hourly ? '8' : '';
       _dayUnits = 1;
     });
   }
 
-  /// Active work types, plus any already on this record (kept at their old
-  /// rate even if made inactive since).
-  List<MasterItem> get _workTypes {
-    final onRecord = {
-      for (final p in widget.edit?.pieces ?? const <PieceLine>[]) p.workTypeId,
-    };
-    return [
-      for (final w in masterCubit.allItemsOfType('workType'))
-        if (w.isActive || onRecord.contains(w.id)) w,
-    ];
-  }
-
-  /// The rate a line is priced at: the record's own for a work type already
-  /// on it, else the work type's current rate.
-  double _rateOf(String? workTypeId) {
-    if (workTypeId == null) return 0;
-    final kept = widget.edit?.pieces
-        .where((p) => p.workTypeId == workTypeId)
-        .firstOrNull;
-    if (kept != null) return kept.rate;
-    return masterCubit
-            .allItemsOfType('workType')
-            .where((w) => w.id == workTypeId)
-            .firstOrNull
-            ?.rate ??
-        0;
-  }
-
   double get _totalShifts => _shifts.fold(0, (a, s) => a + s);
-  int get _totalPieces => _pieces.fold(0, (a, p) => a + p.pieces);
-  double get _totalAmount =>
-      _pieces.fold(0, (a, p) => a + p.pieces * _rateOf(p.workTypeId));
 
   /// The salary per shift or per hour (null when the record's amount isn't
   /// priced that way, e.g. the employee's salary type changed since).
@@ -182,7 +119,7 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
     _absent = absent;
     if (absent) return;
     if (_isShift && _shifts.isEmpty) _shifts.add(1);
-    if (_isPiece && _pieces.isEmpty) _pieces.add(_PieceDraft());
+
     if (_isHourly && _hours.text.trim().isEmpty) _hours.text = '8';
   });
 
@@ -202,16 +139,8 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
       if (_shifts.length > kMaxShifts) {
         return 'At most $kMaxShifts shifts can be recorded for one day';
       }
-    } else {
-      if (_pieces.isEmpty) return 'Add at least one work type';
-      final ids = <String>{};
-      for (final (i, p) in _pieces.indexed) {
-        if (p.workTypeId == null) return 'Line ${i + 1}: pick a work type';
-        if (!ids.add(p.workTypeId!)) {
-          return 'A work type is listed twice. Add its quantities together';
-        }
-      }
     }
+    // Piece rate: just present (paid from sales).
     return null;
   }
 
@@ -230,11 +159,6 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
         ],
       if (_isHourly && !_absent) 'hours': _hoursValue,
       if (SalaryType.isDayBased(_kind) && !_absent) 'day_units': _dayUnits,
-      if (_isPiece && !_absent)
-        'pieces': [
-          for (final p in _pieces)
-            {'work_type_id': p.workTypeId, 'quantity': p.pieces},
-        ],
       'notes': _notes.text.trim(),
     };
     try {
@@ -445,7 +369,7 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
                 icon: salaryTypeIcon(_kind),
                 title: switch (_kind) {
                   SalaryType.shift => 'Shifts worked',
-                  SalaryType.piece => 'Pieces made',
+                  SalaryType.piece => 'Present',
                   SalaryType.hourly => 'Hours worked',
                   _ => 'Day',
                 },
@@ -454,7 +378,7 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
                   if (_isShift)
                     ..._shiftSection(section, hint)
                   else if (_isPiece)
-                    ..._pieceSection(section, hint)
+                    ..._pieceNote(hint)
                   else if (_isHourly)
                     ..._hourSection(section, hint)
                   else
@@ -682,131 +606,16 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
     ];
   }
 
-  List<Widget> _pieceSection(TextStyle section, TextStyle hint) {
-    final types = _workTypes;
-    return [
-      Text(
-        types.isEmpty
-            ? 'No work types yet — add them in Masters → Work Type.'
-            : 'Each work type at its rate per piece',
-        style: hint,
-      ),
-      const SizedBox(height: 12),
-      for (var i = 0; i < _pieces.length; i++) ...[
-        Container(
-          padding: const EdgeInsets.all(12),
-          margin: const EdgeInsets.only(bottom: 10),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
-            children: [
-              BrixenDropdown<MasterItem>(
-                hint: 'Work type *',
-                value: types
-                    .where((w) => w.id == _pieces[i].workTypeId)
-                    .firstOrNull,
-                // A work type already on another line isn't offered twice.
-                items: [
-                  for (final w in types)
-                    if (w.id == _pieces[i].workTypeId ||
-                        !_pieces.any((p) => p.workTypeId == w.id))
-                      w,
-                ],
-                labelOf: (w) => w.name,
-                subtitleOf: (w) => '${rupeesExact(w.rate ?? 0)} per piece',
-                icon: Icons.content_cut_rounded,
-                onChanged: (w) => setState(() => _pieces[i].workTypeId = w?.id),
-              ),
-              const SizedBox(height: 10),
-              // Count in pieces or dozens (× 12).
-              PillSegmentedControl<bool>(
-                height: 38,
-                value: _pieces[i].dozen,
-                onChanged: (d) => setState(() => _pieces[i].dozen = d),
-                segments: const [
-                  PillSegment(value: false, label: 'Pieces'),
-                  PillSegment(value: true, label: 'Dozens'),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: BrixenTextField(
-                      label: _pieces[i].dozen ? 'Dozens *' : 'Quantity *',
-                      hint: _pieces[i].dozen ? 'Dozens done' : 'Pieces done',
-                      controller: _pieces[i].qty,
-                      keyboardType: TextInputType.number,
-                      onChanged: (_) => setState(() {}),
-                      validator: (v) {
-                        final n = int.tryParse(v?.trim() ?? '');
-                        if (n == null || n < 1) {
-                          return 'Whole number, 1 or more';
-                        }
-                        if (n > 1000000) return 'Too many';
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '× ${rupeesExact(_rateOf(_pieces[i].workTypeId))}',
-                          style: hint,
-                        ),
-                        Text(
-                          rupeesExact(
-                            _pieces[i].pieces * _rateOf(_pieces[i].workTypeId),
-                          ),
-                          style: TextStyle(
-                            color: AppColors.ink,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Remove line',
-                    onPressed: _pieces.length == 1
-                        ? null
-                        : () =>
-                              setState(() => _pieces.removeAt(i).qty.dispose()),
-                    icon: const Icon(Icons.remove_circle_outline_rounded),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
-      if (_pieces.length < types.length)
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: () => setState(() => _pieces.add(_PieceDraft())),
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Add work type'),
-          ),
-        ),
-      const SizedBox(height: 8),
-      _TotalBar(
-        label: 'Day total',
-        value: '$_totalPieces piece${_totalPieces == 1 ? '' : 's'}',
-        amount: _totalAmount,
-        color: salaryTypeColor(SalaryType.piece),
-      ),
-    ];
-  }
+  /// Piece rate: nothing to count here — they're paid on the sales of the
+  /// products they make.
+  List<Widget> _pieceNote(TextStyle hint) => [
+    Text(
+      'Paid from sales: pieces sold of the products this employee makes '
+      '(set in Products → Made by) × their rate. Here, just mark them '
+      'present or absent.',
+      style: hint,
+    ),
+  ];
 }
 
 /// One shift size to pick: filled blue when picked.

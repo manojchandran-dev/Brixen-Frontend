@@ -141,8 +141,9 @@ class AttendanceRecord {
       : switch (kind) {
           SalaryType.shift =>
             '${shiftTotalLabel(totalShifts)} shift${totalShifts == 1 ? '' : 's'}',
+          // Piece rate is paid from sales, not counted by the day.
           SalaryType.piece =>
-            '$totalPieces piece${totalPieces == 1 ? '' : 's'}',
+            'Present',
           SalaryType.hourly =>
             '${hoursLabel(hours ?? 0)} hour${hours == 1 ? '' : 's'}',
           _ => (dayUnits ?? 1) < 1 ? 'Half day' : 'Full day',
@@ -207,12 +208,38 @@ class AttendanceList {
   }
 }
 
+/// Piece rate: one product's pieces sold in the range (× 12 when it sells
+/// by the dozen) and what that pays this employee.
+class SoldPieces {
+  final String name;
+  final int sold, pieces;
+  final bool dozen;
+  final double rate, amount;
+  const SoldPieces({
+    required this.name,
+    required this.sold,
+    required this.pieces,
+    required this.dozen,
+    required this.rate,
+    required this.amount,
+  });
+
+  factory SoldPieces.fromJson(Map<String, dynamic> j) => SoldPieces(
+    name: (j['name'] ?? '').toString(),
+    sold: (j['sold'] as num?)?.toInt() ?? 0,
+    pieces: (j['pieces'] as num?)?.toInt() ?? 0,
+    dozen: j['dozen'] == true,
+    rate: (j['rate'] as num?)?.toDouble() ?? 0,
+    amount: (j['amount'] as num?)?.toDouble() ?? 0,
+  );
+}
+
 /// What an employee login sees: their days and the totals for the range.
 class MyAttendance {
   final AttendanceList list;
 
-  /// Lots delivered in the range ([amount] includes them).
-  final List<PieceLot> lots;
+  /// Piece rate: what sold of the products they make ([amount] is its pay).
+  final List<SoldPieces> sold;
   final int days;
   final double shifts;
   final int pieces;
@@ -227,7 +254,7 @@ class MyAttendance {
   final String from, to;
   const MyAttendance({
     required this.list,
-    this.lots = const [],
+    this.sold = const [],
     required this.days,
     required this.shifts,
     required this.pieces,
@@ -244,9 +271,9 @@ class MyAttendance {
     final meta = (j['meta'] as Map?)?.cast<String, dynamic>() ?? const {};
     return MyAttendance(
       list: AttendanceList.fromJson(j),
-      lots: [
-        for (final l in (j['lots'] as List? ?? const []))
-          PieceLot.fromJson((l as Map).cast<String, dynamic>()),
+      sold: [
+        for (final s in (j['sold'] as List? ?? const []))
+          SoldPieces.fromJson((s as Map).cast<String, dynamic>()),
       ],
       days: (t['days'] as num?)?.toInt() ?? 0,
       shifts: (t['shifts'] as num?)?.toDouble() ?? 0,
@@ -257,72 +284,6 @@ class MyAttendance {
       amount: (t['amount'] as num?)?.toDouble() ?? 0,
       from: (meta['from'] ?? '').toString(),
       to: (meta['to'] ?? '').toString(),
-    );
-  }
-}
-
-/// Piece work counted once a lot is delivered, not day by day: e.g. 800
-/// dozen of a work type = 9,600 pieces × its rate.
-class PieceLot {
-  /// What [PieceLot.quantity] counts.
-  static const piece = 'PIECE';
-  static const dozen = 'DOZEN';
-
-  final String id;
-  final String employeeId;
-  final String employeeCode;
-  final String employeeName;
-  final String workTypeId;
-  final String workTypeName;
-
-  /// The delivery date, "2026-10-28".
-  final String lotDate;
-  final String unit;
-  final int quantity;
-  final int pieces;
-  final double rate;
-  final double amount;
-  final String? notes;
-
-  const PieceLot({
-    required this.id,
-    required this.employeeId,
-    required this.employeeCode,
-    required this.employeeName,
-    required this.workTypeId,
-    required this.workTypeName,
-    required this.lotDate,
-    required this.unit,
-    required this.quantity,
-    required this.pieces,
-    required this.rate,
-    required this.amount,
-    this.notes,
-  });
-
-  bool get isDozen => unit == dozen;
-
-  /// "800 dozen (9,600 pieces)" or "250 pieces".
-  String get quantityLabel => isDozen
-      ? '$quantity dozen ($pieces pieces)'
-      : '$pieces piece${pieces == 1 ? '' : 's'}';
-
-  factory PieceLot.fromJson(Map<String, dynamic> j) {
-    final e = (j['employee'] as Map?)?.cast<String, dynamic>() ?? const {};
-    return PieceLot(
-      id: j['id'].toString(),
-      employeeId: (j['employee_id'] ?? e['id']).toString(),
-      employeeCode: (e['employee_code'] ?? '').toString(),
-      employeeName: (e['name'] ?? '').toString(),
-      workTypeId: (j['work_type_id'] ?? '').toString(),
-      workTypeName: (j['work_type_name'] ?? 'Work type').toString(),
-      lotDate: (j['lot_date'] ?? '').toString(),
-      unit: (j['unit'] ?? piece).toString(),
-      quantity: (j['quantity'] as num?)?.toInt() ?? 0,
-      pieces: (j['pieces'] as num?)?.toInt() ?? 0,
-      rate: (j['rate'] as num?)?.toDouble() ?? 0,
-      amount: (j['amount'] as num?)?.toDouble() ?? 0,
-      notes: j['notes']?.toString(),
     );
   }
 }

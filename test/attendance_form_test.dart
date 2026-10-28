@@ -74,7 +74,9 @@ void main() {
     expect(find.textContaining('Add shift'), findsNothing);
   });
 
-  testWidgets('a piece day shows each line at its rate', (tester) async {
+  testWidgets('a piece-rate day is just present (paid from sales)', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(390 * 3, 1500 * 3);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
@@ -90,25 +92,13 @@ void main() {
           workDate: '2026-10-26',
           recordedLocal: '26 Oct 2026, 6:00 pm',
           timezone: 'Asia/Kolkata',
-          pieces: [
-            PieceLine(
-              workTypeId: 'WTYP000000000001',
-              workTypeName: 'T-shirt neck stitching',
-              quantity: 20,
-              rate: 300,
-              amount: 6000,
-            ),
-          ],
-          totalPieces: 20,
-          totalAmount: 6000,
         ),
       ),
     );
     await tester.pump(const Duration(milliseconds: 300));
     expect(tester.takeException(), isNull);
-    expect(find.text('× ₹300'), findsOneWidget);
-    expect(find.text('20 pieces'), findsOneWidget);
-    expect(find.text('₹6,000'), findsWidgets);
+    expect(find.textContaining('Paid from sales'), findsOneWidget);
+    expect(find.text('Work type *'), findsNothing);
   });
 
   testWidgets('an absent day records no work; present brings it back', (

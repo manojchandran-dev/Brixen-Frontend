@@ -37,9 +37,6 @@ class ApiEndpoints {
   static const String attendance = '/api/v1/attendance';
   static const String attendanceMeta = '/api/v1/attendance/meta';
   static String attendanceById(String id) => '/api/v1/attendance/$id';
-  // Piece lots: piece work counted at delivery.
-  static const String attendanceLots = '/api/v1/attendance/lots';
-  static String attendanceLot(String id) => '/api/v1/attendance/lots/$id';
   // An employee login's own data.
   static const String myEmployee = '/api/v1/me/employee';
   static const String myAttendance = '/api/v1/me/attendance';
@@ -141,6 +138,8 @@ class ApiEndpoints {
   static String saleStep2(String id) => '/api/v1/sales/$id/step2';
   static String saleItems(String id) => '/api/v1/sales/$id/items';
   static String productById(String id) => '/api/v1/products/$id';
+  // Made by: the piece-rate employees paid when it sells.
+  static String productMakers(String id) => '/api/v1/products/$id/makers';
   static String productStep2(String id) => '/api/v1/products/$id/step2';
   static String productStep3(String id) => '/api/v1/products/$id/step3';
   static String productStep4(String id) => '/api/v1/products/$id/step4';

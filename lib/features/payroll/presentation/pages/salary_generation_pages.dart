@@ -564,7 +564,7 @@ class _PayRules extends StatelessWidget {
   Widget build(BuildContext context) {
     const rules = {
       SalaryType.shift: 'Shifts worked × amount per shift',
-      SalaryType.piece: 'Pieces × each work type\'s rate',
+      SalaryType.piece: 'Pieces sold of the products they make × their rate',
       SalaryType.hourly: 'Hours worked × amount per hour',
       SalaryType.weekly: 'Days present × (weekly salary ÷ 6)',
       SalaryType.monthly: 'Days present × (monthly salary ÷ working days)',
@@ -723,9 +723,10 @@ class _GenerateSheetState extends State<_GenerateSheet> {
               widget.again
                   ? 'Pay is worked out again from attendance. Additions, '
                         'deductions and notes already entered are kept.'
-                  : 'Pay is worked out from attendance: shifts × rate, pieces × '
-                        'work type rates, hours × rate, and weekly / monthly '
-                        'salaries by days present.',
+                  : 'Pay is worked out from attendance: shifts × rate, hours × '
+                        'rate, weekly / monthly salaries by days present — and '
+                        'piece rate from the pieces sold of the products they '
+                        'make.',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
             ),
             const SizedBox(height: 18),

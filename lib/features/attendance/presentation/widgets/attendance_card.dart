@@ -194,45 +194,8 @@ class AttendanceCard extends StatelessWidget {
           ],
         );
       case SalaryType.piece:
-        return Column(
-          children: [
-            for (final p in r.pieces)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(
-                  children: [
-                    Icon(Icons.circle, size: 6, color: accent),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        p.workTypeName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: AppColors.ink,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${p.quantity} × ${rupeesExact(p.rate)} = ',
-                      style: TextStyle(color: AppColors.textHint, fontSize: 12),
-                    ),
-                    Text(
-                      rupeesExact(p.amount),
-                      style: TextStyle(
-                        color: AppColors.ink,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        );
+        // Paid on the sales of the products they make, not by the day.
+        return _Pill('Present · paid from sales of products made', accent);
       case SalaryType.hourly:
         return Wrap(
           spacing: 6,

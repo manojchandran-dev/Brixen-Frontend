@@ -1,7 +1,7 @@
-/// How an employee is paid. Every type but Piece Rate has an amount of its
-/// own ([Employee.salary]); what attendance records follows the type:
-///   Shift — per shift; shifts.        Piece Rate — work type rates; pieces.
-///   Hourly — per hour; hours.         Weekly / Monthly — full or half days.
+/// How an employee is paid: an amount ([Employee.salary]) per shift, piece
+/// (or dozen), hour, week or month. What attendance records follows the type:
+///   Shift — shifts.   Hourly — hours.   Weekly / Monthly — full or half days.
+///   Piece Rate — just present: paid on the sales of the products they make.
 /// Matches the server's rules (employees/salary.js).
 abstract final class SalaryType {
   static const shift = 'SHIFT_RATE';
@@ -20,26 +20,33 @@ abstract final class SalaryType {
     _ => 'Not set',
   };
 
-  /// Every type but Piece Rate is paid an amount of its own.
-  static bool hasAmount(String? type) => all.contains(type) && type != piece;
+  /// Every type is paid an amount of its own (piece rate: per piece or
+  /// per dozen).
+  static bool hasAmount(String? type) => all.contains(type);
+
+  /// A piece rate's salary_period: per piece or per dozen (12 pieces).
+  static const perPiece = 'PER_PIECE';
+  static const perDozen = 'PER_DOZEN';
 
   /// Weekly and monthly staff record full or half days.
   static bool isDayBased(String? type) => type == weekly || type == monthly;
 
-  /// "per shift" / "per month"… — after an amount.
-  static String perLabel(String? type) => switch (type) {
+  /// "per shift" / "per month" / "per dozen"… — after an amount. [period]
+  /// says per piece or per dozen for piece rate.
+  static String perLabel(String? type, [String? period]) => switch (type) {
     shift => 'per shift',
-    piece => 'per piece',
+    piece => period == perDozen ? 'per dozen' : 'per piece',
     hourly => 'per hour',
     weekly => 'per week',
     monthly => 'per month',
     _ => '',
   };
 
-  /// The salary_period the server keeps alongside the type.
-  static String? periodOf(String? type) => switch (type) {
+  /// The salary_period the server keeps alongside the type ([dozen]: a
+  /// piece rate per dozen).
+  static String? periodOf(String? type, {bool dozen = false}) => switch (type) {
     shift => 'PER_SHIFT',
-    piece => 'PER_PIECE',
+    piece => dozen ? perDozen : perPiece,
     hourly || weekly || monthly => type,
     _ => null,
   };
@@ -140,16 +147,16 @@ class Employee {
   String get fullName =>
       [firstName, lastName].where((s) => s != null && s.isNotEmpty).join(' ');
 
-  /// "Shift · ₹600 per shift", "Piece Rate · per piece (work type
-  /// rates)", or for older employees just the amount.
+  /// "Shift · ₹600 per shift", "Piece Rate · ₹5 per dozen", or for older
+  /// employees just the amount.
   String get salarySummary {
     String money(double v) =>
         '₹${v % 1 == 0 ? v.toStringAsFixed(0) : v.toStringAsFixed(2)}';
     return switch (salaryType) {
-      SalaryType.piece => 'Piece Rate · per piece (work type rates)',
       final t when SalaryType.hasAmount(t) => [
         SalaryType.label(t),
-        if (salary != null) '${money(salary!)} ${SalaryType.perLabel(t)}',
+        if (salary != null)
+          '${money(salary!)} ${SalaryType.perLabel(t, salaryPeriod)}',
       ].join(' · '),
       _ => salary == null ? '—' : money(salary!),
     };
