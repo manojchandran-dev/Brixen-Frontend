@@ -95,6 +95,9 @@ class AttendanceRecord {
   final double totalShifts;
   final int totalPieces;
 
+  /// Absent that day: nothing recorded, and the day isn't paid.
+  final bool isAbsent;
+
   /// Hourly: hours worked.
   final double? hours;
 
@@ -122,6 +125,7 @@ class AttendanceRecord {
     this.pieces = const [],
     this.totalShifts = 0,
     this.totalPieces = 0,
+    this.isAbsent = false,
     this.hours,
     this.dayUnits,
     this.totalAmount,
@@ -130,15 +134,19 @@ class AttendanceRecord {
   bool get isShift => kind == SalaryType.shift;
   bool get isPiece => kind == SalaryType.piece;
 
-  /// "1¾ shifts", "230 pieces", "7.5 hours", "Full day", "Half day".
-  String get workSummary => switch (kind) {
-    SalaryType.shift =>
-      '${shiftTotalLabel(totalShifts)} shift${totalShifts == 1 ? '' : 's'}',
-    SalaryType.piece => '$totalPieces piece${totalPieces == 1 ? '' : 's'}',
-    SalaryType.hourly =>
-      '${hoursLabel(hours ?? 0)} hour${hours == 1 ? '' : 's'}',
-    _ => (dayUnits ?? 1) < 1 ? 'Half day' : 'Full day',
-  };
+  /// "1¾ shifts", "230 pieces", "7.5 hours", "Full day", "Half day",
+  /// "Absent".
+  String get workSummary => isAbsent
+      ? 'Absent'
+      : switch (kind) {
+          SalaryType.shift =>
+            '${shiftTotalLabel(totalShifts)} shift${totalShifts == 1 ? '' : 's'}',
+          SalaryType.piece =>
+            '$totalPieces piece${totalPieces == 1 ? '' : 's'}',
+          SalaryType.hourly =>
+            '${hoursLabel(hours ?? 0)} hour${hours == 1 ? '' : 's'}',
+          _ => (dayUnits ?? 1) < 1 ? 'Half day' : 'Full day',
+        };
 
   factory AttendanceRecord.fromJson(Map<String, dynamic> j) {
     final e = (j['employee'] as Map?)?.cast<String, dynamic>() ?? const {};
@@ -165,6 +173,7 @@ class AttendanceRecord {
       ],
       totalShifts: (j['total_shifts'] as num?)?.toDouble() ?? 0,
       totalPieces: (j['total_pieces'] as num?)?.toInt() ?? 0,
+      isAbsent: j['status'] == 'ABSENT',
       hours: (j['hours'] as num?)?.toDouble(),
       dayUnits: (j['day_units'] as num?)?.toDouble(),
       totalAmount: (j['total_amount'] as num?)?.toDouble(),
@@ -206,6 +215,9 @@ class MyAttendance {
   final int pieces;
   final double hours;
 
+  /// Days marked absent ([days] are the days worked).
+  final int absent;
+
   /// Weekly / monthly days, half days counting ½.
   final double dayUnits;
   final double amount;
@@ -216,6 +228,7 @@ class MyAttendance {
     required this.shifts,
     required this.pieces,
     this.hours = 0,
+    this.absent = 0,
     this.dayUnits = 0,
     required this.amount,
     required this.from,
@@ -231,6 +244,7 @@ class MyAttendance {
       shifts: (t['shifts'] as num?)?.toDouble() ?? 0,
       pieces: (t['pieces'] as num?)?.toInt() ?? 0,
       hours: (t['hours'] as num?)?.toDouble() ?? 0,
+      absent: (t['absent'] as num?)?.toInt() ?? 0,
       dayUnits: (t['day_units'] as num?)?.toDouble() ?? 0,
       amount: (t['amount'] as num?)?.toDouble() ?? 0,
       from: (meta['from'] ?? '').toString(),

@@ -7,6 +7,7 @@ import '../../../../shared/widgets/brixen_button.dart';
 import '../../../../shared/widgets/brixen_date_field.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
+import '../../../../shared/widgets/pill_segmented_control.dart';
 import '../../../../shared/widgets/theme_banner.dart';
 import '../../../employees/domain/entities/employee.dart';
 import '../../../employees/presentation/providers/employees_provider.dart';
@@ -63,6 +64,9 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
   final List<_PieceDraft> _pieces = [];
   final _hours = TextEditingController();
   double _dayUnits = 1;
+
+  /// Marked absent: no shifts, pieces, hours or day — and not paid.
+  bool _absent = false;
   bool _saving = false;
 
   bool get _isEdit => widget.edit != null;
@@ -88,6 +92,7 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
       }
       if (r.hours != null) _hours.text = hoursLabel(r.hours!);
       _dayUnits = r.dayUnits ?? 1;
+      _absent = r.isAbsent;
       _notes.text = r.notes ?? '';
     }
   }
@@ -168,8 +173,19 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
 
   double? get _hoursValue => double.tryParse(_hours.text.trim());
 
+  /// Present ↔ absent. Back to present starts the work lines afresh if an
+  /// absent day had none.
+  void _setAbsent(bool absent) => setState(() {
+    _absent = absent;
+    if (absent) return;
+    if (_isShift && _shifts.isEmpty) _shifts.add(1);
+    if (_isPiece && _pieces.isEmpty) _pieces.add(_PieceDraft());
+    if (_isHourly && _hours.text.trim().isEmpty) _hours.text = '8';
+  });
+
   String? _problem() {
     if (!_isEdit && _employee == null) return 'Pick an employee';
+    if (_absent) return null;
     if (_isHourly) {
       final h = _hoursValue;
       if (h == null || h <= 0 || h > kMaxHours) {
@@ -204,13 +220,14 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
     final body = {
       if (!_isEdit) 'employee_id': int.parse(_employee!.id),
       if (!_isEdit) 'work_date': DateFormat('yyyy-MM-dd').format(_date),
-      if (_isShift)
+      'status': _absent ? 'ABSENT' : 'PRESENT',
+      if (_isShift && !_absent)
         'shifts': [
           for (final s in _shifts) {'units': s},
         ],
-      if (_isHourly) 'hours': _hoursValue,
-      if (SalaryType.isDayBased(_kind)) 'day_units': _dayUnits,
-      if (_isPiece)
+      if (_isHourly && !_absent) 'hours': _hoursValue,
+      if (SalaryType.isDayBased(_kind) && !_absent) 'day_units': _dayUnits,
+      if (_isPiece && !_absent)
         'pieces': [
           for (final p in _pieces)
             {'work_type_id': p.workTypeId, 'quantity': int.parse(p.qty.text)},
@@ -385,6 +402,41 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
               ],
             ),
             if (showLines) ...[
+              const SizedBox(height: 14),
+              // Present (record the work) or absent (nothing to record).
+              PillSegmentedControl<bool>(
+                value: _absent,
+                onChanged: _setAbsent,
+                segments: const [
+                  PillSegment(
+                    value: false,
+                    label: 'Present',
+                    icon: Icons.how_to_reg_rounded,
+                  ),
+                  PillSegment(
+                    value: true,
+                    label: 'Absent',
+                    icon: Icons.person_off_outlined,
+                  ),
+                ],
+              ),
+            ],
+            if (showLines && _absent) ...[
+              const SizedBox(height: 14),
+              _SectionCard(
+                icon: Icons.person_off_outlined,
+                title: 'Absent',
+                color: AppColors.brandBlack,
+                children: [
+                  Text(
+                    'No shifts, pieces or hours are recorded for an absent '
+                    'day, and it isn\'t paid.',
+                    style: hint,
+                  ),
+                ],
+              ),
+            ],
+            if (showLines && !_absent) ...[
               const SizedBox(height: 14),
               _SectionCard(
                 icon: salaryTypeIcon(_kind),

@@ -217,6 +217,28 @@ class _MyWorkPageState extends ConsumerState<MyWorkPage> {
                       ),
                     ],
                   ),
+                  if (w.absent > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.person_off_outlined,
+                            size: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Absent ${w.absent} day${w.absent == 1 ? "" : "s"} this month',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   if (SalaryType.isDayBased(type))
                     Padding(
                       padding: const EdgeInsets.only(top: 8),

@@ -498,7 +498,9 @@ class _DayCell extends StatelessWidget {
     // The day's salary types, most records first.
     final counts = <String, int>{};
     for (final r in records) {
-      counts[r.kind] = (counts[r.kind] ?? 0) + 1;
+      // Absent days get a grey dot of their own.
+      final k = r.isAbsent ? 'ABSENT' : r.kind;
+      counts[k] = (counts[k] ?? 0) + 1;
     }
     final kinds = counts.keys.toList()
       ..sort((a, b) => counts[b]!.compareTo(counts[a]!));
@@ -799,8 +801,10 @@ class _DaySummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    double sum(String kind, double Function(AttendanceRecord) f) =>
-        items.where((r) => r.kind == kind).fold<double>(0, (a, r) => a + f(r));
+    double sum(String kind, double Function(AttendanceRecord) f) => items
+        .where((r) => r.kind == kind && !r.isAbsent)
+        .fold<double>(0, (a, r) => a + f(r));
+    final absent = items.where((r) => r.isAbsent).length;
     final shifts = sum(SalaryType.shift, (r) => r.totalShifts);
     final pieces = sum(SalaryType.piece, (r) => r.totalPieces.toDouble());
     final hours = sum(SalaryType.hourly, (r) => r.hours ?? 0);
@@ -813,9 +817,16 @@ class _DaySummary extends StatelessWidget {
       _Tile(
         Icons.how_to_reg_rounded,
         'Present',
-        '${items.length}',
+        '${items.length - absent}',
         AppColors.brand,
       ),
+      if (absent > 0)
+        _Tile(
+          Icons.person_off_outlined,
+          'Absent',
+          '$absent',
+          AppColors.isDark ? AppColors.textHint : AppColors.brandBlack,
+        ),
       if (shifts > 0)
         _Tile(
           salaryTypeIcon(SalaryType.shift),
@@ -990,7 +1001,6 @@ class _Empty extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-
       ],
     ),
   );

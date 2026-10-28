@@ -227,4 +227,24 @@ void main() {
     expect(piece.pieces.single.name, 'Hand');
     expect(piece.rateLabel((v) => '₹$v'), 'Work type rates');
   });
+
+  test('absent days', () {
+    final r = AttendanceRecord.fromJson({
+      'id': 'ATTN9',
+      'employee_id': 9,
+      'employee': {'name': 'Ravi'},
+      'kind': 'SHIFT_RATE',
+      'status': 'ABSENT',
+      'work_date': '2026-10-27',
+      'total_amount': null,
+    });
+    expect(r.isAbsent, isTrue);
+    expect(r.workSummary, 'Absent');
+    final m = MyAttendance.fromJson({
+      'items': [],
+      'totals': {'days': 20, 'absent': 2, 'shifts': 20, 'amount': 10000},
+    });
+    expect(m.absent, 2);
+    expect(m.days, 20);
+  });
 }

@@ -27,7 +27,10 @@ class AttendanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = record;
-    final accent = salaryTypeColor(r.kind);
+    // An absent day reads dark (ink), not in its salary type's colour.
+    final accent = r.isAbsent
+        ? (AppColors.isDark ? AppColors.textHint : AppColors.brandBlack)
+        : salaryTypeColor(r.kind);
     final day = DateTime.tryParse(r.workDate);
     final title = showEmployee
         ? r.employeeName
@@ -170,11 +173,16 @@ class AttendanceCard extends StatelessWidget {
         ),
       ),
       const SizedBox(width: 6),
-      _Badge(SalaryType.label(r.kind), salaryTypeIcon(r.kind), accent),
+      r.isAbsent
+          ? _Badge('Absent', Icons.person_off_outlined, accent)
+          : _Badge(SalaryType.label(r.kind), salaryTypeIcon(r.kind), accent),
     ],
   );
 
   Widget _work(AttendanceRecord r, Color accent) {
+    if (r.isAbsent) {
+      return _Pill('Absent — nothing recorded, not paid', accent);
+    }
     switch (r.kind) {
       case SalaryType.shift:
         return Wrap(

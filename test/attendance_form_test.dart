@@ -110,4 +110,37 @@ void main() {
     expect(find.text('20 pieces'), findsOneWidget);
     expect(find.text('₹6,000'), findsWidgets);
   });
+
+  testWidgets('an absent day records no work; present brings it back', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390 * 3, 1500 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      _app(
+        const AttendanceRecord(
+          id: 'ATTN000000000003',
+          employeeId: '3',
+          employeeCode: 'EMP0003',
+          employeeName: 'Ravi',
+          kind: SalaryType.shift,
+          workDate: '2026-10-27',
+          recordedLocal: '27 Oct 2026, 9:05 am',
+          timezone: 'Asia/Kolkata',
+          isAbsent: true,
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining('No shifts, pieces or hours'), findsOneWidget);
+    expect(find.text('Shifts worked'), findsNothing);
+
+    await tester.tap(find.text('Present'));
+    await tester.pump();
+    expect(find.text('Shifts worked'), findsOneWidget);
+    expect(find.text('1 shift'), findsWidgets); // starts at a full shift
+  });
 }
