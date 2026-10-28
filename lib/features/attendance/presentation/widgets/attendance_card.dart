@@ -194,8 +194,8 @@ class AttendanceCard extends StatelessWidget {
           ],
         );
       case SalaryType.piece:
-        // Paid on the sales of the products they make, not by the day.
-        return _Pill('Present · paid from sales of products made', accent);
+        // Paid after sales (Salary → Piece rate), not by the day.
+        return _Pill('Present · piece pay is added after sales', accent);
       case SalaryType.hourly:
         return Wrap(
           spacing: 6,

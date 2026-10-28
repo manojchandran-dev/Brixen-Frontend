@@ -22,6 +22,7 @@ class ProductModel extends Product {
     super.onboardingStatus,
     super.stockQuantity,
     super.lowStockThreshold,
+    super.comboSize,
     required super.createdAt,
     super.variants,
   });
@@ -68,6 +69,7 @@ class ProductModel extends Product {
       stockQuantity: int.tryParse('${json['stock_quantity'] ?? 0}') ?? 0,
       lowStockThreshold:
           int.tryParse('${json['low_stock_threshold'] ?? 5}') ?? 5,
+      comboSize: (json['combo_size'] as num?)?.toInt(),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
@@ -117,6 +119,8 @@ class ProductModel extends Product {
   /// Step 2 (Attributes) — PUT /products/:id/step2. All fields optional.
   static Map<String, dynamic> toStep2Body(Product p) => {
     if (p.unitId != null) 'unit_id': p.unitId,
+    // Per piece (null) or a combo of N pieces.
+    'combo_size': p.comboSize,
     if (p.color != null && p.color!.isNotEmpty) 'color': p.color,
     if (p.size != null && p.size!.isNotEmpty) 'size': p.size,
   };

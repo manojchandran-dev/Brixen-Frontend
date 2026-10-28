@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../domain/payroll.dart';
+import '../domain/piece_pay.dart';
 
 final payrollDatasourceProvider = Provider<PayrollRemoteDatasource>(
   (ref) => PayrollRemoteDatasource(ref.read(dioProvider)),
@@ -132,6 +133,56 @@ class PayrollRemoteDatasource {
   /// Finalized payslips, for the salary report.
   Future<List<Payslip>> payslips() =>
       _call(() async => _slips(_data(await _dio.get(ApiEndpoints.payslips))));
+
+  List<PiecePay> _piecePays(Map<String, dynamic> data) => [
+    for (final p in (data['items'] as List? ?? const []))
+      PiecePay.fromJson((p as Map).cast<String, dynamic>()),
+  ];
+
+  /// Piece pays dated [from] to [to] ("YYYY-MM-DD"); [status] narrows to
+  /// drafts or confirmed ones.
+  Future<List<PiecePay>> piecePays({
+    String? from,
+    String? to,
+    String? status,
+  }) => _call(
+    () async => _piecePays(
+      _data(
+        await _dio.get(
+          ApiEndpoints.piecePays,
+          queryParameters: {'from': ?from, 'to': ?to, 'status': ?status},
+        ),
+      ),
+    ),
+  );
+
+  /// [body]: employee_id, work_type_id, pay_date, unit (PIECE / COMBO),
+  /// quantity, product_id (combo), notes.
+  Future<PiecePay> savePiecePay(Map<String, dynamic> body, {String? id}) =>
+      _call(
+        () async => PiecePay.fromJson(
+          _data(
+            id == null
+                ? await _dio.post(ApiEndpoints.piecePays, data: body)
+                : await _dio.put(ApiEndpoints.piecePay(id), data: body),
+          ),
+        ),
+      );
+
+  Future<void> deletePiecePay(String id) =>
+      _call(() => _dio.delete(ApiEndpoints.piecePay(id)));
+
+  /// confirm / reopen / send (email).
+  Future<PiecePay> piecePayAction(String id, String action) => _call(
+    () async => PiecePay.fromJson(
+      _data(await _dio.post(ApiEndpoints.piecePayAction(id, action))),
+    ),
+  );
+
+  /// The signed-in employee's confirmed piece pays.
+  Future<List<PiecePay>> myPiecePays() => _call(
+    () async => _piecePays(_data(await _dio.get(ApiEndpoints.myPiecePays))),
+  );
 
   /// The signed-in employee's payslips.
   Future<List<Payslip>> myPayslips() =>

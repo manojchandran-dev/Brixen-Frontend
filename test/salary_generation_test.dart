@@ -98,6 +98,7 @@ void main() {
       ProviderScope(
         overrides: [
           moduleAccessProvider.overrideWith((ref, _) => _full),
+          piecePaysMonthProvider.overrideWith((ref, _) async => const []),
           payrollRunsProvider.overrideWith(
             (ref) async => const [
               PayrollRun(
@@ -125,7 +126,7 @@ void main() {
     // Pay by the week: the picker shows this week, Monday to Sunday.
     await tester.tap(find.text('Weekly'));
     await tester.pump();
-    expect(find.text('Salary for the week'), findsOneWidget);
+    expect(find.text('Salary for the week · tap to pick'), findsOneWidget);
     expect(
       find.text(
         monthLabel(
@@ -134,6 +135,10 @@ void main() {
       ),
       findsOneWidget,
     );
+    // Piece rate: pay entered after sales, for the month.
+    await tester.tap(find.text('Piece rate'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Add piece pay'), findsOneWidget);
   });
 
   testWidgets('hourly and monthly attendance forms', (tester) async {

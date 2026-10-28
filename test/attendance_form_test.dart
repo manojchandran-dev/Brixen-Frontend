@@ -74,7 +74,7 @@ void main() {
     expect(find.textContaining('Add shift'), findsNothing);
   });
 
-  testWidgets('a piece-rate day is just present (paid from sales)', (
+  testWidgets('a piece-rate day is just present (paid after sales)', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390 * 3, 1500 * 3);
@@ -97,7 +97,7 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 300));
     expect(tester.takeException(), isNull);
-    expect(find.textContaining('Paid from sales'), findsOneWidget);
+    expect(find.textContaining('paid after sales'), findsOneWidget);
     expect(find.text('Work type *'), findsNothing);
   });
 

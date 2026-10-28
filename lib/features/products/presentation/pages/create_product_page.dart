@@ -10,6 +10,7 @@ import '../../../../core/services/session_service.dart';
 import '../../../../shared/widgets/brixen_button.dart';
 import '../../../../shared/widgets/brixen_dropdown.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
+import '../../../../shared/widgets/pill_segmented_control.dart';
 import '../../../../shared/widgets/review_row.dart';
 import '../../../../shared/widgets/company_selector_field.dart';
 import '../../../companies/domain/entities/company.dart';
@@ -82,10 +83,13 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
   String? _designPattern;
 
   // Step 2 — Attributes
-  bool _loadingUnits = true;
   List<MasterItem> _units = [];
   MasterItem? _selectedUnit;
   final _colorCtrl = TextEditingController();
+
+  /// Sold as a combo of [_comboCtrl] pieces (else per piece).
+  bool _combo = false;
+  final _comboCtrl = TextEditingController();
   final _sizeCtrl = TextEditingController();
 
   /// Sold in sizes/colours (variants) instead of one item.
@@ -140,6 +144,8 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
       _designPattern = p.designPattern;
       _colorCtrl.text = p.color ?? '';
       _sizeCtrl.text = p.size ?? '';
+      _combo = (p.comboSize ?? 0) > 0;
+      _comboCtrl.text = p.comboSize?.toString() ?? '';
       if (p.hasVariants) {
         _hasVariants = true;
         _variants.load(p.variants);
@@ -212,11 +218,9 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
       setState(() {
         _units = [];
         _selectedUnit = null;
-        _loadingUnits = false;
       });
       return;
     }
-    setState(() => _loadingUnits = true);
     try {
       final list = await unitsRemoteDatasource.getAll(
         companyId: _effectiveCompanyId,
@@ -224,7 +228,6 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
       if (!mounted) return;
       setState(() {
         _units = list;
-        _loadingUnits = false;
         final id = _isEditing ? widget.editProduct!.unitId : _selectedUnit?.id;
         _selectedUnit = id == null
             ? null
@@ -234,7 +237,6 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
       if (!mounted) return;
       setState(() {
         _units = [];
-        _loadingUnits = false;
       });
     }
   }
@@ -243,6 +245,7 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
   void dispose() {
     _nameCtrl.dispose();
     _colorCtrl.dispose();
+    _comboCtrl.dispose();
     _sizeCtrl.dispose();
     _costPriceCtrl.dispose();
     _retailPriceCtrl.dispose();
@@ -486,7 +489,9 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
             productName: '',
             category: '',
             gender: '',
+            // The unit isn't asked any more; an older product keeps its own.
             unitId: _selectedUnit?.id,
+            comboSize: _combo ? int.tryParse(_comboCtrl.text.trim()) : null,
             color: _hasVariants || _colorCtrl.text.trim().isEmpty
                 ? null
                 : _colorCtrl.text.trim(),
@@ -777,10 +782,9 @@ class _CreateProductPageState extends ConsumerState<CreateProductPage> {
       case 1:
         return _Step2(
           formKey: _step2Key,
-          loadingUnits: _loadingUnits,
-          units: _units,
-          selectedUnit: _selectedUnit,
-          onUnitChanged: (v) => setState(() => _selectedUnit = v),
+          combo: _combo,
+          onComboChanged: (v) => setState(() => _combo = v),
+          comboCtrl: _comboCtrl,
           colorCtrl: _colorCtrl,
           sizeCtrl: _sizeCtrl,
           hasVariants: _hasVariants,
@@ -1086,14 +1090,15 @@ class _Step1 extends StatelessWidget {
   }
 }
 
-// ── Step 2: Attributes & Unit ──────────────────────────────────────────────
+// ── Step 2: Attributes & how it's sold ─────────────────────────────────────
 
 class _Step2 extends StatelessWidget {
   final GlobalKey<FormState> formKey;
-  final bool loadingUnits;
-  final List<MasterItem> units;
-  final MasterItem? selectedUnit;
-  final void Function(MasterItem?) onUnitChanged;
+
+  /// Sold as a combo of [comboCtrl] pieces, else per piece.
+  final bool combo;
+  final ValueChanged<bool> onComboChanged;
+  final TextEditingController comboCtrl;
   final TextEditingController colorCtrl, sizeCtrl;
   final bool hasVariants;
   final ValueChanged<bool> onHasVariantsChanged;
@@ -1102,10 +1107,9 @@ class _Step2 extends StatelessWidget {
 
   const _Step2({
     required this.formKey,
-    required this.loadingUnits,
-    required this.units,
-    required this.selectedUnit,
-    required this.onUnitChanged,
+    required this.combo,
+    required this.onComboChanged,
+    required this.comboCtrl,
     required this.colorCtrl,
     required this.sizeCtrl,
     required this.hasVariants,
@@ -1121,16 +1125,50 @@ class _Step2 extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
         children: [
-          BrixenDropdown<MasterItem>(
-            hint: loadingUnits
-                ? 'Loading units…'
-                : (units.isEmpty ? 'No units yet' : 'Select unit'),
-            value: units.contains(selectedUnit) ? selectedUnit : null,
-            items: units,
-            labelOf: (u) => u.name,
-            icon: Icons.straighten_rounded,
-            onChanged: onUnitChanged,
+          // How it's sold: per piece, or as a combo of N pieces (piece pay
+          // can then be entered in combos of it).
+          Text(
+            'Sold as',
+            style: TextStyle(
+              color: AppColors.ink,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
           ),
+          const SizedBox(height: 8),
+          PillSegmentedControl<bool>(
+            value: combo,
+            onChanged: onComboChanged,
+            segments: const [
+              PillSegment(
+                value: false,
+                label: 'Per piece',
+                icon: Icons.checkroom_rounded,
+              ),
+              PillSegment(
+                value: true,
+                label: 'Combo',
+                icon: Icons.inventory_2_outlined,
+              ),
+            ],
+          ),
+          if (combo) ...[
+            const SizedBox(height: 14),
+            BrixenTextField(
+              label: 'Pieces in a combo *',
+              hint: 'e.g. 12 or 6',
+              controller: comboCtrl,
+              keyboardType: TextInputType.number,
+              prefixIcon: const Icon(Icons.grid_view_rounded),
+              validator: (v) {
+                final n = int.tryParse(v?.trim() ?? '');
+                if (n == null || n < 1 || n > 100) {
+                  return 'A whole number from 1 to 100';
+                }
+                return null;
+              },
+            ),
+          ],
           const SizedBox(height: 18),
           // One item, or many sizes/colours each with its own price & stock.
           Container(

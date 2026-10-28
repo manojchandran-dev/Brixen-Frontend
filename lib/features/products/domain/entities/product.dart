@@ -57,6 +57,10 @@ class Product {
 
   /// At or below this counts as low stock.
   final int lowStockThreshold;
+
+  /// Sold as a combo of this many pieces (1–100); null = per piece. Piece
+  /// pay can be entered in combos of it.
+  final int? comboSize;
   final DateTime createdAt;
 
   /// Sizes/colours; empty for a product sold as one item. With variants,
@@ -84,6 +88,7 @@ class Product {
     this.onboardingStatus,
     this.stockQuantity = 0,
     this.lowStockThreshold = 5,
+    this.comboSize,
     required this.createdAt,
     this.variants = const [],
   });
@@ -120,6 +125,7 @@ class Product {
     DateTime? createdAt,
     int? stockQuantity,
     int? lowStockThreshold,
+    int? comboSize,
     List<ProductVariant>? variants,
   }) {
     return Product(
@@ -143,6 +149,7 @@ class Product {
       onboardingStatus: onboardingStatus ?? this.onboardingStatus,
       stockQuantity: stockQuantity ?? this.stockQuantity,
       lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
+      comboSize: comboSize ?? this.comboSize,
       createdAt: createdAt ?? this.createdAt,
       variants: variants ?? this.variants,
     );

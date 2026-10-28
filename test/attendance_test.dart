@@ -89,12 +89,12 @@ void main() {
       'WEEKLY',
       'MONTHLY',
     ]);
-    // Every type has an amount; piece rate's is per piece or per dozen.
-    expect(SalaryType.all.where(SalaryType.hasAmount), SalaryType.all);
-    expect(
-      SalaryType.periodOf(SalaryType.piece, dozen: true),
-      SalaryType.perDozen,
-    );
+    expect(SalaryType.all.where(SalaryType.hasAmount), [
+      'SHIFT_RATE',
+      'HOURLY',
+      'WEEKLY',
+      'MONTHLY',
+    ]);
     expect(SalaryType.periodOf(SalaryType.shift), 'PER_SHIFT');
     expect(SalaryType.periodOf(SalaryType.monthly), 'MONTHLY');
     // Older Shift Rate paid weekly is the Weekly type now; daily stays Shift.
@@ -117,14 +117,8 @@ void main() {
       'Monthly · ₹26000 per month',
     );
     expect(
-      base
-          .copyWith(
-            salaryType: SalaryType.piece,
-            salaryPeriod: SalaryType.perDozen,
-            salary: 5,
-          )
-          .salarySummary,
-      'Piece Rate · ₹5 per dozen',
+      base.copyWith(salaryType: SalaryType.piece).salarySummary,
+      'Piece Rate · paid after sales',
     );
     // Older employees without a type: just the amount.
     expect(base.copyWith(salary: 20000).salarySummary, '₹20000');
@@ -162,19 +156,16 @@ void main() {
       isNull,
     );
 
-    // Step 2 sends the department and salary terms; piece rate has its own
-    // rate, per piece or per dozen.
+    // Step 2 sends the department and salary terms; piece rate clears the
+    // amount.
     final body = EmployeeModel.toStep2Body(
-      e.copyWith(
-        salaryType: SalaryType.piece,
-        salaryPeriod: 'PER_DOZEN',
-        salary: 5,
-      ),
+      e.copyWith(salaryType: SalaryType.piece, salaryPeriod: 'PER_PIECE'),
     );
     expect(body['department_id'], 'DEPT000000000001');
     expect(body['salary_type'], SalaryType.piece);
-    expect(body['salary_period'], 'PER_DOZEN');
-    expect(body['salary'], 5);
+    expect(body['salary_period'], 'PER_PIECE');
+    expect(body.containsKey('salary'), isTrue);
+    expect(body['salary'], isNull);
     expect(EmployeeModel.toStep2Body(e)['salary'], 3500);
   });
 
@@ -221,29 +212,20 @@ void main() {
     expect(p.net, 20000);
     expect(monthLabel(p.month), 'October 2026');
 
-    // Piece rate: pieces sold of the products they make; 800 dozen sold at
-    // ₹5 a dozen = 9600 pieces × ₹0.4167 = ₹4000.
     final piece = Payslip.fromJson({
       'id': 'PSLP2',
       'month': '2026-10',
       'salary_type': 'PIECE_RATE',
-      'salary_period': 'PER_DOZEN',
-      'rate': 5,
-      'units': 9600,
-      'gross': 4000,
-      'net': 4000,
+      'units': 210,
+      'gross': 105,
+      'net': 105,
       'breakdown': [
-        {
-          'name': 'Billa shorts',
-          'quantity': 9600,
-          'rate': 0.4167,
-          'amount': 4000,
-        },
+        {'name': 'Hand', 'quantity': 210, 'rate': 0.5, 'amount': 105},
       ],
     });
-    expect(piece.workLabel, '9600 pieces sold');
-    expect(piece.pieces.single.name, 'Billa shorts');
-    expect(piece.rateLabel((v) => '₹${v.toStringAsFixed(0)}'), '₹5 per dozen');
+    expect(piece.workLabel, '210 pieces');
+    expect(piece.pieces.single.name, 'Hand');
+    expect(piece.rateLabel((v) => '₹$v'), '—');
   });
 
   test('absent days', () {

@@ -24,7 +24,6 @@ import '../../domain/entities/product.dart';
 import '../../../../shared/widgets/chip_filter_sheet.dart';
 import '../../../../shared/widgets/search_field.dart';
 import '../providers/products_provider.dart';
-import '../widgets/product_makers_section.dart';
 import '../../../../shared/widgets/list_count_bar.dart';
 import '../../../../shared/widgets/module_title.dart';
 import '../../../../shared/widgets/module_tabs.dart';
@@ -1079,8 +1078,6 @@ void _showProductDetail(
                 ),
               ],
             ),
-            // Who's paid piece rate when it sells.
-            ProductMakersSection(productId: product.id),
           ],
         );
       },

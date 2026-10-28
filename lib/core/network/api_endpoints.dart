@@ -50,6 +50,12 @@ class ApiEndpoints {
       '/api/v1/payroll/runs/$id/$action';
   static const String payslips = '/api/v1/payroll/payslips';
   static String payslip(String id) => '/api/v1/payroll/payslips/$id';
+  // Piece-rate pay, entered after sales.
+  static const String piecePays = '/api/v1/payroll/piece-pays';
+  static String piecePay(String id) => '/api/v1/payroll/piece-pays/$id';
+  static String piecePayAction(String id, String action) =>
+      '/api/v1/payroll/piece-pays/$id/$action';
+  static const String myPiecePays = '/api/v1/me/piece-pays';
   static String employeePermissions(String employeeId) =>
       '/api/v1/employee-permissions/$employeeId';
   static String employeeLoginActivate(String id) =>
@@ -138,8 +144,6 @@ class ApiEndpoints {
   static String saleStep2(String id) => '/api/v1/sales/$id/step2';
   static String saleItems(String id) => '/api/v1/sales/$id/items';
   static String productById(String id) => '/api/v1/products/$id';
-  // Made by: the piece-rate employees paid when it sells.
-  static String productMakers(String id) => '/api/v1/products/$id/makers';
   static String productStep2(String id) => '/api/v1/products/$id/step2';
   static String productStep3(String id) => '/api/v1/products/$id/step3';
   static String productStep4(String id) => '/api/v1/products/$id/step4';

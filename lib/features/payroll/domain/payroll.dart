@@ -70,9 +70,6 @@ class Payslip {
   final String? designation;
   final String salaryType;
 
-  /// What [rate] is per: for piece rate, PER_PIECE or PER_DOZEN.
-  final String? salaryPeriod;
-
   /// The salary amount then (per shift / hour / week / month); null for
   /// piece rate.
   final double? rate;
@@ -100,7 +97,6 @@ class Payslip {
     this.department,
     this.designation,
     required this.salaryType,
-    this.salaryPeriod,
     this.rate,
     required this.units,
     required this.daysPresent,
@@ -119,7 +115,7 @@ class Payslip {
   /// "24 shifts", "230 pieces", "7.5 hours", "22½ of 27 days".
   String get workLabel => switch (salaryType) {
     SalaryType.shift => '${shiftTotalLabel(units)} shifts',
-    SalaryType.piece => '${units.round()} pieces sold',
+    SalaryType.piece => '${units.round()} pieces',
     SalaryType.hourly => '${hoursLabel(units)} hours',
     SalaryType.monthly when workingDays != null =>
       '${daysLabel(units)} of $workingDays days',
@@ -133,10 +129,7 @@ class Payslip {
     final r = rate ?? 0;
     return switch (salaryType) {
       SalaryType.shift => '${shiftTotalLabel(units)} shifts × ${money(r)}',
-      // Pieces sold × the rate per piece (a rate per dozen ÷ 12).
-      SalaryType.piece =>
-        '${units.round()} pieces sold × '
-            '${money(salaryPeriod == SalaryType.perDozen ? r / 12 : r)}',
+
       SalaryType.hourly => '${hoursLabel(units)} h × ${money(r)}',
       SalaryType.weekly => '${daysLabel(units)} days × ${money(r / 6)}',
       SalaryType.monthly when (workingDays ?? 0) > 0 =>
@@ -145,10 +138,9 @@ class Payslip {
     };
   }
 
-  /// "₹600 per shift", "₹5 per dozen".
-  String rateLabel(String Function(double) money) => rate == null
-      ? '—'
-      : '${money(rate!)} ${SalaryType.perLabel(salaryType, salaryPeriod)}';
+  /// "₹600 per shift".
+  String rateLabel(String Function(double) money) =>
+      rate == null ? '—' : '${money(rate!)} ${SalaryType.perLabel(salaryType)}';
 
   factory Payslip.fromJson(Map<String, dynamic> j) {
     final e = (j['employee'] as Map?)?.cast<String, dynamic>() ?? const {};
@@ -168,7 +160,6 @@ class Payslip {
       department: e['department']?.toString(),
       designation: e['designation']?.toString(),
       salaryType: (j['salary_type'] ?? '').toString(),
-      salaryPeriod: j['salary_period']?.toString(),
       rate: j['rate'] == null ? null : _d(j['rate']),
       units: _d(j['units']),
       daysPresent: _d(j['days_present']),

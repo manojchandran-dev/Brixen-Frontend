@@ -12,6 +12,7 @@ import '../../../expenses/domain/entities/expense.dart';
 import '../../../expenses/presentation/providers/expenses_provider.dart';
 import '../../../attendance/presentation/salary_type_visuals.dart';
 import '../../../payroll/domain/payroll.dart';
+import '../../../payroll/domain/piece_pay.dart';
 import '../../../payroll/presentation/payroll_providers.dart';
 import '../../../products/domain/entities/product.dart';
 import '../../../products/presentation/providers/products_provider.dart';
@@ -350,6 +351,8 @@ class CompanyExpenseReport extends ConsumerWidget {
     final expenses = ref.watch(expensesProvider);
     // Finalized payslips; empty without the Employees permission.
     final salaries = ref.watch(salaryReportProvider).valueOrNull;
+    // Confirmed piece-rate pay (entered after sales).
+    final piecePays = ref.watch(piecePayReportProvider).valueOrNull;
     return CompanyReportScreen(
       loading: expenses.isLoading && !expenses.hasValue,
       error: expenses.hasValue ? null : expenses.error,
@@ -366,7 +369,13 @@ class CompanyExpenseReport extends ConsumerWidget {
           for (final p in salaries ?? const <Payslip>[])
             if (inPeriod(p.periodTo, period, now)) p,
         ];
-        final salaryTotal = slips.fold<double>(0, (a, p) => a + p.net);
+        final pieces = [
+          for (final p in piecePays ?? const <PiecePay>[])
+            if (inPeriod(DateTime.parse(p.payDate), period, now)) p,
+        ];
+        final pieceTotal = pieces.fold<double>(0, (a, p) => a + p.amount);
+        final salaryTotal =
+            slips.fold<double>(0, (a, p) => a + p.net) + pieceTotal;
         return [
           ReportSummary([
             ReportStat(
@@ -481,17 +490,33 @@ class CompanyExpenseReport extends ConsumerWidget {
               trailingAmount: e.amount,
             ),
           ),
-          if (salaries != null) ..._salaryReport(slips, salaryTotal),
+          if (salaries != null) ..._salaryReport(slips, pieces, salaryTotal),
         ];
       },
     );
   }
 
-  /// Finalized salary months in the period: net pay by salary type and by
-  /// month, then each payslip.
-  List<Widget> _salaryReport(List<Payslip> slips, double total) {
+  /// Finalized salary months and confirmed piece pay in the period: pay by
+  /// salary type and by month, then each payslip.
+  List<Widget> _salaryReport(
+    List<Payslip> slips,
+    List<PiecePay> pieces,
+    double total,
+  ) {
     final byType = <String, Tally>{};
     final byMonth = <String, Tally>{};
+    for (final p in pieces) {
+      byType
+          .putIfAbsent(
+            SalaryType.piece,
+            () => Tally(SalaryType.label(SalaryType.piece)),
+          )
+          .add(amount: p.amount);
+      final month = p.payDate.substring(0, 7);
+      byMonth
+          .putIfAbsent(month, () => Tally(monthLabel(month), month))
+          .add(amount: p.amount);
+    }
     for (final p in slips) {
       byType
           .putIfAbsent(
@@ -510,10 +535,12 @@ class CompanyExpenseReport extends ConsumerWidget {
     return [
       ReportCard(
         title: 'Salary report',
-        caption: slips.isEmpty
+        caption: slips.isEmpty && pieces.isEmpty
             ? 'No finalized salary months in this period'
             : 'Net pay ${rupees(total)} · by salary type',
-        child: slips.isEmpty ? const SizedBox(height: 8) : _amountDonut(types),
+        child: slips.isEmpty && pieces.isEmpty
+            ? const SizedBox(height: 8)
+            : _amountDonut(types),
       ),
       if (months.isNotEmpty)
         ReportList<Tally>(

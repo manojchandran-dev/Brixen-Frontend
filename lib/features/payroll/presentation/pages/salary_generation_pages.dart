@@ -20,7 +20,9 @@ import '../../../permissions/presentation/providers/module_access_provider.dart'
 import '../../data/payroll_remote_datasource.dart';
 import '../../domain/payroll.dart';
 import '../payroll_providers.dart';
+import '../../../../shared/widgets/month_picker.dart';
 import 'payslip_page.dart';
+import 'piece_pay_pages.dart';
 
 final _ym = DateFormat('yyyy-MM');
 
@@ -47,6 +49,10 @@ class SalaryGenerationPage extends ConsumerStatefulWidget {
 class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
   late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
 
+  /// The Piece rate tab (pay entered after sales) instead of Monthly /
+  /// Weekly salary.
+  bool _piece = false;
+
   /// Paying by the week (Monday to Sunday) instead of the month.
   bool _weekly = false;
   late DateTime _week = weekStartOf(DateTime.now());
@@ -56,18 +62,39 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
   String get _key =>
       _weekly ? DateFormat('yyyy-MM-dd').format(_week) : _ym.format(_month);
 
-  bool get _isCurrent => _weekly
+  bool get _byWeek => _weekly && !_piece;
+
+  bool get _isCurrent => _byWeek
       ? _week == weekStartOf(DateTime.now())
       : _ym.format(_month) ==
             _ym.format(DateTime(DateTime.now().year, DateTime.now().month));
 
   void _step(int by) => setState(() {
-    if (_weekly) {
+    if (_byWeek) {
       _week = _week.add(Duration(days: 7 * by));
     } else {
       _month = DateTime(_month.year, _month.month + by);
     }
   });
+
+  /// Tap the month (or week): a month grid, or a calendar to pick any day
+  /// of the week wanted.
+  Future<void> _pick() async {
+    if (_byWeek) {
+      final now = DateTime.now();
+      final d = await showDatePicker(
+        context: context,
+        initialDate: _week,
+        firstDate: DateTime(2000),
+        lastDate: now,
+        helpText: 'Pick any day of the week',
+      );
+      if (d != null) setState(() => _week = weekStartOf(d));
+    } else {
+      final m = await showMonthPicker(context, initial: _month);
+      if (m != null) setState(() => _month = m);
+    }
+  }
 
   Future<void> _generate(List<PayrollRun> runs) async {
     final month = _key;
@@ -154,7 +181,7 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
         ),
         title: const ModuleTitle(
           title: 'Salary',
-          subtitle: 'Weekly or monthly pay from attendance',
+          subtitle: 'Monthly, weekly or piece-rate pay',
         ),
         bottom: const ModuleTabs(
           group: ModuleGroup.staff,
@@ -166,83 +193,119 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
           children: [
-            // Pay by the month or by the week.
+            // Salary by the month / week (from attendance), or piece-rate
+            // pay entered after sales.
             PillSegmentedControl<bool>(
-              value: _weekly,
-              onChanged: (v) => setState(() => _weekly = v),
+              value: _piece,
+              onChanged: (v) => setState(() => _piece = v),
               segments: const [
                 PillSegment(
                   value: false,
-                  label: 'Monthly',
+                  label: 'Month / Week',
                   icon: Icons.calendar_month_rounded,
                 ),
                 PillSegment(
                   value: true,
-                  label: 'Weekly',
-                  icon: Icons.view_week_rounded,
+                  label: 'Piece rate',
+                  icon: Icons.content_cut_rounded,
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            _MonthPicker(
-              label: monthLabel(_key),
-              caption: _weekly ? 'Salary for the week' : 'Salary for',
-              canNext: !_isCurrent,
-              onPrev: () => _step(-1),
-              onNext: () => _step(1),
-            ),
-            const SizedBox(height: 14),
-            if (runs.isLoading && !runs.hasValue)
-              const Shimmer(
-                child: SkeletonBox(width: double.infinity, height: 200),
-              )
-            else
-              _NextStep(
-                name: _weekly
-                    ? 'this week\'s'
-                    : DateFormat('MMMM').format(_month),
-                period: _weekly
-                    ? 'the week ${monthLabel(_key)}'
-                    : DateFormat('MMMM').format(_month),
-                run: current,
-                busy: _busy,
-                canGenerate: access.create,
-                onGenerate: () => _generate(list),
-                onOpen: current == null ? null : () => _open(current.id),
+            if (_piece) ...[
+              _MonthPicker(
+                label: DateFormat('MMMM yyyy').format(_month),
+                caption: 'Piece pay for · tap to pick',
+                canNext: !_isCurrent,
+                onPrev: () => _step(-1),
+                onNext: () => _step(1),
+                onPick: _pick,
               ),
-            const SizedBox(height: 18),
-            StepGuide(
-              steps: kSalarySteps,
-              current: current == null
-                  ? 0
-                  : current.isFinalized
-                  ? 2
-                  : 1,
-            ),
-            const SizedBox(height: 18),
-            const _PayRules(),
-            if (past.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              Text(
-                'Other salary runs',
-                style: TextStyle(
-                  color: AppColors.ink,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
+              const SizedBox(height: 14),
+              PiecePayView(month: _month),
+            ] else ...[
+              // Pay by the month or by the week.
+              PillSegmentedControl<bool>(
+                height: 40,
+                value: _weekly,
+                onChanged: (v) => setState(() => _weekly = v),
+                segments: const [
+                  PillSegment(
+                    value: false,
+                    label: 'Monthly',
+                    icon: Icons.calendar_month_rounded,
+                  ),
+                  PillSegment(
+                    value: true,
+                    label: 'Weekly',
+                    icon: Icons.view_week_rounded,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _MonthPicker(
+                label: monthLabel(_key),
+                caption: _weekly
+                    ? 'Salary for the week · tap to pick'
+                    : 'Salary for · tap to pick',
+                canNext: !_isCurrent,
+                onPrev: () => _step(-1),
+                onNext: () => _step(1),
+                onPick: _pick,
+              ),
+              const SizedBox(height: 14),
+              if (runs.isLoading && !runs.hasValue)
+                const Shimmer(
+                  child: SkeletonBox(width: double.infinity, height: 200),
+                )
+              else
+                _NextStep(
+                  name: _weekly
+                      ? 'this week\'s'
+                      : DateFormat('MMMM').format(_month),
+                  period: _weekly
+                      ? 'the week ${monthLabel(_key)}'
+                      : DateFormat('MMMM').format(_month),
+                  run: current,
+                  busy: _busy,
+                  canGenerate: access.create,
+                  onGenerate: () => _generate(list),
+                  onOpen: current == null ? null : () => _open(current.id),
                 ),
+              const SizedBox(height: 18),
+              StepGuide(
+                steps: kSalarySteps,
+                current: current == null
+                    ? 0
+                    : current.isFinalized
+                    ? 2
+                    : 1,
               ),
-              const SizedBox(height: 10),
-              for (final r in past)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _RunTile(run: r, onTap: () => _open(r.id)),
+              const SizedBox(height: 18),
+              const _PayRules(),
+              if (past.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                Text(
+                  'Other salary runs',
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                for (final r in past)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _RunTile(run: r, onTap: () => _open(r.id)),
+                  ),
+              ],
+              if (runs.hasError && !runs.hasValue)
+                ErrorCard(
+                  error: runs.error!,
+                  onRetry: () => ref.invalidate(payrollRunsProvider),
                 ),
             ],
-            if (runs.hasError && !runs.hasValue)
-              ErrorCard(
-                error: runs.error!,
-                onRetry: () => ref.invalidate(payrollRunsProvider),
-              ),
           ],
         ),
       ),
@@ -250,17 +313,19 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
   }
 }
 
-/// "‹ October 2026 ›" (or a week) on the theme sweep.
+/// "‹ October 2026 ›" (or a week) on the theme sweep; tap the middle to
+/// pick from a calendar ([onPick]).
 class _MonthPicker extends StatelessWidget {
   final String label, caption;
   final bool canNext;
-  final VoidCallback onPrev, onNext;
+  final VoidCallback onPrev, onNext, onPick;
   const _MonthPicker({
     required this.label,
     required this.caption,
     required this.canNext,
     required this.onPrev,
     required this.onNext,
+    required this.onPick,
   });
 
   @override
@@ -291,27 +356,42 @@ class _MonthPicker extends StatelessWidget {
         children: [
           arrow(Icons.chevron_left_rounded, onPrev),
           Expanded(
-            child: Column(
-              children: [
-                Text(
-                  caption,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 12,
-                  ),
-                ),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    label,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 19,
-                      fontWeight: FontWeight.w900,
+            child: GestureDetector(
+              onTap: onPick,
+              behavior: HitTestBehavior.opaque,
+              child: Column(
+                children: [
+                  Text(
+                    caption,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 12,
                     ),
                   ),
-                ),
-              ],
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          label,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(
+                          Icons.calendar_month_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           arrow(Icons.chevron_right_rounded, canNext ? onNext : null),
@@ -564,7 +644,8 @@ class _PayRules extends StatelessWidget {
   Widget build(BuildContext context) {
     const rules = {
       SalaryType.shift: 'Shifts worked × amount per shift',
-      SalaryType.piece: 'Pieces sold of the products they make × their rate',
+      SalaryType.piece:
+          'After a sale: work type rate × quantity (Piece rate tab)',
       SalaryType.hourly: 'Hours worked × amount per hour',
       SalaryType.weekly: 'Days present × (weekly salary ÷ 6)',
       SalaryType.monthly: 'Days present × (monthly salary ÷ working days)',
@@ -1635,10 +1716,15 @@ class MyPayslipsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(myPayslipsProvider);
+    // Piece-rate pay (after sales), confirmed.
+    final pieces = ref.watch(myPiecePaysProvider).valueOrNull ?? const [];
     return Scaffold(
       appBar: AppBar(title: const Text('My payslips')),
       body: RefreshIndicator(
-        onRefresh: () => ref.refresh(myPayslipsProvider.future),
+        onRefresh: () {
+          ref.invalidate(myPiecePaysProvider);
+          return ref.refresh(myPayslipsProvider.future);
+        },
         child: async.when(
           skipError: true,
           loading: () => const Padding(
@@ -1654,16 +1740,53 @@ class MyPayslipsPage extends ConsumerWidget {
           data: (items) => ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
             children: [
-              if (items.isEmpty)
+              if (items.isEmpty && pieces.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 40),
                   child: Text(
                     'No payslips yet. They show here once your company '
-                    'finalizes a month\'s salary.',
+                    'confirms your salary or piece pay.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: AppColors.textSecondary),
                   ),
                 ),
+              if (pieces.isNotEmpty) ...[
+                Text(
+                  'Piece pay',
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (final p in pieces)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: PiecePayTile(
+                      pay: p,
+                      showEmployee: false,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              PiecePayDetailPage(pay: p, readOnly: true),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (items.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Salary',
+                    style: TextStyle(
+                      color: AppColors.ink,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ],
               for (final p in items)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),

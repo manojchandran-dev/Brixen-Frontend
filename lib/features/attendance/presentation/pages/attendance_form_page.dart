@@ -606,13 +606,12 @@ class _AttendanceFormPageState extends ConsumerState<AttendanceFormPage> {
     ];
   }
 
-  /// Piece rate: nothing to count here — they're paid on the sales of the
-  /// products they make.
+  /// Piece rate: nothing to count here — they're paid after sales, in
+  /// Salary → Piece rate.
   List<Widget> _pieceNote(TextStyle hint) => [
     Text(
-      'Paid from sales: pieces sold of the products this employee makes '
-      '(set in Products → Made by) × their rate. Here, just mark them '
-      'present or absent.',
+      'Piece rate is paid after sales, in Salary → Piece rate (work type '
+      '× quantity). Here, just mark them present or absent.',
       style: hint,
     ),
   ];

@@ -142,8 +142,7 @@ class AttendanceRecord {
           SalaryType.shift =>
             '${shiftTotalLabel(totalShifts)} shift${totalShifts == 1 ? '' : 's'}',
           // Piece rate is paid from sales, not counted by the day.
-          SalaryType.piece =>
-            'Present',
+          SalaryType.piece => 'Present',
           SalaryType.hourly =>
             '${hoursLabel(hours ?? 0)} hour${hours == 1 ? '' : 's'}',
           _ => (dayUnits ?? 1) < 1 ? 'Half day' : 'Full day',
@@ -208,38 +207,10 @@ class AttendanceList {
   }
 }
 
-/// Piece rate: one product's pieces sold in the range (× 12 when it sells
-/// by the dozen) and what that pays this employee.
-class SoldPieces {
-  final String name;
-  final int sold, pieces;
-  final bool dozen;
-  final double rate, amount;
-  const SoldPieces({
-    required this.name,
-    required this.sold,
-    required this.pieces,
-    required this.dozen,
-    required this.rate,
-    required this.amount,
-  });
-
-  factory SoldPieces.fromJson(Map<String, dynamic> j) => SoldPieces(
-    name: (j['name'] ?? '').toString(),
-    sold: (j['sold'] as num?)?.toInt() ?? 0,
-    pieces: (j['pieces'] as num?)?.toInt() ?? 0,
-    dozen: j['dozen'] == true,
-    rate: (j['rate'] as num?)?.toDouble() ?? 0,
-    amount: (j['amount'] as num?)?.toDouble() ?? 0,
-  );
-}
-
 /// What an employee login sees: their days and the totals for the range.
 class MyAttendance {
   final AttendanceList list;
 
-  /// Piece rate: what sold of the products they make ([amount] is its pay).
-  final List<SoldPieces> sold;
   final int days;
   final double shifts;
   final int pieces;
@@ -254,7 +225,6 @@ class MyAttendance {
   final String from, to;
   const MyAttendance({
     required this.list,
-    this.sold = const [],
     required this.days,
     required this.shifts,
     required this.pieces,
@@ -271,10 +241,6 @@ class MyAttendance {
     final meta = (j['meta'] as Map?)?.cast<String, dynamic>() ?? const {};
     return MyAttendance(
       list: AttendanceList.fromJson(j),
-      sold: [
-        for (final s in (j['sold'] as List? ?? const []))
-          SoldPieces.fromJson((s as Map).cast<String, dynamic>()),
-      ],
       days: (t['days'] as num?)?.toInt() ?? 0,
       shifts: (t['shifts'] as num?)?.toDouble() ?? 0,
       pieces: (t['pieces'] as num?)?.toInt() ?? 0,

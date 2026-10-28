@@ -195,7 +195,8 @@ class _MyWorkPageState extends ConsumerState<MyWorkPage> {
             data: (w) {
               final type = me.valueOrNull?.employee.salaryType;
               final (label, value) = switch (type) {
-                SalaryType.piece => ('Pieces sold', '${w.pieces}'),
+                // Piece rate is paid after sales (My payslips), not by the day.
+                SalaryType.piece => ('Absent', '${w.absent}'),
                 SalaryType.hourly => ('Hours', hoursLabel(w.hours)),
                 SalaryType.weekly ||
                 SalaryType.monthly => ('Days worked', daysLabel(w.dayUnits)),
@@ -252,27 +253,6 @@ class _MyWorkPageState extends ConsumerState<MyWorkPage> {
                       ),
                     ),
                   const SizedBox(height: 14),
-                  // Piece rate: what sold of the products they make.
-                  if (w.sold.isNotEmpty) ...[
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Sold this month',
-                        style: TextStyle(
-                          color: AppColors.ink,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    for (final p in w.sold)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: _SoldTile(p),
-                      ),
-                    const SizedBox(height: 6),
-                  ],
                   if (w.list.items.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 30),
@@ -513,68 +493,4 @@ class _Total extends StatelessWidget {
       ),
     ),
   );
-}
-
-/// One product sold: "800 dozen = 9600 pieces × ₹0.42" and the pay.
-class _SoldTile extends StatelessWidget {
-  final SoldPieces p;
-  const _SoldTile(this.p);
-
-  @override
-  Widget build(BuildContext context) {
-    final color = salaryTypeColor(SalaryType.piece);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            color.withValues(alpha: 0.20),
-            color.withValues(alpha: 0.06),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.sell_rounded, color: color),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  p.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                Text(
-                  [
-                    if (p.dozen)
-                      '${p.sold} dozen = ${p.pieces} pieces'
-                    else
-                      '${p.pieces} pieces',
-                    '× ${rupeesExact(p.rate)}',
-                  ].join(' '),
-                  style: TextStyle(color: AppColors.textHint, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            rupees(p.amount),
-            style: TextStyle(
-              color: AppColors.ink,
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
