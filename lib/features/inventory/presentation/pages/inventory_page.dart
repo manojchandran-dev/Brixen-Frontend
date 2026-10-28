@@ -34,6 +34,8 @@ class InventoryPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
+      // Tabs switch in place, no slide.
+      animationDuration: Duration.zero,
       length: _tabs.length,
       child: Scaffold(
         backgroundColor: AppColors.background,

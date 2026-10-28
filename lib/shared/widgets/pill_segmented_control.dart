@@ -63,9 +63,10 @@ class PillSegmentedControl<T> extends StatelessWidget {
             final w = box.maxWidth / segments.length;
             return Stack(
               children: [
-                // Sliding thumb.
+                // The picked segment's thumb.
                 AnimatedPositioned(
-                  duration: const Duration(milliseconds: 260),
+                  duration:
+                      Duration.zero, // jumps to the picked segment, no slide
                   curve: Curves.easeOutCubic,
                   left: w * index,
                   top: 0,

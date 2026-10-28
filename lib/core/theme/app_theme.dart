@@ -1,21 +1,34 @@
-import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
+
+/// Opening or leaving a screen shows it straight away: no slide or fade.
+class _InstantPageTransitionsBuilder extends PageTransitionsBuilder {
+  const _InstantPageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) => child;
+}
+
+final _instantPages = PageTransitionsTheme(
+  builders: {
+    for (final p in TargetPlatform.values)
+      p: const _InstantPageTransitionsBuilder(),
+  },
+);
 
 class AppTheme {
   AppTheme._();
 
   static ThemeData get dark => ThemeData(
     fontFamily: 'Inter',
-    // Back/swipe shows the page underneath as you drag: Android's
-    // predictive back (needs enableOnBackInvokedCallback in the
-    // manifest) and the iOS edge swipe.
-    pageTransitionsTheme: const PageTransitionsTheme(
-      builders: {
-        TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
-        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-      },
-    ),
+    // Screens change in place, with no slide, on every platform.
+    pageTransitionsTheme: _instantPages,
     useMaterial3: true,
     brightness: Brightness.dark,
     scaffoldBackgroundColor: AppColors.darkBackground,
@@ -63,15 +76,8 @@ class AppTheme {
 
   static ThemeData get light => ThemeData(
     fontFamily: 'Inter',
-    // Back/swipe shows the page underneath as you drag: Android's
-    // predictive back (needs enableOnBackInvokedCallback in the
-    // manifest) and the iOS edge swipe.
-    pageTransitionsTheme: const PageTransitionsTheme(
-      builders: {
-        TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
-        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-      },
-    ),
+    // Screens change in place, with no slide, on every platform.
+    pageTransitionsTheme: _instantPages,
     useMaterial3: true,
     brightness: Brightness.light,
     scaffoldBackgroundColor: AppColors.lightBackground,
