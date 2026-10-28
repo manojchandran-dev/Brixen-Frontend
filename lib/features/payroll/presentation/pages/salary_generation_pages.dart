@@ -23,6 +23,7 @@ import '../payroll_providers.dart';
 import '../../../../shared/widgets/month_picker.dart';
 import 'payslip_page.dart';
 import 'piece_pay_pages.dart';
+import '../widgets/salary_summary_widgets.dart';
 
 final _ym = DateFormat('yyyy-MM');
 
@@ -161,6 +162,9 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
     final runs = ref.watch(payrollRunsProvider);
     final list = runs.valueOrNull ?? const <PayrollRun>[];
     final current = list.where((r) => r.month == _key).firstOrNull;
+    final summary = _piece
+        ? null
+        : ref.watch(salarySummaryProvider(_key)).valueOrNull;
     final past = [
       for (final r in list)
         if (r.id != current?.id) r,
@@ -272,16 +276,21 @@ class _SalaryGenerationPageState extends ConsumerState<SalaryGenerationPage> {
                   onGenerate: () => _generate(list),
                   onOpen: current == null ? null : () => _open(current.id),
                 ),
-              const SizedBox(height: 18),
-              StepGuide(
-                steps: kSalarySteps,
-                current: current == null
-                    ? 0
-                    : current.isFinalized
-                    ? 2
-                    : 1,
-              ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
+              // Each employee's work and pay so far — check before making it.
+              if (summary != null)
+                EmployeeWorkList(
+                  title: _weekly
+                      ? 'Employees this week'
+                      : 'Employees this month',
+                  caption:
+                      'Pay so far from attendance, before bonus or deductions',
+                  items: [
+                    for (final e in summary.items)
+                      if (e.salaryType != SalaryType.piece) e,
+                  ],
+                ),
+              const SizedBox(height: 16),
               const _PayRules(),
               if (past.isNotEmpty) ...[
                 const SizedBox(height: 20),
@@ -805,52 +814,54 @@ class _GenerateSheetState extends State<_GenerateSheet> {
                   ? 'Pay is worked out again from attendance. Additions, '
                         'deductions and notes already entered are kept.'
                   : 'Pay is worked out from attendance: shifts × rate, hours × '
-                        'rate, weekly / monthly salaries by days present — and '
-                        'piece rate from the pieces sold of the products they '
-                        'make.',
+                        'rate, weekly / monthly salaries by days present. '
+                        'Piece-rate staff are paid in the Piece rate tab.',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
             ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Working days',
-                        style: TextStyle(
-                          color: AppColors.ink,
-                          fontWeight: FontWeight.w800,
+            // Working days only matter for a month's salary.
+            if (widget.month.length != 10) ...[
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Working days',
+                          style: TextStyle(
+                            color: AppColors.ink,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                      ),
-                      Text(
-                        'A monthly salary ÷ these days = one day\'s pay. '
-                        'Default: the month less Sundays.',
-                        style: TextStyle(
-                          color: AppColors.textHint,
-                          fontSize: 11.5,
+                        Text(
+                          'A monthly salary ÷ these days = one day\'s pay. '
+                          'Default: the month less Sundays.',
+                          style: TextStyle(
+                            color: AppColors.textHint,
+                            fontSize: 11.5,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                step(Icons.remove_rounded, -1),
-                SizedBox(
-                  width: 44,
-                  child: Text(
-                    '$_days',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppColors.ink,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
+                      ],
                     ),
                   ),
-                ),
-                step(Icons.add_rounded, 1),
-              ],
-            ),
+                  step(Icons.remove_rounded, -1),
+                  SizedBox(
+                    width: 44,
+                    child: Text(
+                      '$_days',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  step(Icons.add_rounded, 1),
+                ],
+              ),
+            ],
             const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: () => Navigator.of(context).pop(_days),

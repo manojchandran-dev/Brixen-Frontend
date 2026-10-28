@@ -3,6 +3,7 @@ import 'package:brixen/features/attendance/presentation/pages/attendance_form_pa
 import 'package:brixen/features/employees/domain/entities/employee.dart';
 import 'package:brixen/features/employees/presentation/providers/employees_provider.dart';
 import 'package:brixen/features/payroll/domain/payroll.dart';
+import 'package:brixen/features/payroll/domain/salary_summary.dart';
 import 'package:brixen/features/payroll/presentation/pages/salary_generation_pages.dart';
 import 'package:brixen/features/payroll/presentation/payroll_providers.dart';
 import 'package:brixen/features/permissions/presentation/providers/module_access_provider.dart';
@@ -99,6 +100,26 @@ void main() {
         overrides: [
           moduleAccessProvider.overrideWith((ref, _) => _full),
           piecePaysMonthProvider.overrideWith((ref, _) async => const []),
+          salesByDayProvider.overrideWith((ref, _) async => const []),
+          salarySummaryProvider.overrideWith(
+            (ref, key) async => SalarySummary(
+              key: key,
+              label: key,
+              workingDays: 26,
+              total: 14400,
+              items: const [
+                EmployeeWork(
+                  id: '1',
+                  code: 'EMP1',
+                  name: 'Ravi',
+                  salaryType: SalaryType.shift,
+                  shifts: 24,
+                  daysPresent: 22,
+                  amount: 14400,
+                ),
+              ],
+            ),
+          ),
           payrollRunsProvider.overrideWith(
             (ref) async => const [
               PayrollRun(
@@ -122,6 +143,9 @@ void main() {
     expect(find.textContaining('salary'), findsWidgets);
     expect(find.text('September 2026'), findsOneWidget);
     expect(find.text('Confirmed'), findsOneWidget);
+    // Each employee's work this month, before making salary.
+    expect(find.text('Ravi'), findsOneWidget);
+    expect(find.textContaining('24 shifts'), findsOneWidget);
 
     // Pay by the week: the picker shows this week, Monday to Sunday.
     await tester.tap(find.text('Weekly'));

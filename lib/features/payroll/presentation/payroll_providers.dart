@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/payroll_remote_datasource.dart';
 import '../domain/payroll.dart';
 import '../domain/piece_pay.dart';
+import '../domain/salary_summary.dart';
 
 /// Every salary month generated, newest first.
 final payrollRunsProvider = FutureProvider.autoDispose<List<PayrollRun>>(
@@ -30,6 +31,7 @@ void refreshPayroll(WidgetRef ref, [String? runId]) {
   ref.invalidate(payrollRunsProvider);
   if (runId != null) ref.invalidate(payrollRunProvider(runId));
   ref.invalidate(salaryReportProvider);
+  ref.invalidate(salarySummaryProvider);
 }
 
 /// A month's ("YYYY-MM") piece pays, drafts and confirmed.
@@ -58,4 +60,23 @@ final myPiecePaysProvider = FutureProvider.autoDispose<List<PiecePay>>(
 void refreshPiecePays(WidgetRef ref) {
   ref.invalidate(piecePaysMonthProvider);
   ref.invalidate(piecePayReportProvider);
+  ref.invalidate(salarySummaryProvider);
 }
+
+/// Each employee's work and pay so far for a period ("2026-10" or a week's
+/// Monday).
+final salarySummaryProvider = FutureProvider.autoDispose
+    .family<SalarySummary, String>(
+      (ref, key) => ref.read(payrollDatasourceProvider).summary(key),
+    );
+
+/// A month's ("YYYY-MM") sales by day and product, for entering piece pay.
+final salesByDayProvider = FutureProvider.autoDispose
+    .family<List<SoldLine>, String>((ref, month) {
+      final y = int.parse(month.substring(0, 4));
+      final m = int.parse(month.substring(5, 7));
+      final last = DateTime(y, m + 1, 0).day.toString().padLeft(2, '0');
+      return ref
+          .read(payrollDatasourceProvider)
+          .sales(from: '$month-01', to: '$month-$last');
+    });

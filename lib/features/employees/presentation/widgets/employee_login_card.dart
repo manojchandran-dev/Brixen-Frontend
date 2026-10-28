@@ -119,6 +119,13 @@ class _EmployeeLoginCardState extends ConsumerState<EmployeeLoginCard> {
         ref.watch(moduleAccessProvider('Employees')).edit;
     final hasEmail = (e.email ?? '').trim().isNotEmpty;
     final failed = e.loginActive && e.setupEmailError != null;
+    // The employee's email was changed after the login was set up: they
+    // still sign in with the old one until a new password is sent.
+    final emailChanged =
+        e.loginActive &&
+        hasEmail &&
+        e.loginEmail != null &&
+        e.loginEmail!.toLowerCase() != e.email!.trim().toLowerCase();
     final (IconData icon, Color color, String status) = !e.loginActive
         ? (
             Icons.no_accounts,
@@ -126,6 +133,14 @@ class _EmployeeLoginCardState extends ConsumerState<EmployeeLoginCard> {
             e.loginEmail != null
                 ? 'Access removed (${e.loginEmail})'
                 : 'No login yet',
+          )
+        : emailChanged
+        ? (
+            Icons.alternate_email_rounded,
+            AppColors.brandDeep,
+            'Email changed to ${e.email!.trim()}. They still sign in as '
+                '${e.loginEmail} — tap Send new password to move the login '
+                'to the new email.',
           )
         : failed
         ? (

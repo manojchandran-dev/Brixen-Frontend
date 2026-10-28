@@ -22,7 +22,9 @@ import '../../../products/domain/entities/product.dart';
 import '../../../products/presentation/providers/products_provider.dart';
 import '../../data/payroll_remote_datasource.dart';
 import '../../domain/piece_pay.dart';
+import '../../domain/salary_summary.dart';
 import '../payroll_providers.dart';
+import '../widgets/salary_summary_widgets.dart';
 
 final _ym = DateFormat('yyyy-MM');
 final _ymd = DateFormat('yyyy-MM-dd');
@@ -47,6 +49,8 @@ class PiecePayView extends ConsumerWidget {
     final access = ref.watch(moduleAccessProvider('Employees'));
     final key = _ym.format(month);
     final async = ref.watch(piecePaysMonthProvider(key));
+    final sold = ref.watch(salesByDayProvider(key)).valueOrNull;
+    final summary = ref.watch(salarySummaryProvider(key)).valueOrNull;
     final items = async.valueOrNull ?? const <PiecePay>[];
     final total = items.fold<double>(0, (a, p) => a + p.amount);
     final pieces = items.fold<int>(0, (a, p) => a + p.pieces);
@@ -108,6 +112,20 @@ class PiecePayView extends ConsumerWidget {
             ),
           ),
         ],
+        // Enter piece pay from what sold, day by day.
+        if (sold != null) ...[
+          const SizedBox(height: 14),
+          SalesByDayList(
+            lines: sold,
+            onPick: access.create
+                ? (l) => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => PiecePayFormPage(sold: l),
+                    ),
+                  )
+                : null,
+          ),
+        ],
         if (drafts > 0) ...[
           const SizedBox(height: 10),
           Text(
@@ -148,6 +166,18 @@ class PiecePayView extends ConsumerWidget {
                   ],
                 ),
         ),
+        // Each piece-rate employee's pieces and pay this month.
+        if (summary != null) ...[
+          const SizedBox(height: 6),
+          EmployeeWorkList(
+            title: 'Each piece-rate employee',
+            caption: 'Pieces and piece pay this month',
+            items: [
+              for (final e in summary.items)
+                if (e.salaryType == SalaryType.piece) e,
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -585,10 +615,12 @@ class _PiecePayDetailPageState extends ConsumerState<PiecePayDetailPage> {
 
 /// Add or edit a piece pay: employee (piece rate), work type (its rate),
 /// pieces or combos of a product, the date — with the working as you type.
-/// Pops the saved [PiecePay].
+/// Pops the saved [PiecePay]. [sold]: start from a product sold that day
+/// (its date, quantity, and product when sold in combos).
 class PiecePayFormPage extends ConsumerStatefulWidget {
   final PiecePay? edit;
-  const PiecePayFormPage({super.key, this.edit});
+  final SoldLine? sold;
+  const PiecePayFormPage({super.key, this.edit, this.sold});
 
   @override
   ConsumerState<PiecePayFormPage> createState() => _PiecePayFormPageState();
@@ -597,16 +629,28 @@ class PiecePayFormPage extends ConsumerStatefulWidget {
 class _PiecePayFormPageState extends ConsumerState<PiecePayFormPage> {
   final _form = GlobalKey<FormState>();
   late final _qty = TextEditingController(
-    text: widget.edit?.quantity.toString() ?? '',
+    text:
+        widget.edit?.quantity.toString() ??
+        (widget.sold == null
+            ? ''
+            : '${widget.sold!.isCombo ? widget.sold!.quantity : widget.sold!.pieces}'),
   );
-  late final _notes = TextEditingController(text: widget.edit?.notes ?? '');
+  late final _notes = TextEditingController(
+    text:
+        widget.edit?.notes ??
+        (widget.sold == null ? '' : 'Sold: ${widget.sold!.productName}'),
+  );
   late String? _employeeId = widget.edit?.employeeId;
   late String? _workTypeId = widget.edit?.workTypeId;
-  late String? _productId = widget.edit?.productId;
-  late bool _combo = widget.edit?.isCombo ?? false;
-  late DateTime _date = widget.edit == null
-      ? DateTime.now()
-      : DateTime.parse(widget.edit!.payDate);
+  late String? _productId =
+      widget.edit?.productId ??
+      (widget.sold?.isCombo ?? false ? widget.sold!.productId : null);
+  late bool _combo = widget.edit?.isCombo ?? widget.sold?.isCombo ?? false;
+  late DateTime _date = widget.edit != null
+      ? DateTime.parse(widget.edit!.payDate)
+      : widget.sold != null
+      ? DateTime.parse(widget.sold!.date)
+      : DateTime.now();
   bool _saving = false;
 
   bool get _isEdit => widget.edit != null;

@@ -56,6 +56,9 @@ class ApiEndpoints {
   static String piecePayAction(String id, String action) =>
       '/api/v1/payroll/piece-pays/$id/$action';
   static const String myPiecePays = '/api/v1/me/piece-pays';
+  // Each employee's work for a period; sales by day.
+  static const String payrollSummary = '/api/v1/payroll/summary';
+  static const String payrollSales = '/api/v1/payroll/sales';
   static String employeePermissions(String employeeId) =>
       '/api/v1/employee-permissions/$employeeId';
   static String employeeLoginActivate(String id) =>

@@ -4,6 +4,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../domain/payroll.dart';
 import '../domain/piece_pay.dart';
+import '../domain/salary_summary.dart';
 
 final payrollDatasourceProvider = Provider<PayrollRemoteDatasource>(
   (ref) => PayrollRemoteDatasource(ref.read(dioProvider)),
@@ -178,6 +179,34 @@ class PayrollRemoteDatasource {
       _data(await _dio.post(ApiEndpoints.piecePayAction(id, action))),
     ),
   );
+
+  /// Each employee's work and pay so far for a period ([key]: "2026-10" or a
+  /// week's Monday).
+  Future<SalarySummary> summary(String key) => _call(
+    () async => SalarySummary.fromJson(
+      _data(
+        await _dio.get(
+          ApiEndpoints.payrollSummary,
+          queryParameters: _period(key),
+        ),
+      ),
+    ),
+  );
+
+  /// What sold from [from] to [to] ("YYYY-MM-DD"), by day and product.
+  Future<List<SoldLine>> sales({required String from, required String to}) =>
+      _call(() async {
+        final data = _data(
+          await _dio.get(
+            ApiEndpoints.payrollSales,
+            queryParameters: {'from': from, 'to': to},
+          ),
+        );
+        return [
+          for (final s in (data['items'] as List? ?? const []))
+            SoldLine.fromJson((s as Map).cast<String, dynamic>()),
+        ];
+      });
 
   /// The signed-in employee's confirmed piece pays.
   Future<List<PiecePay>> myPiecePays() => _call(
