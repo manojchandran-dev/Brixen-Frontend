@@ -1284,3 +1284,216 @@ class _ProfitRowTile extends StatelessWidget {
     );
   }
 }
+
+// ── Salary report ─────────────────────────────────────────────────────────
+
+/// One person's pay in the period: confirmed salary payslips and piece pay.
+class _PersonPay {
+  final String id, name, code;
+  final Set<String> types = {};
+  double salary = 0, piece = 0;
+  int payslips = 0, pieceEntries = 0, pieces = 0;
+  _PersonPay(this.id, this.name, this.code);
+  double get total => salary + piece;
+}
+
+/// Salary report: what was paid in the period (confirmed salary months and
+/// weeks, by their end date, plus confirmed piece pay, by its date) — the
+/// total, pay over time, by salary type, and per person with each payslip
+/// and piece pay. Week, month or custom dates come from the report filter.
+class CompanySalaryReport extends ConsumerWidget {
+  const CompanySalaryReport({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final slipsAsync = ref.watch(salaryReportProvider);
+    final piecesAsync = ref.watch(piecePayReportProvider);
+    return CompanyReportScreen(
+      loading: slipsAsync.isLoading && !slipsAsync.hasValue,
+      error: slipsAsync.hasValue ? null : slipsAsync.error,
+      onRetry: () {
+        ref.invalidate(salaryReportProvider);
+        ref.invalidate(piecePayReportProvider);
+      },
+      body: (period) {
+        final now = DateTime.now();
+        final slips = [
+          for (final p in slipsAsync.valueOrNull ?? const <Payslip>[])
+            if (inPeriod(p.periodTo, period, now)) p,
+        ];
+        final pieces = [
+          for (final p in piecesAsync.valueOrNull ?? const <PiecePay>[])
+            if (inPeriod(DateTime.parse(p.payDate), period, now)) p,
+        ];
+        final people = <String, _PersonPay>{};
+        for (final s in slips) {
+          final p = people.putIfAbsent(
+            s.employeeId,
+            () => _PersonPay(s.employeeId, s.employeeName, s.employeeCode),
+          );
+          p.salary += s.net;
+          p.payslips++;
+          p.types.add(s.salaryType);
+        }
+        for (final x in pieces) {
+          final p = people.putIfAbsent(
+            x.employeeId,
+            () => _PersonPay(x.employeeId, x.employeeName, x.employeeCode),
+          );
+          p.piece += x.amount;
+          p.pieceEntries++;
+          p.pieces += x.pieces;
+          p.types.add(SalaryType.piece);
+        }
+        final salaryTotal = slips.fold<double>(0, (a, s) => a + s.net);
+        final pieceTotal = pieces.fold<double>(0, (a, x) => a + x.amount);
+        final total = salaryTotal + pieceTotal;
+        final byType = <String, Tally>{};
+        for (final s in slips) {
+          byType
+              .putIfAbsent(
+                s.salaryType,
+                () => Tally(SalaryType.label(s.salaryType)),
+              )
+              .add(amount: s.net);
+        }
+        if (pieces.isNotEmpty) {
+          byType[SalaryType.piece] = Tally(SalaryType.label(SalaryType.piece))
+            ..add(amount: pieceTotal, count: pieces.length);
+        }
+        final types = byType.values.toList()
+          ..sort((a, b) => b.amount.compareTo(a.amount));
+        final list = people.values.toList()
+          ..sort((a, b) => b.total.compareTo(a.total));
+
+        return [
+          ReportSummary([
+            ReportStat(
+              Icons.payments_rounded,
+              'Total pay',
+              rupees(total),
+              AppColors.positiveDeep,
+              amount: total,
+            ),
+            ReportStat(
+              Icons.receipt_long_rounded,
+              'Salary · ${slips.length} payslips',
+              rupees(salaryTotal),
+              AppColors.brand,
+              amount: salaryTotal,
+            ),
+            ReportStat(
+              Icons.content_cut_rounded,
+              'Piece pay · ${pieces.length}',
+              rupees(pieceTotal),
+              AppColors.positive,
+              amount: pieceTotal,
+            ),
+            ReportStat(
+              Icons.groups_rounded,
+              'People paid',
+              '${people.length}',
+              AppColors.brandDeep,
+            ),
+          ]),
+          ReportCard(
+            title: 'Pay by date',
+            caption: 'Salary (by period end) and piece pay',
+            child: ReportTrendChart(
+              buckets: amountBuckets(
+                [
+                  for (final s in slips) (s.periodTo, s.net),
+                  for (final x in pieces) (DateTime.parse(x.payDate), x.amount),
+                ],
+                period,
+                now,
+              ),
+              valueLabel: _money,
+            ),
+          ),
+          if (types.isNotEmpty)
+            ReportCard(
+              title: 'By salary type',
+              caption: 'Share of pay',
+              child: _amountDonut(types),
+            ),
+          ReportList<_PersonPay>(
+            title: 'Each person',
+            caption: '${list.length} paid · total ${rupees(total)}',
+            items: list,
+            searchText: (p) => '${p.name} ${p.code}',
+            sorts: [
+              ReportSort('Highest', (a, b) => b.total.compareTo(a.total)),
+              ReportSort(
+                'Name',
+                (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+              ),
+            ],
+            row: (p, i) => _RankRow(
+              rank: i + 1,
+              title: p.name,
+              subtitle: [
+                p.types.map(SalaryType.label).join(', '),
+                if (p.payslips > 0)
+                  'Salary ${rupees(p.salary)} (${p.payslips})',
+                if (p.pieceEntries > 0)
+                  'Piece ${rupees(p.piece)} · ${p.pieces} pcs',
+              ].join(' · '),
+              value: rupees(p.total),
+              amount: p.total,
+            ),
+          ),
+          if (slips.isNotEmpty)
+            ReportList<Payslip>(
+              title: 'Salary payslips',
+              pageSize: 5,
+              caption: '${slips.length} in this period',
+              items: slips,
+              searchText: (p) =>
+                  '${p.employeeName} ${p.employeeCode} ${monthLabel(p.month)}',
+              sorts: [
+                ReportSort(
+                  'Newest',
+                  (a, b) => b.periodTo.compareTo(a.periodTo),
+                ),
+                ReportSort('Highest', (a, b) => b.net.compareTo(a.net)),
+              ],
+              row: (p, _) => ReportRow(
+                icon: salaryTypeIcon(p.salaryType),
+                color: salaryTypeColor(p.salaryType),
+                title: p.employeeName,
+                subtitle:
+                    '${monthLabel(p.month)} · ${SalaryType.label(p.salaryType)} · '
+                    '${p.workLabel}',
+                trailing: rupees(p.net),
+                trailingAmount: p.net,
+              ),
+            ),
+          if (pieces.isNotEmpty)
+            ReportList<PiecePay>(
+              title: 'Piece pay',
+              pageSize: 5,
+              caption: '${pieces.length} in this period',
+              items: pieces,
+              searchText: (p) =>
+                  '${p.employeeName} ${p.employeeCode} ${p.workTypeName}',
+              sorts: [
+                ReportSort('Newest', (a, b) => b.payDate.compareTo(a.payDate)),
+                ReportSort('Highest', (a, b) => b.amount.compareTo(a.amount)),
+              ],
+              row: (p, _) => ReportRow(
+                icon: Icons.content_cut_rounded,
+                color: salaryTypeColor(SalaryType.piece),
+                title: p.employeeName,
+                subtitle:
+                    '${_day.format(DateTime.parse(p.payDate))} · ${p.workTypeName} · '
+                    '${p.pieces} pcs × ${rupeesExact(p.rate)}',
+                trailing: rupees(p.amount),
+                trailingAmount: p.amount,
+              ),
+            ),
+        ];
+      },
+    );
+  }
+}

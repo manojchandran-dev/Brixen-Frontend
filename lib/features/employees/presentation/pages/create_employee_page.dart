@@ -181,8 +181,10 @@ class _CreateEmployeePageState extends ConsumerState<CreateEmployeePage> {
   ];
 
   Future<void> _handleNext() async {
-    if (_currentFormKey != null && !_currentFormKey!.currentState!.validate())
+    if (_currentFormKey != null &&
+        !_currentFormKey!.currentState!.validate()) {
       return;
+    }
     if (_currentStep == 0 &&
         !_isEditing &&
         Session.isSuperAdmin &&

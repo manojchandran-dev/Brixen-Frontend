@@ -43,16 +43,6 @@ String accountDisplayName(AccountSnapshot a) {
   }
 }
 
-String _roleLabel(AccountSnapshot a) {
-  final role = switch (UserRoleX.fromString(a.userType ?? a.role)) {
-    UserRole.superAdmin => 'Super Admin',
-    UserRole.companyAdmin => 'Company Admin',
-    UserRole.employee => 'Employee',
-  };
-  final company = a.companyName;
-  return company == null || company.isEmpty ? role : '$role · $company';
-}
-
 String _initials(String name) {
   final parts = name
       .trim()
@@ -175,9 +165,9 @@ class _AccountSwitcherSheetState extends State<_AccountSwitcherSheet> {
         padding: const EdgeInsets.all(12),
         child: Container(
           constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * 0.8,
+            maxHeight: MediaQuery.sizeOf(context).height * 0.85,
           ),
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(26),
@@ -191,7 +181,7 @@ class _AccountSwitcherSheetState extends State<_AccountSwitcherSheet> {
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Center(
                 child: Container(
@@ -203,38 +193,61 @@ class _AccountSwitcherSheetState extends State<_AccountSwitcherSheet> {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Accounts',
-                style: TextStyle(
-                  color: AppColors.ink,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                others.isEmpty
-                    ? 'Add another account to switch between them'
-                    : 'Tap an account to switch to it',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12.5,
-                ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.brand.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.switch_account_rounded,
+                      color: AppColors.brand,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Accounts',
+                          style: TextStyle(
+                            color: AppColors.ink,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          others.isEmpty
+                              ? 'Add another account to switch between them'
+                              : 'Tap Switch to change account',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 14),
               Flexible(
                 child: SingleChildScrollView(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       if (active != null) _ActiveAccountCard(account: active),
                       if (others.isNotEmpty) ...[
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 16),
                         Padding(
-                          padding: const EdgeInsets.only(left: 4, bottom: 4),
+                          padding: const EdgeInsets.only(left: 4, bottom: 8),
                           child: Text(
-                            'OTHER ACCOUNTS',
+                            'OTHER ACCOUNTS · ${others.length}',
                             style: TextStyle(
                               color: AppColors.textHint,
                               fontSize: 11,
@@ -244,36 +257,39 @@ class _AccountSwitcherSheetState extends State<_AccountSwitcherSheet> {
                           ),
                         ),
                         for (final a in others)
-                          _AccountRow(
-                            account: a,
-                            switching: _switching == a.email,
-                            enabled: _switching == null,
-                            onTap: () => _switchTo(a.email),
-                            onRemove: () => _removeAccount(a),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _AccountRow(
+                              account: a,
+                              switching: _switching == a.email,
+                              enabled: _switching == null,
+                              onTap: () => _switchTo(a.email),
+                              onRemove: () => _removeAccount(a),
+                            ),
                           ),
                       ],
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _switching == null ? _addAccount : null,
-                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 20),
-                  label: const Text('Add another account'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.brand,
-                    side: BorderSide(color: AppColors.border),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: _switching == null ? _addAccount : null,
+                icon: const Icon(Icons.person_add_alt_1_rounded, size: 20),
+                label: const Text('Add another account'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.brand,
+                  side: BorderSide(
+                    color: AppColors.brand.withValues(alpha: 0.35),
+                  ),
+                  backgroundColor: AppColors.brand.withValues(alpha: 0.05),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
@@ -285,36 +301,99 @@ class _AccountSwitcherSheetState extends State<_AccountSwitcherSheet> {
   }
 }
 
+/// A role's colour: company admins blue, employees green, superadmin dark.
+Color _roleColor(AccountSnapshot a) =>
+    switch (UserRoleX.fromString(a.userType ?? a.role)) {
+      UserRole.superAdmin => AppColors.brandDeep,
+      UserRole.companyAdmin => AppColors.brand,
+      UserRole.employee => AppColors.positiveDeep,
+    };
+
+String _roleName(AccountSnapshot a) =>
+    switch (UserRoleX.fromString(a.userType ?? a.role)) {
+      UserRole.superAdmin => 'Super Admin',
+      UserRole.companyAdmin => 'Company Admin',
+      UserRole.employee => 'Employee',
+    };
+
 class _Avatar extends StatelessWidget {
   final String name;
+  final Color color;
   final double size;
-  const _Avatar(this.name, {this.size = 42});
+
+  /// On a coloured card: a white-tinted circle.
+  final bool onColour;
+  const _Avatar(
+    this.name, {
+    required this.color,
+    this.size = 44,
+    this.onColour = false,
+  });
 
   @override
   Widget build(BuildContext context) => Container(
     width: size,
     height: size,
     alignment: Alignment.center,
-    decoration: const BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [AppColors.brand, AppColors.brandDeep],
-      ),
+    decoration: BoxDecoration(
+      gradient: onColour
+          ? null
+          : LinearGradient(colors: AppColors.accentGradient(color)),
+      color: onColour ? Colors.white.withValues(alpha: 0.22) : null,
       shape: BoxShape.circle,
+      border: onColour
+          ? Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.5)
+          : null,
     ),
     child: Text(
       _initials(name),
       style: TextStyle(
         color: AppColors.white,
-        fontWeight: FontWeight.w800,
-        fontSize: size * 0.33,
+        fontWeight: FontWeight.w900,
+        fontSize: size * 0.34,
       ),
     ),
   );
 }
 
-/// The signed-in account, highlighted at the top.
+/// A small rounded label: the role or the company.
+class _Chip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color fg, bg;
+  const _Chip(this.icon, this.text, {required this.fg, required this.bg});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: bg,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: fg),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: fg,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// The signed-in account, on its role's colour at the top: name, role and
+/// company, and the full email.
 class _ActiveAccountCard extends StatelessWidget {
   final AccountSnapshot account;
   const _ActiveAccountCard({required this.account});
@@ -322,72 +401,115 @@ class _ActiveAccountCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = accountDisplayName(account);
+    final color = _roleColor(account);
+    final company = account.companyName;
+    final chipBg = Colors.white.withValues(alpha: 0.2);
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.brand.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.brand.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        children: [
-          _Avatar(name, size: 48),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _roleLabel(account),
-                  maxLines: 3,
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  account.email,
-                  maxLines: 3,
-                  style: TextStyle(color: AppColors.textHint, fontSize: 12),
-                ),
-              ],
-            ),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: AppColors.accentGradient(color),
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.3),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.positive.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.check_circle_rounded,
-                  size: 14,
-                  color: AppColors.positive,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _Avatar(name, color: color, size: 50, onColour: true),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 2,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        _Chip(
+                          Icons.verified_user_rounded,
+                          _roleName(account),
+                          fg: Colors.white,
+                          bg: chipBg,
+                        ),
+                        if (company != null && company.isNotEmpty)
+                          _Chip(
+                            Icons.storefront_rounded,
+                            company,
+                            fg: Colors.white,
+                            bg: chipBg,
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
-                SizedBox(width: 4),
-                Text(
-                  'Active',
-                  style: TextStyle(
-                    color: AppColors.positive,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w800,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.alternate_email_rounded,
+                  size: 16,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    account.email,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
+                ),
+                const SizedBox(width: 8),
+                const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.check_circle_rounded,
+                      size: 14,
+                      color: Colors.white,
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      'Signed in',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -398,6 +520,8 @@ class _ActiveAccountCard extends StatelessWidget {
   }
 }
 
+/// Another saved account: who, role and company, the full email, and a
+/// Switch button; ⋮ removes it from this device.
 class _AccountRow extends StatelessWidget {
   final AccountSnapshot account;
   final bool switching;
@@ -415,16 +539,26 @@ class _AccountRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = accountDisplayName(account);
+    final color = _roleColor(account);
+    final company = account.companyName;
     return Material(
-      type: MaterialType.transparency,
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: enabled ? onTap : null,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(4, 10, 0, 10),
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
+            gradient: LinearGradient(
+              colors: [color.withValues(alpha: 0.10), AppColors.surface],
+            ),
+          ),
           child: Row(
             children: [
-              _Avatar(name),
+              _Avatar(name, color: color),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -432,34 +566,42 @@ class _AccountRow extends StatelessWidget {
                   children: [
                     Text(
                       name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
                       style: TextStyle(
                         color: AppColors.ink,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 1),
-                    Text(
-                      switching ? 'Switching…' : _roleLabel(account),
-                      maxLines: 3,
-                      style: TextStyle(
-                        color: switching
-                            ? AppColors.brand
-                            : AppColors.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        _Chip(
+                          Icons.verified_user_rounded,
+                          switching ? 'Switching…' : _roleName(account),
+                          fg: color,
+                          bg: color.withValues(alpha: 0.12),
+                        ),
+                        if (company != null && company.isNotEmpty)
+                          _Chip(
+                            Icons.storefront_rounded,
+                            company,
+                            fg: AppColors.textSecondary,
+                            bg: AppColors.surfaceElevated,
+                          ),
+                      ],
                     ),
+                    const SizedBox(height: 4),
                     Text(
                       account.email,
-                      maxLines: 3,
                       style: TextStyle(color: AppColors.textHint, fontSize: 12),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 6),
               if (switching)
                 const Padding(
                   padding: EdgeInsets.all(14),
@@ -469,7 +611,24 @@ class _AccountRow extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                 )
-              else
+              else ...[
+                FilledButton(
+                  onPressed: enabled ? onTap : null,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: color,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    minimumSize: const Size(0, 34),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  child: const Text('Switch'),
+                ),
                 PopupMenuButton<String>(
                   enabled: enabled,
                   tooltip: 'More',
@@ -491,6 +650,7 @@ class _AccountRow extends StatelessWidget {
                     ),
                   ],
                 ),
+              ],
             ],
           ),
         ),

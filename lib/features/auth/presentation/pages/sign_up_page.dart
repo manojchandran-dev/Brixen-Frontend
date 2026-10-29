@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/theme_cubit.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../shared/widgets/brixen_button.dart';
 import '../../../../shared/widgets/brixen_text_field.dart';
@@ -232,35 +231,6 @@ class _SignUpViewState extends State<_SignUpView> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _ThemeToggle extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<ThemeCubit, ThemeMode>(
-      bloc: themeCubit,
-      builder: (context, mode) {
-        final isDark = mode == ThemeMode.dark;
-        return GestureDetector(
-          onTap: () => themeCubit.toggle(),
-          child: Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(11),
-              border: Border.all(color: Theme.of(context).dividerColor),
-            ),
-            child: Icon(
-              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-              color: Theme.of(context).colorScheme.primary,
-              size: 20,
-            ),
-          ),
-        );
-      },
     );
   }
 }

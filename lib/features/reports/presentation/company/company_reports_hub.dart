@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import 'company_report_pages.dart';
 
-/// Company Reports: the six reports on one page, one tab each — tap a tab
+/// Company Reports: the seven reports on one page, one tab each — tap a tab
 /// or swipe sideways. Each tab has the date filter (shared across tabs) and
 /// its detailed lists. The Dashboard stays the quick status view.
 class CompanyReportsHub extends StatelessWidget {
@@ -15,6 +15,7 @@ class CompanyReportsHub extends StatelessWidget {
     (Icons.people_alt_rounded, 'Customers'),
     (Icons.checkroom_rounded, 'Products'),
     (Icons.badge_rounded, 'Employees'),
+    (Icons.payments_rounded, 'Salary'),
   ];
 
   @override
@@ -84,6 +85,7 @@ class CompanyReportsHub extends StatelessWidget {
                 CompanyCustomerReport(),
                 CompanyProductReport(),
                 CompanyEmployeeReport(),
+                CompanySalaryReport(),
               ],
             ),
           ),

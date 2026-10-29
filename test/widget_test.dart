@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:brixen/core/theme/app_colors.dart';
 import 'package:brixen/core/theme/app_theme.dart';
 import 'package:brixen/core/theme/theme_cubit.dart';
+import 'package:brixen/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:brixen/features/auth/presentation/pages/sign_in_page.dart';
 import 'package:brixen/features/auth/presentation/pages/sign_up_page.dart';
 import 'package:brixen/shared/widgets/brixen_button.dart';
 import 'package:brixen/shared/widgets/brixen_text_field.dart';
 
 // Top-level helper — accessible in every group
-Widget themed(Widget child, {ThemeMode mode = ThemeMode.dark}) {
+Widget themed(Widget child, {ThemeMode mode = ThemeMode.light}) {
   return MaterialApp(
     theme: AppTheme.light,
     darkTheme: AppTheme.dark,
@@ -18,16 +21,21 @@ Widget themed(Widget child, {ThemeMode mode = ThemeMode.dark}) {
   );
 }
 
+// The sign-in page, with the AuthCubit the app provides above it.
+Widget signIn() => themed(
+  BlocProvider(create: (_) => AuthCubit(), child: const SignInPage()),
+);
+
 void main() {
   // ── AppColors ────────────────────────────────────────────────────
 
   group('AppColors', () {
     test('dark background is near-black', () {
-      expect(AppColors.background, const Color(0xFF0C0C0C));
+      expect(AppColors.darkBackground, const Color(0xFF10161A));
     });
 
-    test('light background is near-white silver', () {
-      expect(AppColors.lightBackground, const Color(0xFFF0F0F0));
+    test('light background is near-white', () {
+      expect(AppColors.lightBackground, const Color(0xFFF3F7F9));
     });
 
     test('silver gradient has 4 stops', () {
@@ -40,24 +48,27 @@ void main() {
   group('ThemeCubit', () {
     late ThemeCubit cubit;
 
-    setUp(() => cubit = ThemeCubit());
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+      cubit = ThemeCubit();
+    });
     tearDown(() => cubit.close());
 
-    test('initial state is dark', () {
-      expect(cubit.state, ThemeMode.dark);
-      expect(cubit.isDark, true);
-    });
-
-    test('toggle switches to light', () {
-      cubit.toggle();
+    test('initial state is light', () {
       expect(cubit.state, ThemeMode.light);
       expect(cubit.isDark, false);
     });
 
-    test('double toggle returns to dark', () {
-      cubit.toggle();
+    test('toggle switches to dark', () {
       cubit.toggle();
       expect(cubit.state, ThemeMode.dark);
+      expect(cubit.isDark, true);
+    });
+
+    test('double toggle returns to light', () {
+      cubit.toggle();
+      cubit.toggle();
+      expect(cubit.state, ThemeMode.light);
     });
 
     test('setMode works for any ThemeMode', () {
@@ -70,19 +81,19 @@ void main() {
 
   group('AppTheme', () {
     test('dark theme scaffold background', () {
-      expect(AppTheme.dark.scaffoldBackgroundColor, AppColors.background);
+      expect(AppTheme.dark.scaffoldBackgroundColor, AppColors.darkBackground);
     });
 
     test('light theme scaffold background', () {
       expect(AppTheme.light.scaffoldBackgroundColor, AppColors.lightBackground);
     });
 
-    test('dark primary color is silver', () {
-      expect(AppTheme.dark.colorScheme.primary, AppColors.silver);
+    test('dark primary color is the light brand blue', () {
+      expect(AppTheme.dark.colorScheme.primary, AppColors.silverLight);
     });
 
-    test('light primary color is near-black', () {
-      expect(AppTheme.light.colorScheme.primary, const Color(0xFF111111));
+    test('light primary color is the brand blue', () {
+      expect(AppTheme.light.colorScheme.primary, AppColors.brand);
     });
   });
 
@@ -158,26 +169,38 @@ void main() {
   // ── SignInPage ───────────────────────────────────────────────────
 
   group('SignInPage', () {
+    // A phone-sized screen, so the Sign in button is on it.
+    setUp(() {
+      final view = TestWidgetsFlutterBinding.instance.platformDispatcher.views.first;
+      view.physicalSize = const Size(1080, 2400);
+      view.devicePixelRatio = 2.75;
+    });
+    tearDown(() {
+      final view = TestWidgetsFlutterBinding.instance.platformDispatcher.views.first;
+      view.resetPhysicalSize();
+      view.resetDevicePixelRatio();
+    });
+
     testWidgets('renders email and password fields', (tester) async {
-      await tester.pumpWidget(themed(const SignInPage()));
+      await tester.pumpWidget(signIn());
       await tester.pump();
-      expect(find.text('Email'), findsOneWidget);
+      expect(find.text('Email address'), findsOneWidget);
       expect(find.text('Password'), findsOneWidget);
     });
 
     testWidgets('empty submit shows email required error', (tester) async {
-      await tester.pumpWidget(themed(const SignInPage()));
+      await tester.pumpWidget(signIn());
       await tester.pump();
-      await tester.tap(find.text('Sign In'));
+      await tester.tap(find.text('Sign in'));
       await tester.pump();
       expect(find.text('Email is required'), findsOneWidget);
     });
 
     testWidgets('invalid email shows format error', (tester) async {
-      await tester.pumpWidget(themed(const SignInPage()));
+      await tester.pumpWidget(signIn());
       await tester.pump();
       await tester.enterText(find.byType(TextFormField).first, 'notanemail');
-      await tester.tap(find.text('Sign In'));
+      await tester.tap(find.text('Sign in'));
       await tester.pump();
       expect(find.text('Enter a valid email'), findsOneWidget);
     });

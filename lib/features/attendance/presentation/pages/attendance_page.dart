@@ -45,6 +45,11 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
   final _searchCtrl = TextEditingController();
   Timer? _debounce;
 
+  /// The last month loaded: kept on screen while a search or filter
+  /// reloads the same month, so nothing flickers.
+  AttendanceList? _last;
+  String? _lastMonth;
+
   AttendanceQuery get _query =>
       (month: _ym.format(_month), search: _search, kind: _kind);
 
@@ -98,7 +103,12 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
   Widget build(BuildContext context) {
     final access = ref.watch(moduleAccessProvider('Attendance'));
     final async = ref.watch(attendanceMonthProvider(_query));
-    final month = async.valueOrNull;
+    final fresh = async.valueOrNull;
+    if (fresh != null) {
+      _last = fresh;
+      _lastMonth = _ym.format(_month);
+    }
+    final month = fresh ?? (_lastMonth == _ym.format(_month) ? _last : null);
     final today = month?.today;
     // Default: today when this is the current month, else the 1st.
     final selected =
@@ -147,18 +157,29 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
           children: [
-            _CalendarCard(
-              month: _month,
-              selected: selected,
-              today: today,
-              items: month?.items ?? const [],
-              loading: month == null,
-              onPrev: () =>
-                  _shiftMonth(-1, today ?? _ymd.format(DateTime.now())),
-              onNext: () =>
-                  _shiftMonth(1, today ?? _ymd.format(DateTime.now())),
-              onPick: (d) => setState(() => _selected = d),
-            ),
+            // A month loading for the first time: a skeleton, not an empty
+            // calendar that then jumps.
+            if (month == null && !async.hasError)
+              const Shimmer(
+                child: SkeletonBox(
+                  width: double.infinity,
+                  height: 470,
+                  radius: 22,
+                ),
+              )
+            else
+              _CalendarCard(
+                month: _month,
+                selected: selected,
+                today: today,
+                items: month?.items ?? const [],
+                loading: month == null,
+                onPrev: () =>
+                    _shiftMonth(-1, today ?? _ymd.format(DateTime.now())),
+                onNext: () =>
+                    _shiftMonth(1, today ?? _ymd.format(DateTime.now())),
+                onPick: (d) => setState(() => _selected = d),
+              ),
             const SizedBox(height: 14),
             SearchField(
               controller: _searchCtrl,
@@ -179,36 +200,53 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
             const SizedBox(height: 16),
             _DayHeader(day: selected, isToday: selected == today),
             const SizedBox(height: 10),
-            async.when(
-              skipError: true,
-              loading: () => const Shimmer(
-                child: SkeletonBox(width: double.infinity, height: 160),
-              ),
-              error: (e, _) => ErrorCard(
-                error: e,
+            if (month == null && async.hasError)
+              ErrorCard(
+                error: async.error!,
                 onRetry: () => ref.invalidate(attendanceMonthProvider(_query)),
-              ),
-              data: (list) => Column(
-                children: [
-                  _DaySummary(dayItems),
-                  const SizedBox(height: 12),
-                  if (dayItems.isEmpty)
-                    // Recording is the + at the top.
-                    _Empty(searching: _search.isNotEmpty || _kind != null)
-                  else
-                    for (final r in dayItems)
+              )
+            else if (month == null)
+              Shimmer(
+                child: Column(
+                  children: [
+                    for (final h in const [70.0, 150.0, 150.0])
                       Padding(
                         padding: const EdgeInsets.only(bottom: 10),
-                        child: AttendanceCard(
-                          record: r,
-                          onTap: access.edit || access.delete
-                              ? () => _openForm(list, selected, edit: r)
-                              : null,
+                        child: SkeletonBox(
+                          width: double.infinity,
+                          height: h,
+                          radius: 16,
                         ),
                       ),
-                ],
+                  ],
+                ),
+              )
+            else
+              Builder(
+                builder: (context) {
+                  final list = month;
+                  return Column(
+                    children: [
+                      _DaySummary(dayItems),
+                      const SizedBox(height: 12),
+                      if (dayItems.isEmpty)
+                        // Recording is the + at the top.
+                        _Empty(searching: _search.isNotEmpty || _kind != null)
+                      else
+                        for (final r in dayItems)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: AttendanceCard(
+                              record: r,
+                              onTap: access.edit || access.delete
+                                  ? () => _openForm(list, selected, edit: r)
+                                  : null,
+                            ),
+                          ),
+                    ],
+                  );
+                },
               ),
-            ),
           ],
         ),
       ),
